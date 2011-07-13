@@ -1,0 +1,10 @@
+
+
+
+# Compiled files
+x64/
+*.exe
+*.pdb
+
+# Local user options
+*.suo
