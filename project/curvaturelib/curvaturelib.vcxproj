@@ -1,0 +1,125 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\adaptive_mesh.cc" />
+    <ClCompile Include="..\..\color_conversion.cc" />
+    <ClCompile Include="..\..\common\application.cc" />
+    <ClCompile Include="..\..\common\combinatoric.cc" />
+    <ClCompile Include="..\..\common\fileio.cc" />
+    <ClCompile Include="..\..\common\makros.cc" />
+    <ClCompile Include="..\..\common\matrix.cc" />
+    <ClCompile Include="..\..\common\storage1D.cc" />
+    <ClCompile Include="..\..\common\storage2D.cc" />
+    <ClCompile Include="..\..\common\stringprocessing.cc" />
+    <ClCompile Include="..\..\common\tensor.cc" />
+    <ClCompile Include="..\..\common\timing.cc" />
+    <ClCompile Include="..\..\common\vector.cc" />
+    <ClCompile Include="..\..\conversion.cc" />
+    <ClCompile Include="..\..\conv_lp_solving.cc" />
+    <ClCompile Include="..\..\curvature.cc" />
+    <ClCompile Include="..\..\draw_segmentation.cc" />
+    <ClCompile Include="..\..\extended_lp_segmentation.cc" />
+    <ClCompile Include="..\..\gpcpetter.cc" />
+    <ClCompile Include="..\..\label_components.cc" />
+    <ClCompile Include="..\..\lp_inpainting.cc" />
+    <ClCompile Include="..\..\lp_segmentation.cc" />
+    <ClCompile Include="..\..\lp_segmenter.cc" />
+    <ClCompile Include="..\..\mesh2D.cc" />
+    <ClCompile Include="..\..\qpbo_segmentation.cc" />
+    <ClCompile Include="..\..\segmentation_common.cc" />
+    <ClCompile Include="..\..\svg.cc" />
+    <ClCompile Include="..\..\thirdparty\gpc.cc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\color_conversion.hh" />
+    <None Include="..\..\common\application.hh" />
+    <None Include="..\..\common\colorimage.hh" />
+    <None Include="..\..\common\combinatoric.hh" />
+    <None Include="..\..\common\fileio.hh" />
+    <None Include="..\..\common\grayimage.hh" />
+    <None Include="..\..\common\makros.hh" />
+    <None Include="..\..\common\matrix.hh" />
+    <None Include="..\..\common\matrix_inversion.hh" />
+    <None Include="..\..\common\outer_product.hh" />
+    <None Include="..\..\common\stl_out.hh" />
+    <None Include="..\..\common\storage1D.hh" />
+    <None Include="..\..\common\storage2D.hh" />
+    <None Include="..\..\common\storage3D.hh" />
+    <None Include="..\..\common\stringprocessing.hh" />
+    <None Include="..\..\common\tensor.hh" />
+    <None Include="..\..\common\timing.hh" />
+    <None Include="..\..\common\vector.hh" />
+    <None Include="..\..\conversion.hh" />
+    <None Include="..\..\convolution.hh" />
+    <None Include="..\..\conv_lp_solving.hh" />
+    <None Include="..\..\curvature.hh" />
+    <None Include="..\..\draw_segmentation.hh" />
+    <None Include="..\..\extended_lp_segmentation.hh" />
+    <None Include="..\..\gpcpetter.hh" />
+    <None Include="..\..\label_components.hh" />
+    <None Include="..\..\lp_inpainting.hh" />
+    <None Include="..\..\lp_segmentation.hh" />
+    <None Include="..\..\lp_segmenter.hh" />
+    <None Include="..\..\matrix_interpolation.hh" />
+    <None Include="..\..\mesh2D.hh" />
+    <None Include="..\..\Petter-Color.hh" />
+    <None Include="..\..\projection.hh" />
+    <None Include="..\..\sampling.hh" />
+    <None Include="..\..\segmentation_common.hh" />
+    <None Include="..\..\smoothing.hh" />
+    <None Include="..\..\sparse_matrix_description.hh" />
+    <None Include="..\..\svg.hh" />
+    <None Include="..\..\tensor_interpolation.hh" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\qpbo_segmentation.h" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{49B4885C-94E4-41D8-95D6-6173A0115C2D}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>curvaturelib</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>..\..\common;..\..\thirdparty;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

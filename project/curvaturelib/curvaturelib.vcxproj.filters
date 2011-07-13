@@ -1,0 +1,224 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="common">
+      <UniqueIdentifier>{5574a124-bfc8-4148-992d-bfbe45fd1c80}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="curvature">
+      <UniqueIdentifier>{72db5292-9b28-480c-af3d-a6bbd52fa53d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty">
+      <UniqueIdentifier>{b3c458d6-7ffd-4de7-affa-185e0730e0e2}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\common\application.cc">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\common\combinatoric.cc">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\common\fileio.cc">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\common\makros.cc">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\common\matrix.cc">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\common\storage1D.cc">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\common\storage2D.cc">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\common\stringprocessing.cc">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\common\tensor.cc">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\common\timing.cc">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\common\vector.cc">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\adaptive_mesh.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\color_conversion.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\conv_lp_solving.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\conversion.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\curvature.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\draw_segmentation.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\extended_lp_segmentation.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\gpcpetter.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\label_components.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\lp_inpainting.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\lp_segmentation.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\lp_segmenter.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\mesh2D.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\qpbo_segmentation.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\segmentation_common.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\svg.cc">
+      <Filter>curvature</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\thirdparty\gpc.cc">
+      <Filter>thirdparty</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\common\application.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\colorimage.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\combinatoric.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\fileio.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\grayimage.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\makros.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\matrix.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\matrix_inversion.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\outer_product.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\stl_out.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\storage1D.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\storage2D.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\storage3D.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\stringprocessing.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\tensor.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\timing.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\common\vector.hh">
+      <Filter>common</Filter>
+    </None>
+    <None Include="..\..\color_conversion.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\conv_lp_solving.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\conversion.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\convolution.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\curvature.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\draw_segmentation.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\extended_lp_segmentation.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\gpcpetter.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\label_components.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\lp_inpainting.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\lp_segmentation.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\lp_segmenter.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\matrix_interpolation.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\mesh2D.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\Petter-Color.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\projection.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\sampling.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\segmentation_common.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\smoothing.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\sparse_matrix_description.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\svg.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\tensor_interpolation.hh">
+      <Filter>curvature</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\qpbo_segmentation.h">
+      <Filter>curvature</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

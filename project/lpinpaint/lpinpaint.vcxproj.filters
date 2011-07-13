@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="QPBO">
+      <UniqueIdentifier>{ab188da4-c9f5-4788-b52e-9b65aba7f802}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\QPBO-v1.3.src\QPBO.cpp">
+      <Filter>QPBO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\QPBO-v1.3.src\QPBO_extra.cpp">
+      <Filter>QPBO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\QPBO-v1.3.src\QPBO_maxflow.cpp">
+      <Filter>QPBO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\QPBO-v1.3.src\QPBO_postprocessing.cpp">
+      <Filter>QPBO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\lpinpaint.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

@@ -115,7 +115,7 @@ int main(int argc, char** argv) {
 	image(x,y) = yuv_image(x,y,z);
 
 
-    float min_val = 1e300;
+    float min_val = 1e36;
     float max_val = 0.0;
     
     

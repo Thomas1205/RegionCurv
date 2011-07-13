@@ -9,8 +9,8 @@
 #include "sparse_matrix_description.hh"
 
 
-#include "ClpSimplex.hpp"
-#include "OsiClpSolverInterface.hpp"
+#include <coin/ClpSimplex.hpp>
+#include <coin/OsiClpSolverInterface.hpp>
 
 #ifdef HAS_GUROBI
 #include "gurobi_c++.h"

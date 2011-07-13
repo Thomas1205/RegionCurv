@@ -10,9 +10,9 @@
 #include "segmentation_common.hh"
 #include "stl_out.hh"
 
-#include "ClpSimplex.hpp"
-#include "ClpPlusMinusOneMatrix.hpp"
-#include "ClpFactorization.hpp"
+#include <coin/ClpSimplex.hpp>
+#include <coin/ClpPlusMinusOneMatrix.hpp>
+#include <coin/ClpFactorization.hpp>
 
 #include "conv_lp_solving.hh"
 

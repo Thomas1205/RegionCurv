@@ -1,0 +1,38 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lpseg", "lpseg\lpseg.vcxproj", "{9F324222-56BC-4EAB-8488-158B55CDBA64}"
+	ProjectSection(ProjectDependencies) = postProject
+		{49B4885C-94E4-41D8-95D6-6173A0115C2D} = {49B4885C-94E4-41D8-95D6-6173A0115C2D}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "interactiveseg", "interactiveseg\interactiveseg.vcxproj", "{AF39E237-84B6-44CF-84A7-C178FAE25E95}"
+	ProjectSection(ProjectDependencies) = postProject
+		{49B4885C-94E4-41D8-95D6-6173A0115C2D} = {49B4885C-94E4-41D8-95D6-6173A0115C2D}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lpinpaint", "lpinpaint\lpinpaint.vcxproj", "{D7930739-CEF6-4A09-968B-1B5A5018F04E}"
+	ProjectSection(ProjectDependencies) = postProject
+		{49B4885C-94E4-41D8-95D6-6173A0115C2D} = {49B4885C-94E4-41D8-95D6-6173A0115C2D}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "curvaturelib", "curvaturelib\curvaturelib.vcxproj", "{49B4885C-94E4-41D8-95D6-6173A0115C2D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9F324222-56BC-4EAB-8488-158B55CDBA64}.Release|x64.ActiveCfg = Release|x64
+		{9F324222-56BC-4EAB-8488-158B55CDBA64}.Release|x64.Build.0 = Release|x64
+		{AF39E237-84B6-44CF-84A7-C178FAE25E95}.Release|x64.ActiveCfg = Release|x64
+		{AF39E237-84B6-44CF-84A7-C178FAE25E95}.Release|x64.Build.0 = Release|x64
+		{D7930739-CEF6-4A09-968B-1B5A5018F04E}.Release|x64.ActiveCfg = Release|x64
+		{D7930739-CEF6-4A09-968B-1B5A5018F04E}.Release|x64.Build.0 = Release|x64
+		{49B4885C-94E4-41D8-95D6-6173A0115C2D}.Release|x64.ActiveCfg = Release|x64
+		{49B4885C-94E4-41D8-95D6-6173A0115C2D}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

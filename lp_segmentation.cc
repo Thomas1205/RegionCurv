@@ -11,8 +11,8 @@
 #include "segmentation_common.hh"
 #include "stl_out.hh"
 
-#include "ClpSimplex.hpp"
-#include "ClpPlusMinusOneMatrix.hpp"
+#include <coin/ClpSimplex.hpp>
+#include <coin/ClpPlusMinusOneMatrix.hpp>
 
 #define USE_PM_ONE_MATRIX
 

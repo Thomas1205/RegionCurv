@@ -5,13 +5,19 @@
 
 #include "mesh2D.hh"
 #include "sparse_matrix_description.hh"
-#include "ClpSimplex.hpp"
-#include "ClpFactorization.hpp"
+#include <coin/ClpSimplex.hpp>
+#include <coin/ClpFactorization.hpp>
 
 #include "tensor.hh"
 #include "outer_product.hh"
 #include "timing.hh"
 #include "smoothing.hh"
+
+template<typename T>
+int round(T t) 
+{
+	return int(t + 0.5);
+}
 
 enum InpaintStatus {ToInpaint, Border, Irrelevant};
 enum EdgeStatus {InteriorEdge, BorderEdge};
@@ -890,8 +896,8 @@ double lp_inpaint(const Math2D::Matrix<float>& image, const Math2D::Matrix<float
 
   std::cerr << "to inpaint: " << nToInpaint << " pixels." << std::endl;
 
-  float min_border = 1e300;
-  float max_border = -1e300;
+  float min_border = 1e36;
+  float max_border = -1e36;
 
   for (uint y=0; y < yDim; y++) {
     for (uint x=0; x < xDim; x++) {
@@ -1899,10 +1905,10 @@ double lp_inpaint_hybrid(const Math2D::Matrix<float>& image, const Math2D::Matri
 
   std::cerr << "to inpaint: " << nToInpaint << " pixels." << std::endl;
 
-  float min_border = 1e300;
-  float max_border = -1e300;
-  float im_min_border = 1e300;
-  float im_max_border = -1e300;
+  float min_border = 1e36;
+  float max_border = -1e36;
+  float im_min_border = 1e36;
+  float im_max_border = -1e36;
 
   for (uint y=0; y < yDim; y++) {
     for (uint x=0; x < xDim; x++) {
@@ -2031,7 +2037,7 @@ double lp_inpaint_hybrid(const Math2D::Matrix<float>& image, const Math2D::Matri
     double bin_lb = im_min_border + (kk)*bin_size;
 
     min_border = 0.0;
-    max_border = -1e300;
+    max_border = -1e100;
 
     //setting up quantized images for level line recovery 
     for (uint y=0; y < yDim; y++) {

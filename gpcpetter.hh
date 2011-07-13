@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include <mesh2D.hh>
+#include "mesh2D.hh"
 
 #ifndef GPCPETTER_HH
 #define GPCPETTER_HH
