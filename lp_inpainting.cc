@@ -2037,7 +2037,7 @@ double lp_inpaint_hybrid(const Math2D::Matrix<float>& image, const Math2D::Matri
     double bin_lb = im_min_border + (kk)*bin_size;
 
     min_border = 0.0;
-    max_border = -1e100;
+    max_border = -1e36;
 
     //setting up quantized images for level line recovery 
     for (uint y=0; y < yDim; y++) {
