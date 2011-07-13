@@ -1,0 +1,55 @@
+This project generates three executables:
+
+- lpseg.debug.L64 : a program for unsupervised region-based
+segmentation with length and curvature regularity. The data terms are
+squared differences of intensities and specified mean values. 
+
+- interactiveseg.debug.L64 : this is the same kind of segmentation
+ problem, but this time seed nodes for foreground and background are
+ given. From these, histograms are generated, their logarithms serve
+ as data terms. 
+
+- lpinpaint.debug.L64 : this program employs the same
+ formalism to the problem of image inpainting. It supports gray-level
+ and color images. Color images are transformed to YUV first, then
+ each channel is inpainted separately.
+
+To get a list of available options, call the programs without any options.
+
+In all cases, the underlying optimization scheme relies on a standard
+LP-solver. You will have to download Clp and Osi from www.coin-or.org. We
+recommend to download Cbc from the same project line, which includes
+these packages.
+
+Optionally, you can also use the commercial solvers Gurobi, FICO
+Xpress and ILOG Cplex. In this case, please add -DHAS_GUROBI,
+-DHAS_XPRESS and/or -DHAS_CPLEX to your compiler flags.
+
+Furthermore, you will need to download the General Polygon Clipper
+library from http://www.cs.man.ac.uk/~toby/alan/software/ .
+
+Lastly, you need the packages QPBO (by Vladimir Kolmogorov) and
+HOCR (by Hiroshi Ishikawa).
+
+A sample Makefile has been included, but you will most likely need to
+modify it.
+
+
+************ CREDITS ********** 
+
+The first version was written by Thomas Schoenemann in 2009, based on
+open publications. Later, the code was completed and augmented at Lund
+University, Sweden. This was done jointly by Thomas Schoenemann and
+Petter Strandmark, with additional assistance by Yubin Kuang and
+Fredrik Kahl.
+
+Furthermore, the project includes parts of the C++-Toolbox in version
+0.925, written by Thomas Schoenemann.
+
+
+************ Tested Platforms ***********
+
+This software has been successfully tested in the following environments:
+
+- 64 Bit SuSE Linux, g++ 4.5.0
+- Microsoft Windows 7 64 with Microsoft Visual Studio 2010 (64 Bit)

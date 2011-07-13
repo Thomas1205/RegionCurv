@@ -1,0 +1,57 @@
+This code was by Thomas Schoenemann and Petter Strandmark (both Lund
+University, Sweden) in 2009-2001. They are refered to as the
+"copyright holders" below.
+
+The code may be used, modified and distributed at the below given conditions.
+
+To use this software, you need the following packages:
+
+- Clp http://www.coin-or.org/projects/Clp.xml (tested with Version 2.4.0)
+- GPC http://www.cs.man.ac.uk/~toby/alan/software/
+
+
+Conditions of usages: 
+
+1. Usage is only allowed if it does not violate the LICENSE conditions
+of either Clp or GPC. In case the license conditions of these
+packages conflict with the ones given here, their rules have
+precedence.  
+
+2. The software is provided "as is" by the authors, with absolutely no
+actual or implied warranty of correctness, fitness, intellectual
+property ownership, or anything else whatsoever. You use the software
+entirely at your own risk. In no event shall the copyright holder be
+liable for any direct, indirect or perceived damage whatsoever
+connected with the use of this work.
+
+3. If you use this software for image segmentation, you are requested to cite
+the paper
+
+"T. Schoenemann, F. Kahl and D. Cremers - Curvature Regularity for
+Region-based Image Segmentation and Inpainting: A linear programming
+relaxation, ICCV 2009".
+
+and, where appropriate 
+
+"P. Strandmark and F. Kahl - Curvature Regularization for Curves and Surfaces
+in a Global Optimization framework, EMMCVPR 2011"
+
+in resulting publications. 
+
+If you are using QPBO, please also consider citing [EL Zehiry and Grady, CVPR 2010].
+
+4. If you use this software for image inpainting, you are requested to
+cite the more appropriate of the following papers:
+
+
+- "T. Schoenemann, F. Kahl and D. Cremers - Curvature Regularity for
+Region-based Image Segmentation and Inpainting: A linear programming
+relaxation, ICCV 2009".
+
+- "T. Schoenemann, Y. Kuang and F. Kahl - Curvature Regularity for Multi-Label
+  Problems - Standard and Customized Linear Programming, EMMCVPR 2011".
+
+
+5. Permission to use or distribute this software for commercial or
+military purposes is NOT granted unless directly implied by the Clp
+and/or GPC licenses.

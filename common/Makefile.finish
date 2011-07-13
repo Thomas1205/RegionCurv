@@ -1,0 +1,22 @@
+
+tidy:
+	rm *~
+
+clean:
+	rm $(DEBUGDIR)/*.o $(DEBUGDIR)/*.cu_o
+	rm $(OPTDIR)/*.o $(OPTDIR)/*.cu_o
+
+$(DEBUGDIR)/%.o : %.cc
+	$(COMPILER) $(INCLUDE) -c $< $(DEBUGFLAGS) -o $@
+
+$(DEBUGDIR)/%.cu_o : %.cu
+		  $(NVCC) $(NVCCOPTFLAGS) -c $< -o $@
+
+$(OPTDIR)/%.o : %.cc
+	$(COMPILER) $(INCLUDE) -c $< $(OPTFLAGS) -o $@
+
+$(DEVELDIR)/%.o : %.cc
+	$(COMPILER) $(INCLUDE) -c $< $(DEVELFLAGS) -o $@
+
+asm/%.s : %.cc
+	$(COMPILER) $(INCLUDE) $(OPTFLAGS) -c $< -S -o $@

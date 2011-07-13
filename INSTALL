@@ -1,0 +1,19 @@
+
+sample installation protocol for Linux (provided by Martin Byröd):
+
+to compile:
+- checkout cbc (with svn)
+- download gpc
+- download QPBO and HOCR
+- copy gpc.c and gpc.h to thirdparty/
+- copy Clp/inc/* and Clp/src/*.hpp and Clp/src/*.h to ClpInc/
+- copy CoinUtils/inc/* and CoinUtils/src/*.hpp to CoinUtilsInc/
+- do likewise for Osi and OsiClp
+- adjust CLPLIBDIR to point to the dir with the clp libs
+- add this line to common/Makefile.common: CC = $(COMPILER)
+- cd to common/ and then type make
+- make
+
+to run:
+- Add path to clp lib files to /usr/etc/ld.so.conf
+- Run /sbin/ldconfig
