@@ -5,6 +5,10 @@
 x64/
 *.exe
 *.pdb
+*.L64
+debug/
+opt/
+lib/
 
 # Local user options
 *.suo
