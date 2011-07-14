@@ -11,14 +11,14 @@
 #include <iomanip>
 #include <cstdlib> //includes the exit-function
 
-#ifdef WIN32
+//#ifdef WIN32
 namespace{
 bool isnan(double x) {
   return (x != x);
 }
 }
 #define M_PI 3.1415926535897931
-#endif
+//#endif
 
 
 /******************** Data Macros *****************************/

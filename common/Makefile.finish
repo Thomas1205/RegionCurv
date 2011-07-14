@@ -5,6 +5,8 @@ tidy:
 clean:
 	rm $(DEBUGDIR)/*.o $(DEBUGDIR)/*.cu_o
 	rm $(OPTDIR)/*.o $(OPTDIR)/*.cu_o
+	rm QPBO-v1.3.src/*.o
+	rm thirdparty/*.o
 
 $(DEBUGDIR)/%.o : %.cc
 	$(COMPILER) $(INCLUDE) -c $< $(DEBUGFLAGS) -o $@
@@ -17,6 +19,12 @@ $(OPTDIR)/%.o : %.cc
 
 $(DEVELDIR)/%.o : %.cc
 	$(COMPILER) $(INCLUDE) -c $< $(DEVELFLAGS) -o $@
+	
+%.o : %.cpp
+	$(COMPILER) $(INCLUDE) -c $< $(OPTFLAGS) -o $@
+	
+%.o : %.cc
+	$(COMPILER) $(INCLUDE) -c $< $(OPTFLAGS) -o $@
 
 asm/%.s : %.cc
 	$(COMPILER) $(INCLUDE) $(OPTFLAGS) -c $< -S -o $@
