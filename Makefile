@@ -1,8 +1,13 @@
 include common/Makefile.common
 
-COMMONDIR = common
+
+# Change these to point to your Coin Cbc installation
 COININCLUDEDIR = ~/Programming/coin-Cbc-win/build/include/
 COINLIBDIR = ~/Programming/coin-Cbc-win/build/lib/
+
+##############################################################
+
+COMMONDIR = common
 INCLUDE = -I common/ -I thirdparty/ -I . -I $(COININCLUDEDIR) -DHAVE_CONFIG_H -I QPBO-v1.3.src -I HOCR
 
 # if you have the any of the solvers Gurobi, Cplex or Xpress, please add -DHAS_GUROBI etc. to the INCLUDE options
