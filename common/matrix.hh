@@ -308,11 +308,12 @@ namespace Math2D {
       return false;
     }
 
-    of << "P5\n" << Storage2D<T>::xDim_ << " " << Storage2D<T>::yDim_ << "\n" << max_intensity << "\n";
+    of << "P5\n" << Storage2D<T>::xDim_ << " " << Storage2D<T>::yDim_ << "\n" << max_intensity;
 
     //Reopen in binary mode to avoid silent conversion from '\n' to "\r\n" under Windows
     of.close();
     of.open(filename.c_str(), std::ios::binary | std::ios::app);
+    of << '\n';
 
     for (size_t i=0; i < Storage2D<T>::size_; i++) {
       

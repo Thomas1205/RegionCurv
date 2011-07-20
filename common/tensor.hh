@@ -405,11 +405,12 @@ namespace Math3D {
       of << "P5\n"; 
     else
       of << "P6\n";
-    of << Storage3D<T>::xDim_ << " " << Storage3D<T>::yDim_ << "\n" << max_intensity << "\n";
+    of << Storage3D<T>::xDim_ << " " << Storage3D<T>::yDim_ << "\n" << max_intensity; 
 
     //Reopen in binary mode to avoid silent conversion from '\n' to "\r\n" under Windows
     of.close();
     of.open(filename.c_str(), std::ios::binary | std::ios::app);
+    of << '\n';
 
     for (size_t i=0; i < Storage3D<T>::size_; i++) {
 
