@@ -1,5 +1,11 @@
 
 
+# Created by program
+*last_call
+bin/output/*.svg
+bin/output/*.pgm
+bin/output/*log
+bin/output/*.info
 
 # Compiled files
 x64/
