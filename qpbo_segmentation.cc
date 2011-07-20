@@ -30,6 +30,12 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
   using namespace std;
   using namespace Petter;
 
+  //Open the log file (append mode)
+  string logfile_name = options.base_filename + ".qpbolog";
+  ofstream logfile(logfile_name.c_str(), ios::app);
+  logfile << options.lambda_ << " " << options.gamma_ << " ";
+
+
   const int svg_face_limit = 20000;
 
   const Math2D::Matrix<int>* fixed_labels = 0;
@@ -77,8 +83,13 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
   std::cerr << edge_pairs.size() << " edge pairs." << std::endl;
 
   statusTry("Drawing mesh...");
-  mesh.draw("mesh.svg");
-  statusOK();
+  if (mesh.nFaces() > svg_face_limit) {
+    statusFailed();
+  }
+  else {
+    mesh.draw(options.base_filename + ".mesh.svg");
+    statusOK();
+  }
 
   statusTry("Calculating required QPBO size...");
   int required_nodes = mesh.nFaces();
@@ -529,9 +540,11 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
     labels[i] = qpbo.GetLabel(i);
   }
 
-  statusOK();
+  double time = statusOK();
+  logfile << time << " ";
 
   cerr << "Unlabelled regions    : " << unlabelled << " (" << 100*double(unlabelled)/double(nvars) << "%)" << endl;
+  logfile << 100*double(unlabelled)/double(nvars) << " ";
 
   unlabelled=0;
   for (int i=0; i<qpbo.GetNodeNum(); ++i) {
@@ -575,7 +588,8 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
     qpbo.ComputeWeakPersistencies();
     qpbo.MergeMappings(nvars,mapping,tmp_mapping);
     }*/
-    statusOK();
+    double time = statusOK();
+    logfile << time << " ";
 
     // Read out entire labelling again (as weak persistencies may have changed)
     for (int nodeCount = 0; nodeCount < nvars; nodeCount++) {
@@ -593,60 +607,35 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
       statusOK();
     }
 
-    statusTry("Running QPBO-I...");
-    for (int iter=1;iter<=30;++iter) {
-      qpbo.Improve();
-    }
-    statusOK();
+    //statusTry("Running QPBO-I...");
+    //for (int iter=1;iter<=30;++iter) {
+    //  qpbo.Improve();
+    //}
+    //statusOK();
 
-    // Read out entire labelling again (as weak persistencies may have changed)
-    for (int nodeCount = 0; nodeCount < nvars; nodeCount++) {
-      labels[nodeCount] = (int)qpbo.GetLabel(mapping[nodeCount]/2);
-      if (labels[nodeCount] >= 0)
-        labels[nodeCount] = (labels[nodeCount] + mapping[nodeCount]) % 2;
-    }
+    //// Read out entire labelling again (as weak persistencies may have changed)
+    //for (int nodeCount = 0; nodeCount < nvars; nodeCount++) {
+    //  labels[nodeCount] = (int)qpbo.GetLabel(mapping[nodeCount]/2);
+    //  if (labels[nodeCount] >= 0)
+    //    labels[nodeCount] = (labels[nodeCount] + mapping[nodeCount]) % 2;
+    //}
 
-    delete[] mapping;
-    delete[] tmp_mapping;  
+    //delete[] mapping;
+    //delete[] tmp_mapping;  
 
-    statusTry("Drawing SVG output...");
-    if (mesh.nFaces() > svg_face_limit) {
-      statusFailed();
-    }
-    else {
-      mesh.draw_labels(options.base_filename + ".qpboi.svg",labels);
-      statusOK();
-    }
+    //statusTry("Drawing SVG output...");
+    //if (mesh.nFaces() > svg_face_limit) {
+    //  statusFailed();
+    //}
+    //else {
+    //  mesh.draw_labels(options.base_filename + ".qpboi.svg",labels);
+    //  statusOK();
+    //}
   }
 
 
   statusTry("Building output...");
-  //nvars=0;
-  //unlabelled=0;
-  //for (uint y=0; y < yDim; y++) {
-  //for (uint x=0; x < xDim; x++) {
 
-  //	double sum = 0.0;
-  //	bool unknown = false;
-  //	for (uint j=0; j < nAreasPerPixel; j++) {
-  //		uint area_idx = (y*xDim+x)*nAreasPerPixel+j;
-  //		if (labels[area_idx] == 1)
-  //			sum += mesh.convex_area(area_idx);
-  //		
-  //		if (labels[area_idx] < 0) {
-  //			unlabelled++;
-  //			unknown = true;
-  //		}
-  //		nvars++;
-  //	}
-  //    
-  //	if (unknown) {
-  //		segmentation(x,y) = 128;
-  //	}
-  //	else {
-  //		segmentation(x,y) = (sum > 0.5) ? 255 : 0;
-  //	}
-  //}}
   //Calculate unlabelled pixels
   unlabelled = 0;
   for (uint i=0; i<mesh.nFaces(); ++i) {
@@ -657,19 +646,17 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
   Math2D::Matrix<double> output(xDim,yDim,0);
   for (uint i=0;i<mesh.nFaces();++i) {
     add_grid_output(i,labels[i],mesh,output);	
-
-    //double area = mesh.convex_area(i);
-    //add_grid_output(i,raw_data[i]/255.0/area,mesh,output);
   }
   for (uint y=0; y < yDim; y++) {
     for (uint x=0; x < xDim; x++) {
       segmentation(x,y) = uint(output(x,y)*255.0);
-    }}
+  }}
   statusOK();
 
   delete[] raw_data;
 
   cerr << "Unlabelled regions    : " << unlabelled << " (" << 100*double(unlabelled)/double(nvars) << "%)" << endl;
+  logfile << 100*double(unlabelled)/double(nvars) << " ";
 
   unlabelled=0;
   for (int i=0; i<qpbo.GetNodeNum(); ++i) {
@@ -678,16 +665,11 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
   }
   cerr << "Unlabelled QPBO nodes : " << unlabelled << " (" << 100*double(unlabelled)/double(qpbo.GetNodeNum()) << "%)" << endl;
 
-  statusTry("Drawing SVG output...");
-  if (mesh.nFaces() > svg_face_limit) {
-    statusFailed();
-  }
-  else {
-    mesh.draw_labels("mesh_qpbo.svg",labels);
-    statusOK();
-  }
 
   delete[] labels;
+
+  //Close logfile
+  logfile << endl;
 
   return 0;
 }

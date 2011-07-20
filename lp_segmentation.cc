@@ -261,6 +261,11 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   bool light_constraints = options.light_constraints_;
   bool bruckstein = options.bruckstein_;
 
+  //Open the log file (append mode)
+  std::string logfile_name = options.base_filename + ".lplog";
+  std::ofstream logfile(logfile_name.c_str(), std::ios::app);
+  logfile << options.lambda_ << " " << options.gamma_ << " ";
+
   std::string solver = options.solver_;
 
   std::cerr.precision(10);
@@ -905,8 +910,8 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     if (error != 0)
       std::cerr << "!!!!!!!!!!!!!!LP-solver failed!!!!!!!!!!!!!!!!!!!" << std::endl;
 
-    std::cerr << "CLP-time: " << diff_seconds(tEndCLP,tStartCLP) << " seconds. " << std::endl;
-
+      std::cerr << "CLP-time: " << diff_seconds(tEndCLP,tStartCLP) << " seconds. " << std::endl;
+      logfile << diff_seconds(tEndCLP,tStartCLP) << " ";
     if (mesh.nFaces() <= 20000) {
       Petter::statusTry("Saving SVG...");
       mesh.draw_labels_with_pairs(options.base_filename + ".lp.svg",lp_solution,edge_pairs,xDim,yDim);
@@ -1123,6 +1128,8 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   std::cerr << nNonInt << " region variables are fractional" << std::endl;
   std::cerr << nNonIntAuxVars << " auxiliary (non-region) variables are fractional" << std::endl;
+  logfile << 100.0*double(nNonInt)/double(mesh.nFaces()) << " ";
+
 
   Math1D::Vector<double> frac_solution(mesh.nFaces());
   for (uint k=0; k < mesh.nFaces(); k++) {
@@ -1489,9 +1496,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       double sum = 0.0;
       double frac_sum = 0.0;
       for (uint k= share_start[y*(xDim*out_factor)+x]; k < share_start[y*(xDim*out_factor)+x+1]; k++) {
-	uint face = shares[k].face_idx_;
-	sum += mesh.convex_area(face) * shares[k].share_ * lp_solution[face];
-	frac_sum += mesh.convex_area(face) * shares[k].share_ * frac_solution[face];
+        uint face = shares[k].face_idx_;
+        sum += mesh.convex_area(face) * shares[k].share_ * lp_solution[face];
+        frac_sum += mesh.convex_area(face) * shares[k].share_ * frac_solution[face];
       }
       segmentation(x,y) = uint(sum*255.0);
       frac_seg(x,y) = frac_sum * 255.0;
@@ -1526,6 +1533,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     XPRSfree();
   }
 #endif
+
+  //Close logfile
+  logfile << std::endl;
 
   return energy;
 }
