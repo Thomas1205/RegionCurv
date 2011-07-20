@@ -1234,7 +1234,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   std::cerr << nNonInt << " region variables are fractional" << std::endl;
   std::cerr << nNonIntAuxVars << " auxiliary (non-region) variables are fractional" << std::endl;
-  logfile << 100.0*double(nNonInt)/double(mesh.nFaces()) << " ";
+  logfile << 100.0*double(nNonInt + nNonIntAuxVars)/double(nVars) << " ";
 
 
   Math1D::Vector<double> frac_solution(mesh.nFaces());

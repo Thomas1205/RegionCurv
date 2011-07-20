@@ -528,7 +528,6 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
   qpbo.ComputeWeakPersistencies();
 
 
-  int nvars=mesh.nFaces();
   int unlabelled=0;
   for (uint i=0; i<mesh.nFaces(); ++i) {
     if (qpbo.GetLabel(i) < 0)
@@ -543,8 +542,8 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
   double time = statusOK();
   logfile << time << " ";
 
-  cerr << "Unlabelled regions    : " << unlabelled << " (" << 100*double(unlabelled)/double(nvars) << "%)" << endl;
-  logfile << 100*double(unlabelled)/double(nvars) << " ";
+  cerr << "Unlabelled regions    : " << unlabelled << " (" << 100*double(unlabelled)/double(mesh.nFaces()) << "%)" << endl;
+  logfile << 100*double(unlabelled)/double(mesh.nFaces()) << " ";
 
   unlabelled=0;
   for (int i=0; i<qpbo.GetNodeNum(); ++i) {
@@ -655,8 +654,8 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
 
   delete[] raw_data;
 
-  cerr << "Unlabelled regions    : " << unlabelled << " (" << 100*double(unlabelled)/double(nvars) << "%)" << endl;
-  logfile << 100*double(unlabelled)/double(nvars) << " ";
+  cerr << "Unlabelled regions    : " << unlabelled << " (" << 100*double(unlabelled)/double(mesh.nFaces()) << "%)" << endl;
+  logfile << 100*double(unlabelled)/double(mesh.nFaces()) << " ";
 
   unlabelled=0;
   for (int i=0; i<qpbo.GetNodeNum(); ++i) {
