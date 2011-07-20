@@ -35,214 +35,214 @@
 //solves a segmentation problem with length regularity via an LP
 //@param lambda: the weight for the length term
 double lp_segment_lenreg(const Math2D::Matrix<float>& data_term, const LPSegOptions& options,
-			 double energy_offset, Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels) {
+  double energy_offset, Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels) {
 
-  double lambda = options.lambda_;
-  int neighborhood = options.neighborhood_;
+    double lambda = options.lambda_;
+    int neighborhood = options.neighborhood_;
 
-  uint xDim = uint( data_term.xDim() );
-  uint yDim = uint( data_term.yDim() );
+    uint xDim = uint( data_term.xDim() );
+    uint yDim = uint( data_term.yDim() );
 
-  Mesh2D mesh;
-  
-  uint nAreasPerPixel = 1;
-  if (neighborhood == 8)
-    nAreasPerPixel = 4;
-  if (neighborhood == 16)
-    nAreasPerPixel = 32;
+    Mesh2D mesh;
 
-  generate_mesh(xDim,yDim,neighborhood,mesh);
+    uint nAreasPerPixel = 1;
+    if (neighborhood == 8)
+      nAreasPerPixel = 4;
+    if (neighborhood == 16)
+      nAreasPerPixel = 32;
 
-  Storage1D<PixelFaceRelation> shares;
-  Math1D::Vector<uint> share_start;
-  compute_pixel_shares(mesh, xDim, yDim, shares, share_start);
-  
-  uint nVars = mesh.nFaces() + 2*mesh.nEdges();
-  uint nConstraints = mesh.nEdges();
+    generate_mesh(xDim,yDim,neighborhood,mesh);
 
-  Math1D::NamedVector<double> cost(nVars,0.0,MAKENAME(cost));
-  for (uint y=0; y < yDim; y++) {
-    for (uint x=0; x < xDim; x++) {
+    Storage1D<PixelFaceRelation> shares;
+    Math1D::Vector<uint> share_start;
+    compute_pixel_shares(mesh, xDim, yDim, shares, share_start);
 
-      uint base = (y*xDim+x)*nAreasPerPixel;
-      double cur_data = data_term(x,y); 
+    uint nVars = mesh.nFaces() + 2*mesh.nEdges();
+    uint nConstraints = mesh.nEdges();
 
-      for (uint i=0; i < nAreasPerPixel; i++) {
-	double area = mesh.convex_area(base+i);
-	cost[base+i] = area * cur_data;
-      }
-    }
-  }
-
-  uint edge_offset = mesh.nFaces();
-  for (uint i=0; i < mesh.nEdges(); i++) {
-    double length_weight = lambda * mesh.edge_length(i);
-
-    if (mesh.adjacent_faces(i).size() >= 2) {
-      cost[edge_offset + 2*i]   = length_weight;
-      cost[edge_offset + 2*i+1] = length_weight;
-    }
-  }
-
-  Math1D::NamedVector<double> rhs(nConstraints,0.0,MAKENAME(rhs));
-  
-  Math1D::NamedVector<double> var_lb(nVars,0.0,MAKENAME(var_lb));
-  Math1D::NamedVector<double> var_ub(nVars,1.0,MAKENAME(var_ub));
-
-  if (fixed_labels != 0) {
-
-    bool has_warned = false;
-
+    Math1D::NamedVector<double> cost(nVars,0.0,MAKENAME(cost));
     for (uint y=0; y < yDim; y++) {
       for (uint x=0; x < xDim; x++) {
-	
-	int fixed = (*fixed_labels)(x,y);
-	if (fixed == 0) {
-	  for (uint v=share_start[y*xDim+x]; v < share_start[y*xDim+x+1]; v++) {
-	    uint f = shares[v].face_idx_;
-	    float area_share = std::min(1.0f, shares[v].share_);
-	    if (area_share >= 0.95)
-	      var_ub[f] = 0.0;
-	    else if (!has_warned) {
-	      std::cerr << Petter::RED << "WARNING: ignored a partial seed region" << Petter::NORMAL << std::endl;
-              has_warned = true;
-	    }
-	  }
-	}
-	else if (fixed == 1) {
-	  for (uint v=share_start[y*xDim+x]; v < share_start[y*xDim+x+1]; v++) {
-	    uint f = shares[v].face_idx_;
-	    float area_share = std::min(1.0f, shares[v].share_);
-	    if (area_share >= 0.95)
-	      var_lb[f] = 1.0;
-	    else if (!has_warned) {
-	      std::cerr << Petter::RED << "WARNING: ignored a partial seed region" << Petter::NORMAL << std::endl;
-              has_warned = true;
-	    }
-	  }
-	}
+
+        uint base = (y*xDim+x)*nAreasPerPixel;
+        double cur_data = data_term(x,y); 
+
+        for (uint i=0; i < nAreasPerPixel; i++) {
+          double area = mesh.convex_area(base+i);
+          cost[base+i] = area * cur_data;
+        }
       }
     }
-  }
 
-  std::cerr << "coding matrix" << std::endl;
+    uint edge_offset = mesh.nFaces();
+    for (uint i=0; i < mesh.nEdges(); i++) {
+      double length_weight = lambda * mesh.edge_length(i);
 
-  uint nEntries = 4*mesh.nEdges(); 
-  SparseMatrixDescription<double> lp_descr(nEntries, nConstraints, nVars);
-
-  for (uint j=0; j < mesh.nEdges(); j++) {
-    lp_descr.add_entry(j,edge_offset+2*j,1);
-    lp_descr.add_entry(j,edge_offset+2*j+1,-1);
-
-    for (std::vector<uint>::const_iterator it = mesh.adjacent_faces(j).begin();
-	 it != mesh.adjacent_faces(j).end(); it++) {
-
-      lp_descr.add_entry(j,*it,mesh.match(*it,j));
+      if (mesh.adjacent_faces(i).size() >= 2) {
+        cost[edge_offset + 2*i]   = length_weight;
+        cost[edge_offset + 2*i+1] = length_weight;
+      }
     }
-  }
 
-  std::cerr << nVars << " variables, " << nConstraints << " constraints" << std::endl;
+    Math1D::NamedVector<double> rhs(nConstraints,0.0,MAKENAME(rhs));
 
-  std::cerr << "converting matrix" << std::endl;
+    Math1D::NamedVector<double> var_lb(nVars,0.0,MAKENAME(var_lb));
+    Math1D::NamedVector<double> var_ub(nVars,1.0,MAKENAME(var_ub));
 
-  std::clock_t tStartCLP, tEndCLP;  
+    if (fixed_labels != 0) {
 
-  CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
-			      lp_descr.value(),lp_descr.nEntries());
+      bool has_warned = false;
 
-  ClpSimplex lpSolver;
-  lpSolver.loadProblem (coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
-			cost.direct_access(), rhs.direct_access(), rhs.direct_access());
+      for (uint y=0; y < yDim; y++) {
+        for (uint x=0; x < xDim; x++) {
 
-  coinMatrix.cleanMatrix();
+          int fixed = (*fixed_labels)(x,y);
+          if (fixed == 0) {
+            for (uint v=share_start[y*xDim+x]; v < share_start[y*xDim+x+1]; v++) {
+              uint f = shares[v].face_idx_;
+              float area_share = std::min(1.0f, shares[v].share_);
+              if (area_share >= 0.95)
+                var_ub[f] = 0.0;
+              else if (!has_warned) {
+                std::cerr << Petter::RED << "WARNING: ignored a partial seed region" << Petter::NORMAL << std::endl;
+                has_warned = true;
+              }
+            }
+          }
+          else if (fixed == 1) {
+            for (uint v=share_start[y*xDim+x]; v < share_start[y*xDim+x+1]; v++) {
+              uint f = shares[v].face_idx_;
+              float area_share = std::min(1.0f, shares[v].share_);
+              if (area_share >= 0.95)
+                var_lb[f] = 1.0;
+              else if (!has_warned) {
+                std::cerr << Petter::RED << "WARNING: ignored a partial seed region" << Petter::NORMAL << std::endl;
+                has_warned = true;
+              }
+            }
+          }
+        }
+      }
+    }
 
-  tStartCLP = std::clock();
+    std::cerr << "coding matrix" << std::endl;
 
-  int error = lpSolver.dual();
-  //lpSolver.initialSolve();
-  //int error = 1 - lpSolver.isProvenOptimal();
+    uint nEntries = 4*mesh.nEdges(); 
+    SparseMatrixDescription<double> lp_descr(nEntries, nConstraints, nVars);
 
-  tEndCLP = std::clock();
+    for (uint j=0; j < mesh.nEdges(); j++) {
+      lp_descr.add_entry(j,edge_offset+2*j,1);
+      lp_descr.add_entry(j,edge_offset+2*j+1,-1);
 
-  std::cerr << "CLP-time: " << diff_seconds(tEndCLP,tStartCLP) << " seconds. " << std::endl;
+      for (std::vector<uint>::const_iterator it = mesh.adjacent_faces(j).begin();
+        it != mesh.adjacent_faces(j).end(); it++) {
 
-  if (error)
-    std::cerr << "WARNING: solving the LP-relaxation failed!!!" << std::endl;
+          lp_descr.add_entry(j,*it,mesh.match(*it,j));
+      }
+    }
 
-  const double* lp_solution = lpSolver.primalColumnSolution();
+    std::cerr << nVars << " variables, " << nConstraints << " constraints" << std::endl;
+
+    std::cerr << "converting matrix" << std::endl;
+
+    std::clock_t tStartCLP, tEndCLP;  
+
+    CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
+      lp_descr.value(),lp_descr.nEntries());
+
+    ClpSimplex lpSolver;
+    lpSolver.loadProblem (coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
+      cost.direct_access(), rhs.direct_access(), rhs.direct_access());
+
+    coinMatrix.cleanMatrix();
+
+    tStartCLP = std::clock();
+
+    int error = lpSolver.dual();
+    //lpSolver.initialSolve();
+    //int error = 1 - lpSolver.isProvenOptimal();
+
+    tEndCLP = std::clock();
+
+    std::cerr << "CLP-time: " << diff_seconds(tEndCLP,tStartCLP) << " seconds. " << std::endl;
+
+    if (error)
+      std::cerr << "WARNING: solving the LP-relaxation failed!!!" << std::endl;
+
+    const double* lp_solution = lpSolver.primalColumnSolution();
 
 #ifdef HAS_VNK_GRAPH 
-  Graph<double,double,double> graph(mesh.nFaces(), 2*mesh.nEdges());
-  
-  graph.add_node(mesh.nFaces());
+    Graph<double,double,double> graph(mesh.nFaces(), 2*mesh.nEdges());
 
-  for (uint f=0; f < mesh.nFaces(); f++) {
+    graph.add_node(mesh.nFaces());
 
-    graph.add_tweights(f, cost[f], 0.0);
+    for (uint f=0; f < mesh.nFaces(); f++) {
 
-    if (var_lb[f] == 1.0)
-      graph.add_tweights(f, 0.0, 1e50);
-    if (var_ub[f] == 0.0) 
-      graph.add_tweights(f, 1e50,0.0);
-  }
-  for (uint e=0; e < mesh.nEdges(); e++) {
+      graph.add_tweights(f, cost[f], 0.0);
 
-    const std::vector<uint>& adjacent = mesh.adjacent_faces(e);
-
-    if (adjacent.size() == 1) {
-
-      graph.add_tweights(adjacent[0],lambda*mesh.edge_length(e),0.0);
+      if (var_lb[f] == 1.0)
+        graph.add_tweights(f, 0.0, 1e50);
+      if (var_ub[f] == 0.0) 
+        graph.add_tweights(f, 1e50,0.0);
     }
-    else {
-      assert(adjacent.size() == 2);
+    for (uint e=0; e < mesh.nEdges(); e++) {
 
-      graph.add_edge(adjacent[0],adjacent[1],lambda*mesh.edge_length(e),lambda*mesh.edge_length(e));
+      const std::vector<uint>& adjacent = mesh.adjacent_faces(e);
+
+      if (adjacent.size() == 1) {
+
+        graph.add_tweights(adjacent[0],lambda*mesh.edge_length(e),0.0);
+      }
+      else {
+        assert(adjacent.size() == 2);
+
+        graph.add_edge(adjacent[0],adjacent[1],lambda*mesh.edge_length(e),lambda*mesh.edge_length(e));
+      }
     }
-  }
 
-  double gc_energy = graph.maxflow();
+    double gc_energy = graph.maxflow();
 
-  std::cerr << "graph cut energy: " << gc_energy << std::endl;
+    std::cerr << "graph cut energy: " << gc_energy << std::endl;
 
-  Math1D::Vector<double> gc_solution(nVars,0.0);
+    Math1D::Vector<double> gc_solution(nVars,0.0);
 
-  for (uint f=0; f < mesh.nFaces(); f++) {
-    int seg = graph.what_segment(f);
-    gc_solution[f] = (seg == Graph<double,double,double>::SOURCE) ? 0 : 1;
-  }
+    for (uint f=0; f < mesh.nFaces(); f++) {
+      int seg = graph.what_segment(f);
+      gc_solution[f] = (seg == Graph<double,double,double>::SOURCE) ? 0 : 1;
+    }
 
-  lp_solution = gc_solution.direct_access();
+    lp_solution = gc_solution.direct_access();
 #endif
 
 
-  double energy = energy_offset;
-  for (uint i=0; i < nVars; i++)
-    energy += cost[i] * lp_solution[i];
+    double energy = energy_offset;
+    for (uint i=0; i < nVars; i++)
+      energy += cost[i] * lp_solution[i];
 
-  std::cerr << "energy: " << energy << std::endl;
+    std::cerr << "energy: " << energy << std::endl;
 
-  uint out_factor = options.output_factor_;
+    uint out_factor = options.output_factor_;
 
-  segmentation.resize(xDim*out_factor,yDim*out_factor);
+    segmentation.resize(xDim*out_factor,yDim*out_factor);
 
-  mesh.enlarge(out_factor,out_factor);
+    mesh.enlarge(out_factor,out_factor);
 
-  //re-compute pixel shares for the now larger mesh
-  compute_pixel_shares(mesh, out_factor*xDim, out_factor*yDim, shares, share_start);
+    //re-compute pixel shares for the now larger mesh
+    compute_pixel_shares(mesh, out_factor*xDim, out_factor*yDim, shares, share_start);
 
-  for (uint y=0; y < yDim*out_factor; y++) {
-    for (uint x=0; x < xDim*out_factor; x++) {
-      
-      double sum = 0.0;
-      for (uint k= share_start[y*(xDim*out_factor)+x]; k < share_start[y*(xDim*out_factor)+x+1]; k++) {
-	uint face = shares[k].face_idx_;
-	sum += mesh.convex_area(face) * shares[k].share_ * lp_solution[face];
+    for (uint y=0; y < yDim*out_factor; y++) {
+      for (uint x=0; x < xDim*out_factor; x++) {
+
+        double sum = 0.0;
+        for (uint k= share_start[y*(xDim*out_factor)+x]; k < share_start[y*(xDim*out_factor)+x+1]; k++) {
+          uint face = shares[k].face_idx_;
+          sum += mesh.convex_area(face) * shares[k].share_ * lp_solution[face];
+        }
+        segmentation(x,y) = uint(sum*255.0);
       }
-      segmentation(x,y) = uint(sum*255.0);
     }
-  }
 
-  return energy;
+    return energy;
 }
 
 
