@@ -307,10 +307,10 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     if (options.fix_regions_) {
       //Fix region variables
       if (cost[i] < 0) {
-	var_lb[i] = 1.0;
+        var_lb[i] = 1.0;
       }
       else if (cost[i] > 0) {
-	var_ub[i] = 0.0;
+        var_ub[i] = 0.0;
       }
       cost[i] = 0.0;
     }
@@ -348,12 +348,12 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       uint y = edge_pair_var_offs+2*j;
 
       if (edge_pairs[j].common_point_idx_ == mesh.edge(edge).from_idx_)
-	match *= -1;
+        match *= -1;
 
       if (match == -1)
-	var_ub[y+1] = 0.0;
+	      var_ub[y+1] = 0.0;
       else if (match == 1)
-	var_ub[y] = 0.0;
+	      var_ub[y] = 0.0;
     }
 
     edge = second;
@@ -363,12 +363,12 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       uint y = edge_pair_var_offs+2*j;
 
       if (edge_pairs[j].common_point_idx_ == mesh.edge(edge).from_idx_)
-	match *= -1;
+	      match *= -1;
 
       if (match == -1)
-	var_ub[y] = 0.0;
+	      var_ub[y] = 0.0;
       else if (match == 1)
-	var_ub[y+1] = 0.0;
+	      var_ub[y+1] = 0.0;
     }
   }
   Petter::statusOK();
@@ -386,31 +386,31 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     for (uint y=0; y < yDim; y++) {
       for (uint x=0; x < xDim; x++) {
 
-	int fixed = (*fixed_labels)(x,y);
-	if (fixed == 0) {
-	  for (uint v=share_start[y*xDim+x]; v < share_start[y*xDim+x+1]; v++) {
-	    uint f = shares[v].face_idx_;
-	    float area_share = std::min(1.0f, shares[v].share_);
-	    if (area_share >= 0.95)
-	      var_ub[f] = 0.0;
-	    else if (!has_warned) {
-	      std::cerr << Petter::RED << "WARNING: ignored a partial seed region" << Petter::NORMAL << std::endl;
-	      has_warned = true;
-	    }
-	  }
-	}
-	else if (fixed == 1) {
-	  for (uint v=share_start[y*xDim+x]; v < share_start[y*xDim+x+1]; v++) {
-	    uint f = shares[v].face_idx_;
-	    float area_share = std::min(1.0f, shares[v].share_);
-	    if (area_share >= 0.95)
-	      var_lb[f] = 1.0;
-	    else if (!has_warned) {
-	      std::cerr << Petter::RED << "WARNING: ignored a partial seed region" << Petter::NORMAL << std::endl;
-	      has_warned = true;
-	    }
-	  }
-	}
+	      int fixed = (*fixed_labels)(x,y);
+	      if (fixed == 0) {
+	        for (uint v=share_start[y*xDim+x]; v < share_start[y*xDim+x+1]; v++) {
+	          uint f = shares[v].face_idx_;
+	          float area_share = std::min(1.0f, shares[v].share_);
+	          if (area_share >= 0.95)
+	            var_ub[f] = 0.0;
+	          else if (!has_warned) {
+	            std::cerr << Petter::RED << "WARNING: ignored a partial seed region" << Petter::NORMAL << std::endl;
+	            has_warned = true;
+	          }
+	        }
+	      }
+	      else if (fixed == 1) {
+	        for (uint v=share_start[y*xDim+x]; v < share_start[y*xDim+x+1]; v++) {
+	          uint f = shares[v].face_idx_;
+	          float area_share = std::min(1.0f, shares[v].share_);
+	          if (area_share >= 0.95)
+	            var_lb[f] = 1.0;
+	          else if (!has_warned) {
+	            std::cerr << Petter::RED << "WARNING: ignored a partial seed region" << Petter::NORMAL << std::endl;
+	            has_warned = true;
+	          }
+	        }
+	      }
       }
     }
   }
@@ -430,7 +430,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
     const std::vector<uint>& adjacent_faces = mesh.adjacent_faces(j);
     for (std::vector<uint>::const_iterator it = adjacent_faces.begin();
-	 it != adjacent_faces.end(); it++) {
+    it != adjacent_faces.end(); it++) {
 
       lp_descr.add_entry(j,*it,mesh.match(*it,j));
     }
@@ -503,7 +503,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       rhs_upper[c] = 1.0;
       if (!light_constraints)
-	rhs_upper[c+1] = 1.0;
+        rhs_upper[c+1] = 1.0;
     }
 
     for (uint j=0; j < edge_pairs.size(); j++) {
@@ -515,25 +515,25 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
 
       if (mesh.edge(first_edge).to_idx_ == middle_point) { 
-	lp_descr.add_entry(consistency_con_offs + light_factor*first_edge, edge_pair_var_offs+2*j, 1);
-	lp_descr.add_entry(consistency_con_offs + light_factor*first_edge, edge_pair_var_offs+2*j+1, 1);
+        lp_descr.add_entry(consistency_con_offs + light_factor*first_edge, edge_pair_var_offs+2*j, 1);
+        lp_descr.add_entry(consistency_con_offs + light_factor*first_edge, edge_pair_var_offs+2*j+1, 1);
       }
       else {
-	if (!light_constraints) {
-	  lp_descr.add_entry(consistency_con_offs + light_factor*first_edge+1, edge_pair_var_offs+2*j, 1);
-	  lp_descr.add_entry(consistency_con_offs + light_factor*first_edge+1, edge_pair_var_offs+2*j+1, 1);
-	}
+        if (!light_constraints) {
+          lp_descr.add_entry(consistency_con_offs + light_factor*first_edge+1, edge_pair_var_offs+2*j, 1);
+          lp_descr.add_entry(consistency_con_offs + light_factor*first_edge+1, edge_pair_var_offs+2*j+1, 1);
+        }
       }
 
       if (mesh.edge(second_edge).to_idx_ == middle_point) {
-	lp_descr.add_entry(consistency_con_offs + light_factor*second_edge, edge_pair_var_offs+2*j, 1);
-	lp_descr.add_entry(consistency_con_offs + light_factor*second_edge, edge_pair_var_offs+2*j+1, 1);
+        lp_descr.add_entry(consistency_con_offs + light_factor*second_edge, edge_pair_var_offs+2*j, 1);
+        lp_descr.add_entry(consistency_con_offs + light_factor*second_edge, edge_pair_var_offs+2*j+1, 1);
       }
       else {
-	if (!light_constraints) {
-	  lp_descr.add_entry(consistency_con_offs + light_factor*second_edge+1, edge_pair_var_offs+2*j, 1);
-	  lp_descr.add_entry(consistency_con_offs + light_factor*second_edge+1, edge_pair_var_offs+2*j+1, 1);
-	}
+        if (!light_constraints) {
+          lp_descr.add_entry(consistency_con_offs + light_factor*second_edge+1, edge_pair_var_offs+2*j, 1);
+          lp_descr.add_entry(consistency_con_offs + light_factor*second_edge+1, edge_pair_var_offs+2*j+1, 1);
+        }
       }
     }
 
@@ -830,12 +830,12 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       double entry = lp_descr.value()[k];
 
       if (entry == -1.0)
-	nNeg++;
+        nNeg++;
       else if (entry == 1.0)
-	nPos++;
+        nPos++;
       else {
-	INTERNAL_ERROR << " cannot create a +1/-1 matrix from this matrix. exiting..." << std::endl;
-	exit(1);
+        INTERNAL_ERROR << " cannot create a +1/-1 matrix from this matrix. exiting..." << std::endl;
+        exit(1);
       }
     }
 
@@ -852,19 +852,19 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       for (uint k=row_start[r]; k < row_start[r+1]; k++) {
 
-	if (lp_descr.value()[k] == 1.0) {
-	  pmone_idx[cur_pos] = lp_descr.col_indices()[k];
-	  cur_pos++;
-	}
+        if (lp_descr.value()[k] == 1.0) {
+          pmone_idx[cur_pos] = lp_descr.col_indices()[k];
+          cur_pos++;
+        }
       }
 
       row_neg_start[r] = cur_pos;
       for (uint k=row_start[r]; k < row_start[r+1]; k++) {
 
-	if (lp_descr.value()[k] == -1.0) {
-	  pmone_idx[cur_pos] = lp_descr.col_indices()[k];
-	  cur_pos++;
-	}
+        if (lp_descr.value()[k] == -1.0) {
+          pmone_idx[cur_pos] = lp_descr.col_indices()[k];
+          cur_pos++;
+        }
       }    
     }
 
@@ -872,7 +872,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     row_neg_start[row_start.size()-1] = cur_pos;
 
     ClpPlusMinusOneMatrix pmone_matrix(row_start.size()-1,nVars,false,pmone_idx.direct_access(),
-				       row_pos_start.direct_access(),row_neg_start.direct_access());
+                                       row_pos_start.direct_access(),row_neg_start.direct_access());
 
     pmone_idx.resize(0);
     row_pos_start.resize(0);
@@ -931,7 +931,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       
       double val = lp_solution[i];
       if (val > 0.01 && val < 0.99) {
-	nNonInt++;
+        nNonInt++;
       }
     }
 
@@ -940,102 +940,102 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   uint nIter = 0;
   while (prevent_crossings) {
-    
+
     nIter++;
-    
+
     std::cerr << "##### constraint generation iter #" << nIter << std::endl;
-    
+
     uint nConstraintsAdded = 0;
     for (uint p=0; p < mesh.nPoints(); p++) {
-      
+
       double sum = 0.0;
       for (std::vector<uint>::iterator it = point_pairs[p].begin(); it != point_pairs[p].end(); it++)
-	sum += lp_solution[edge_pair_var_offs +  2*(*it)] + lp_solution[edge_pair_var_offs +  2*(*it) + 1];
-      
+        sum += lp_solution[edge_pair_var_offs +  2*(*it)] + lp_solution[edge_pair_var_offs +  2*(*it) + 1];
+
       if (sum > 1.0) {
-	std::cerr << "point #" << p << " might be a crossing point" << std::endl;
-	
-	uint nPrevAdded = nConstraintsAdded;
-	
-	for (uint k1=0; k1 < point_pairs[p].size()-1; k1++) {
-	  
-	  uint pair1 = point_pairs[p][k1];
-	  
-	  for (uint k2=k1+1; k2 < point_pairs[p].size(); k2++) {
-	    
-	    uint pair2 = point_pairs[p][k2];
-	    
-	    double sum = lp_solution[edge_pair_var_offs +  2*pair1] + lp_solution[edge_pair_var_offs +  2*pair1 + 1]
-	      + lp_solution[edge_pair_var_offs +  2*pair2] + lp_solution[edge_pair_var_offs +  2*pair2 + 1];
-	    
-	    if (sum >= 1.01) {
+        std::cerr << "point #" << p << " might be a crossing point" << std::endl;
 
-	      //std::cerr << "checking pair" << std::endl;
+        uint nPrevAdded = nConstraintsAdded;
 
-	      uint pair1_edge1 = edge_pairs[pair1].first_edge_idx_;
-	      uint pair1_edge2 = edge_pairs[pair1].second_edge_idx_;
-	      
-	      uint p1_idx = (mesh.edge(pair1_edge1).from_idx_ != p) ? 
-		mesh.edge(pair1_edge1).from_idx_ : mesh.edge(pair1_edge1).to_idx_;
-	      
-	      uint p2_idx = (mesh.edge(pair1_edge2).from_idx_ != p) ? 
-		mesh.edge(pair1_edge2).from_idx_ : mesh.edge(pair1_edge2).to_idx_;
-	      
-	      uint pair2_edge1 = edge_pairs[pair2].first_edge_idx_;
-	      uint pair2_edge2 = edge_pairs[pair2].second_edge_idx_;
-	      
-	      uint p3_idx = (mesh.edge(pair2_edge1).from_idx_ != p) ? 
-		mesh.edge(pair2_edge1).from_idx_ : mesh.edge(pair2_edge1).to_idx_;
-	      
-	      uint p4_idx = (mesh.edge(pair2_edge2).from_idx_ != p) ? 
-		mesh.edge(pair2_edge2).from_idx_ : mesh.edge(pair2_edge2).to_idx_;
-	      
-	      if ( line_pairs_with_meeting_point_cross(mesh.point(p1_idx), mesh.point(p2_idx), mesh.point(p3_idx), 
-						       mesh.point(p4_idx), mesh.point(p)) ) {
+        for (uint k1=0; k1 < point_pairs[p].size()-1; k1++) {
 
-		//std::cerr << "pair needs to be handled!" << std::endl;
-		//add the constraint
-		int cols[4];
-		double coeffs[4] = {1.0,1.0,1.0,1.0};
-		cols[0] = edge_pair_var_offs +  2*pair1;
-		cols[1] = edge_pair_var_offs +  2*pair1 + 1;
-		cols[2] = edge_pair_var_offs +  2*pair2;
-		cols[3] = edge_pair_var_offs +  2*pair2 + 1;
-		
-		//note: adding constraints separately is VERY inefficient
-		if (solver == "clp")
-		  lpSolver.addRow(4, cols, coeffs, 0.0, 1.0);
+          uint pair1 = point_pairs[p][k1];
+
+          for (uint k2=k1+1; k2 < point_pairs[p].size(); k2++) {
+
+            uint pair2 = point_pairs[p][k2];
+
+            double sum = lp_solution[edge_pair_var_offs +  2*pair1] + lp_solution[edge_pair_var_offs +  2*pair1 + 1]
+            + lp_solution[edge_pair_var_offs +  2*pair2] + lp_solution[edge_pair_var_offs +  2*pair2 + 1];
+
+            if (sum >= 1.01) {
+
+              //std::cerr << "checking pair" << std::endl;
+
+              uint pair1_edge1 = edge_pairs[pair1].first_edge_idx_;
+              uint pair1_edge2 = edge_pairs[pair1].second_edge_idx_;
+
+              uint p1_idx = (mesh.edge(pair1_edge1).from_idx_ != p) ? 
+                mesh.edge(pair1_edge1).from_idx_ : mesh.edge(pair1_edge1).to_idx_;
+
+              uint p2_idx = (mesh.edge(pair1_edge2).from_idx_ != p) ? 
+                mesh.edge(pair1_edge2).from_idx_ : mesh.edge(pair1_edge2).to_idx_;
+
+              uint pair2_edge1 = edge_pairs[pair2].first_edge_idx_;
+              uint pair2_edge2 = edge_pairs[pair2].second_edge_idx_;
+
+              uint p3_idx = (mesh.edge(pair2_edge1).from_idx_ != p) ? 
+                mesh.edge(pair2_edge1).from_idx_ : mesh.edge(pair2_edge1).to_idx_;
+
+              uint p4_idx = (mesh.edge(pair2_edge2).from_idx_ != p) ? 
+                mesh.edge(pair2_edge2).from_idx_ : mesh.edge(pair2_edge2).to_idx_;
+
+              if ( line_pairs_with_meeting_point_cross(mesh.point(p1_idx), mesh.point(p2_idx), mesh.point(p3_idx), 
+                mesh.point(p4_idx), mesh.point(p)) ) {
+
+                  //std::cerr << "pair needs to be handled!" << std::endl;
+                  //add the constraint
+                  int cols[4];
+                  double coeffs[4] = {1.0,1.0,1.0,1.0};
+                  cols[0] = edge_pair_var_offs +  2*pair1;
+                  cols[1] = edge_pair_var_offs +  2*pair1 + 1;
+                  cols[2] = edge_pair_var_offs +  2*pair2;
+                  cols[3] = edge_pair_var_offs +  2*pair2 + 1;
+
+                  //note: adding constraints separately is VERY inefficient
+                  if (solver == "clp")
+                    lpSolver.addRow(4, cols, coeffs, 0.0, 1.0);
 #ifdef HAS_GUROBI
-		if (solver == "gurobi") {
-		  GRBaddconstr(grb_model,4,cols,coeffs,'L',1.0,NULL);
-		}
+                  if (solver == "gurobi") {
+                    GRBaddconstr(grb_model,4,cols,coeffs,'L',1.0,NULL);
+                  }
 #endif
 #ifdef HAS_XPRESS
-		if (solver == "xpress") {
-		  
-		  double new_rhs[1] = {1.0};
-		  double new_range[1] = {0.0};
-		  int new_start[2] = {0,4};
-		  XPRSaddrows(xp_prob, 1, 4, "L", new_rhs,new_range,new_start,cols,coeffs);
-		}
+                  if (solver == "xpress") {
+
+                    double new_rhs[1] = {1.0};
+                    double new_range[1] = {0.0};
+                    int new_start[2] = {0,4};
+                    XPRSaddrows(xp_prob, 1, 4, "L", new_rhs,new_range,new_start,cols,coeffs);
+                  }
 #endif
 #ifdef HAS_CPLEX
-		if (solver == "cplex") {
+                  if (solver == "cplex") {
 
-		  double new_rhs[1] = {1.0};
-		  int new_start[2] = {0,4};
-		  
-		  CPXaddrows(cp_env, cp_lp, 0, 1, 4, new_rhs, "L", new_start, cols, coeffs,  NULL, NULL);
-		}
+                    double new_rhs[1] = {1.0};
+                    int new_start[2] = {0,4};
+
+                    CPXaddrows(cp_env, cp_lp, 0, 1, 4, new_rhs, "L", new_start, cols, coeffs,  NULL, NULL);
+                  }
 #endif		
-		nConstraintsAdded++;
-	      }
-	    }
-	  }
-	}
-	
-	if (nPrevAdded != nConstraintsAdded)
-	  std::cerr << "added " << (nConstraintsAdded - nPrevAdded) << " constraints" << std::endl;
+                  nConstraintsAdded++;
+              }
+            }
+          }
+        }
+
+        if (nPrevAdded != nConstraintsAdded)
+          std::cerr << "added " << (nConstraintsAdded - nPrevAdded) << " constraints" << std::endl;
       }
     }
 
@@ -1044,45 +1044,45 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     if (nConstraintsAdded > 0) {
 
       if (solver == "clp") {
-	lpSolver.dual();
-	lp_solution = lpSolver.primalColumnSolution();
+        lpSolver.dual();
+        lp_solution = lpSolver.primalColumnSolution();
       }
 #ifdef HAS_GUROBI
       if (solver == "gurobi") {
 
-	int error = GRBupdatemodel(grb_model);
-	error = GRBoptimize(grb_model);
-	assert(!error);
-	
-	for (uint v=0; v < nVars; v++)
-	  GRBgetdblattrelement(grb_model,"X",v, GUROBI_solution.direct_access()+v);
-	
-	lp_solution = GUROBI_solution.direct_access();
+        int error = GRBupdatemodel(grb_model);
+        error = GRBoptimize(grb_model);
+        assert(!error);
+
+        for (uint v=0; v < nVars; v++)
+          GRBgetdblattrelement(grb_model,"X",v, GUROBI_solution.direct_access()+v);
+
+        lp_solution = GUROBI_solution.direct_access();
       }
 #endif
 #ifdef HAS_XPRESS
       if (solver == "xpress") {
 
-	XPRSlpoptimize(xp_prob,"b");      
-	XPRSgetlpsol(xp_prob, XPRESS_solution.direct_access(), 0, 0, 0); 
-	
-	lp_solution = XPRESS_solution.direct_access();
+        XPRSlpoptimize(xp_prob,"b");      
+        XPRSgetlpsol(xp_prob, XPRESS_solution.direct_access(), 0, 0, 0); 
+
+        lp_solution = XPRESS_solution.direct_access();
       }
 #endif
 #ifdef HAS_CPLEX
       if (solver == "cplex") {
 
-	int cpx_status = CPXbaropt(cp_env,cp_lp);
-	//int cpx_status = CPXlpopt(cp_env,cp_lp);
-	
-	if ( cpx_status ) {
-	  fprintf (stderr, "Failed to optimize MIP.\n");
-	  exit(1);
-	}
-	
-	CPXsolution (cp_env, cp_lp, NULL, NULL, CPLEX_solution.direct_access(), NULL, NULL, NULL);
-	    
-	lp_solution = CPLEX_solution.direct_access();
+        int cpx_status = CPXbaropt(cp_env,cp_lp);
+        //int cpx_status = CPXlpopt(cp_env,cp_lp);
+
+        if ( cpx_status ) {
+          fprintf (stderr, "Failed to optimize MIP.\n");
+          exit(1);
+        }
+
+        CPXsolution (cp_env, cp_lp, NULL, NULL, CPLEX_solution.direct_access(), NULL, NULL, NULL);
+
+        lp_solution = CPLEX_solution.direct_access();
       }
 #endif
     }
@@ -1149,38 +1149,38 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       for (uint p=0; p < edge_pairs.size(); p++) {
 
-	uint edge1 = edge_pairs[p].first_edge_idx_;
-	uint edge2 = edge_pairs[p].second_edge_idx_;
+        uint edge1 = edge_pairs[p].first_edge_idx_;
+        uint edge2 = edge_pairs[p].second_edge_idx_;
 
-	double drop1 = 0.0;
-	for (uint i=0; i < mesh.adjacent_faces(edge1).size(); i++) {
-	  uint face = mesh.adjacent_faces(edge1)[i];
-	  drop1 += var_ub[face] * mesh.match(face,edge1);      
-	}
+        double drop1 = 0.0;
+        for (uint i=0; i < mesh.adjacent_faces(edge1).size(); i++) {
+          uint face = mesh.adjacent_faces(edge1)[i];
+          drop1 += var_ub[face] * mesh.match(face,edge1);      
+        }
 
-	double drop2 = 0.0;
-	for (uint i=0; i < mesh.adjacent_faces(edge2).size(); i++) {
-	  uint face = mesh.adjacent_faces(edge2)[i];
-	  drop2 += var_ub[face] * mesh.match(face,edge2);      
-	}
+        double drop2 = 0.0;
+        for (uint i=0; i < mesh.adjacent_faces(edge2).size(); i++) {
+          uint face = mesh.adjacent_faces(edge2)[i];
+          drop2 += var_ub[face] * mesh.match(face,edge2);      
+        }
 
-	if (drop1 == 0.0 || drop2 == 0.0) {
-	  var_ub[edge_pair_var_offs + 2*p] = 0.0;
-	  var_ub[edge_pair_var_offs + 2*p+1] = 0.0;
-	}
-	else {
+        if (drop1 == 0.0 || drop2 == 0.0) {
+          var_ub[edge_pair_var_offs + 2*p] = 0.0;
+          var_ub[edge_pair_var_offs + 2*p+1] = 0.0;
+        }
+        else {
 
-	  if (mesh.edge(edge1).from_idx_ == edge_pairs[p].common_point_idx_) {
+          if (mesh.edge(edge1).from_idx_ == edge_pairs[p].common_point_idx_) {
 
-	    drop1 *= -1.0;
-	    drop2 *= -1.0;
-	  }
+            drop1 *= -1.0;
+            drop2 *= -1.0;
+          }
 
-	  if (drop1 < 0.0)
-	    var_ub[edge_pair_var_offs + 2*p+1] = 0.0;
-	  else
-	    var_ub[edge_pair_var_offs + 2*p] = 0.0;
-	}
+          if (drop1 < 0.0)
+            var_ub[edge_pair_var_offs + 2*p+1] = 0.0;
+          else
+            var_ub[edge_pair_var_offs + 2*p] = 0.0;
+        }
       }
     }
 
@@ -1188,19 +1188,19 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
     if (solver == "clp") {
       for (uint i=0; i < (uint) lpSolver.getNumCols(); i++) {
-	
-	if (! (var_lb[i] <= var_ub[i]))
-	  std::cerr << i << ", lb: " << var_lb[i] << ", ub: " << var_ub[i] << std::endl;
-	
-	assert(var_lb[i] <= var_ub[i]);
-	lpSolver.setColumnBounds(i,var_lb[i],var_ub[i]);
+
+        if (! (var_lb[i] <= var_ub[i]))
+          std::cerr << i << ", lb: " << var_lb[i] << ", ub: " << var_ub[i] << std::endl;
+
+        assert(var_lb[i] <= var_ub[i]);
+        lpSolver.setColumnBounds(i,var_lb[i],var_ub[i]);
       }
     }
 #ifdef HAS_GUROBI
     if (solver == "gurobi") {	
       for (uint v=0; v < mesh.nFaces(); v++) {
-	GRBsetdblattrelement(grb_model,"LB",v,var_lb[v]);
-	GRBsetdblattrelement(grb_model,"UB",v,var_ub[v]);
+        GRBsetdblattrelement(grb_model,"LB",v,var_lb[v]);
+        GRBsetdblattrelement(grb_model,"UB",v,var_ub[v]);
       }
     }
 #endif
@@ -1208,10 +1208,10 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     if (solver == "xpress") {
       Math1D::Vector<int> indices(mesh.nFaces());
       for (uint v=0; v < mesh.nFaces(); v++)
-	indices[v] = v;
-      
+        indices[v] = v;
+
       Storage1D<char> indicator(mesh.nFaces(),'L');
-      
+
       XPRSchgbounds(xp_prob, mesh.nFaces(), indices.direct_access(), indicator.direct_access(), var_lb.direct_access());
       indicator.set_constant('U');
       XPRSchgbounds(xp_prob, mesh.nFaces(), indices.direct_access(), indicator.direct_access(), var_ub.direct_access());
@@ -1222,8 +1222,8 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       Math1D::Vector<int> indices(mesh.nFaces());
       for (uint v=0; v < mesh.nFaces(); v++)
-	indices[v] = v;
-      
+        indices[v] = v;
+
       Storage1D<char> indicator(mesh.nFaces(),'L');
       CPXchgbds(cp_env, cp_lp, mesh.nFaces(), indices.direct_access(), indicator.direct_access(), var_lb.direct_access());
       indicator.set_constant('U');
@@ -1234,29 +1234,29 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     if (solver == "clp") {
       lpSolver.dual();
       lp_solution = lpSolver.primalColumnSolution();
-      
+
       error = 1 - lpSolver.isProvenOptimal();
       assert(!error);
     }
 #ifdef HAS_GUROBI
     if (solver == "gurobi") {
-      
+
       int error = GRBupdatemodel(grb_model);
       error = GRBoptimize(grb_model);
       assert(!error);
-      
+
       for (uint v=0; v < nVars; v++)
-	GRBgetdblattrelement(grb_model,"X",v, GUROBI_solution.direct_access()+v);
-      
+        GRBgetdblattrelement(grb_model,"X",v, GUROBI_solution.direct_access()+v);
+
       lp_solution = GUROBI_solution.direct_access();
     }
 #endif
 #ifdef HAS_XPRESS
     if (solver == "xpress") {
-      
+
       XPRSlpoptimize(xp_prob,"b");      
       XPRSgetlpsol(xp_prob, XPRESS_solution.direct_access(), 0, 0, 0); 
-      
+
       lp_solution = XPRESS_solution.direct_access();
     }
 #endif
@@ -1265,14 +1265,14 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       int cpx_status = CPXbaropt(cp_env,cp_lp);
       //int cpx_status = CPXlpopt(cp_env,cp_lp);
-      
+
       if ( cpx_status ) {
-	fprintf (stderr, "Failed to optimize MIP.\n");
-	exit(1);
+        fprintf (stderr, "Failed to optimize MIP.\n");
+        exit(1);
       }
-      
+
       CPXsolution (cp_env, cp_lp, NULL, NULL, CPLEX_solution.direct_access(), NULL, NULL, NULL);
-      
+
       lp_solution = CPLEX_solution.direct_access();
     }
 #endif
@@ -1283,145 +1283,145 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       nIter++;
 
       std::cerr << "##### constraint generation (for thresholded solution) iter #" << nIter << std::endl;
-      
+
       uint nConstraintsAdded = 0;
       for (uint p=0; p < mesh.nPoints(); p++) {
-	
-	double sum = 0.0;
-	for (std::vector<uint>::iterator it = point_pairs[p].begin(); it != point_pairs[p].end(); it++)
-	  sum += lp_solution[edge_pair_var_offs +  2*(*it)] + lp_solution[edge_pair_var_offs +  2*(*it) + 1];
-	
-	if (sum > 1.0) {
-	  
-	  for (uint k1=0; k1 < point_pairs[p].size()-1; k1++) {
-	    
-	    uint pair1 = point_pairs[p][k1];
-	    
-	    for (uint k2=k1+1; k2 < point_pairs[p].size(); k2++) {
-	      
-	      uint pair2 = point_pairs[p][k2];
-	      
-	      double sum = lp_solution[edge_pair_var_offs +  2*pair1] + lp_solution[edge_pair_var_offs +  2*pair1 + 1]
-		+ lp_solution[edge_pair_var_offs +  2*pair2] + lp_solution[edge_pair_var_offs +  2*pair2 + 1];
-	      
-	      if (sum >= 1.01) {
-		
-		//std::cerr << "checking pair" << std::endl;
-		
-		uint pair1_edge1 = edge_pairs[pair1].first_edge_idx_;
-		uint pair1_edge2 = edge_pairs[pair1].second_edge_idx_;
-		
-		uint p1_idx = (mesh.edge(pair1_edge1).from_idx_ != p) ? 
-		  mesh.edge(pair1_edge1).from_idx_ : mesh.edge(pair1_edge1).to_idx_;
-		
-		uint p2_idx = (mesh.edge(pair1_edge2).from_idx_ != p) ? 
-		  mesh.edge(pair1_edge2).from_idx_ : mesh.edge(pair1_edge2).to_idx_;
 
-		uint pair2_edge1 = edge_pairs[pair2].first_edge_idx_;
-		uint pair2_edge2 = edge_pairs[pair2].second_edge_idx_;
-		
-		uint p3_idx = (mesh.edge(pair2_edge1).from_idx_ != p) ? 
-		  mesh.edge(pair2_edge1).from_idx_ : mesh.edge(pair2_edge1).to_idx_;
-		
-		uint p4_idx = (mesh.edge(pair2_edge2).from_idx_ != p) ? 
-		  mesh.edge(pair2_edge2).from_idx_ : mesh.edge(pair2_edge2).to_idx_;
-		
-		if ( line_pairs_with_meeting_point_cross(mesh.point(p1_idx), mesh.point(p2_idx), mesh.point(p3_idx), 
-							 mesh.point(p4_idx), mesh.point(p)) ) {
-		  
-		  //std::cerr << "pair needs to be handled!" << std::endl;
-		  //add the constraint
-		  int cols[4];
-		  double coeffs[4] = {1.0,1.0,1.0,1.0};
-		  cols[0] = edge_pair_var_offs +  2*pair1;
-		  cols[1] = edge_pair_var_offs +  2*pair1 + 1;
-		  cols[2] = edge_pair_var_offs +  2*pair2;
-		  cols[3] = edge_pair_var_offs +  2*pair2 + 1;
-		    
-		  //note: adding constraints separately is VERY inefficient
-		  if (solver == "clp")
-		    lpSolver.addRow(4, cols, coeffs, 0.0, 1.0);
+        double sum = 0.0;
+        for (std::vector<uint>::iterator it = point_pairs[p].begin(); it != point_pairs[p].end(); it++)
+          sum += lp_solution[edge_pair_var_offs +  2*(*it)] + lp_solution[edge_pair_var_offs +  2*(*it) + 1];
+
+        if (sum > 1.0) {
+
+          for (uint k1=0; k1 < point_pairs[p].size()-1; k1++) {
+
+            uint pair1 = point_pairs[p][k1];
+
+            for (uint k2=k1+1; k2 < point_pairs[p].size(); k2++) {
+
+              uint pair2 = point_pairs[p][k2];
+
+              double sum = lp_solution[edge_pair_var_offs +  2*pair1] + lp_solution[edge_pair_var_offs +  2*pair1 + 1]
+              + lp_solution[edge_pair_var_offs +  2*pair2] + lp_solution[edge_pair_var_offs +  2*pair2 + 1];
+
+              if (sum >= 1.01) {
+
+                //std::cerr << "checking pair" << std::endl;
+
+                uint pair1_edge1 = edge_pairs[pair1].first_edge_idx_;
+                uint pair1_edge2 = edge_pairs[pair1].second_edge_idx_;
+
+                uint p1_idx = (mesh.edge(pair1_edge1).from_idx_ != p) ? 
+                  mesh.edge(pair1_edge1).from_idx_ : mesh.edge(pair1_edge1).to_idx_;
+
+                uint p2_idx = (mesh.edge(pair1_edge2).from_idx_ != p) ? 
+                  mesh.edge(pair1_edge2).from_idx_ : mesh.edge(pair1_edge2).to_idx_;
+
+                uint pair2_edge1 = edge_pairs[pair2].first_edge_idx_;
+                uint pair2_edge2 = edge_pairs[pair2].second_edge_idx_;
+
+                uint p3_idx = (mesh.edge(pair2_edge1).from_idx_ != p) ? 
+                  mesh.edge(pair2_edge1).from_idx_ : mesh.edge(pair2_edge1).to_idx_;
+
+                uint p4_idx = (mesh.edge(pair2_edge2).from_idx_ != p) ? 
+                  mesh.edge(pair2_edge2).from_idx_ : mesh.edge(pair2_edge2).to_idx_;
+
+                if ( line_pairs_with_meeting_point_cross(mesh.point(p1_idx), mesh.point(p2_idx), mesh.point(p3_idx), 
+                  mesh.point(p4_idx), mesh.point(p)) ) {
+
+                    //std::cerr << "pair needs to be handled!" << std::endl;
+                    //add the constraint
+                    int cols[4];
+                    double coeffs[4] = {1.0,1.0,1.0,1.0};
+                    cols[0] = edge_pair_var_offs +  2*pair1;
+                    cols[1] = edge_pair_var_offs +  2*pair1 + 1;
+                    cols[2] = edge_pair_var_offs +  2*pair2;
+                    cols[3] = edge_pair_var_offs +  2*pair2 + 1;
+
+                    //note: adding constraints separately is VERY inefficient
+                    if (solver == "clp")
+                      lpSolver.addRow(4, cols, coeffs, 0.0, 1.0);
 #ifdef HAS_GUROBI
-		  if (solver == "gurobi") {
-		    GRBaddconstr(grb_model,4,cols,coeffs,'L',1.0,NULL);
-		  }
+                    if (solver == "gurobi") {
+                      GRBaddconstr(grb_model,4,cols,coeffs,'L',1.0,NULL);
+                    }
 #endif
 #ifdef HAS_XPRESS
-		  if (solver == "xpress") {
-		    
-		    double new_rhs[1] = {1.0};
-		    double new_range[1] = {0.0};
-		    int new_start[2] = {0,4};
-		    XPRSaddrows(xp_prob, 1, 4, "L", new_rhs,new_range,new_start,cols,coeffs);
-		  }
+                    if (solver == "xpress") {
+
+                      double new_rhs[1] = {1.0};
+                      double new_range[1] = {0.0};
+                      int new_start[2] = {0,4};
+                      XPRSaddrows(xp_prob, 1, 4, "L", new_rhs,new_range,new_start,cols,coeffs);
+                    }
 #endif
 #ifdef HAS_CPLEX
-		  if (solver == "cplex") {
-		    
-		    double new_rhs[1] = {1.0};
-		    int new_start[2] = {0,4};
-		    
-		    CPXaddrows(cp_env, cp_lp, 0, 1, 4, new_rhs, "L", new_start, cols, coeffs,  NULL, NULL);
-		  }
+                    if (solver == "cplex") {
+
+                      double new_rhs[1] = {1.0};
+                      int new_start[2] = {0,4};
+
+                      CPXaddrows(cp_env, cp_lp, 0, 1, 4, new_rhs, "L", new_start, cols, coeffs,  NULL, NULL);
+                    }
 #endif
 
-		  nConstraintsAdded++;
-		}
-	      }
-	    }
-	  }
-	}
+                    nConstraintsAdded++;
+                }
+              }
+            }
+          }
+        }
       }
 
       std::cerr << "added " << nConstraintsAdded << " constraints" << std::endl;
 
       if (nConstraintsAdded > 0) {
-	
-	if (solver == "clp") {
-	  lpSolver.dual();
-	  lp_solution = lpSolver.primalColumnSolution();
-	}
+
+        if (solver == "clp") {
+          lpSolver.dual();
+          lp_solution = lpSolver.primalColumnSolution();
+        }
 #ifdef HAS_GUROBI
-	if (solver == "gurobi") {
-	  
-	  int error = GRBupdatemodel(grb_model);
-	  error = GRBoptimize(grb_model);
-	  assert(!error);
-	  
-	  for (uint v=0; v < nVars; v++)
-	    GRBgetdblattrelement(grb_model,"X",v, GUROBI_solution.direct_access()+v);
-	  
-	  lp_solution = GUROBI_solution.direct_access();
-	}
+        if (solver == "gurobi") {
+
+          int error = GRBupdatemodel(grb_model);
+          error = GRBoptimize(grb_model);
+          assert(!error);
+
+          for (uint v=0; v < nVars; v++)
+            GRBgetdblattrelement(grb_model,"X",v, GUROBI_solution.direct_access()+v);
+
+          lp_solution = GUROBI_solution.direct_access();
+        }
 #endif
 #ifdef HAS_XPRESS
-	if (solver == "xpress") {
+        if (solver == "xpress") {
 
-	  XPRSlpoptimize(xp_prob,"b");      
-	  XPRSgetlpsol(xp_prob, XPRESS_solution.direct_access(), 0, 0, 0); 
-	  
-	  lp_solution = XPRESS_solution.direct_access();
-	}
+          XPRSlpoptimize(xp_prob,"b");      
+          XPRSgetlpsol(xp_prob, XPRESS_solution.direct_access(), 0, 0, 0); 
+
+          lp_solution = XPRESS_solution.direct_access();
+        }
 #endif
 #ifdef HAS_CPLEX
-	if (solver == "cplex") {
-	  
-	  int cpx_status = CPXbaropt(cp_env,cp_lp);
-	  //int cpx_status = CPXlpopt(cp_env,cp_lp);
-	  
-	  if ( cpx_status ) {
-	    fprintf (stderr, "Failed to optimize MIP.\n");
-	    exit(1);
-	  }
-	    
-	  CPXsolution (cp_env, cp_lp, NULL, NULL, CPLEX_solution.direct_access(), NULL, NULL, NULL);
-	    
-	  lp_solution = CPLEX_solution.direct_access();
-	}
+        if (solver == "cplex") {
+
+          int cpx_status = CPXbaropt(cp_env,cp_lp);
+          //int cpx_status = CPXlpopt(cp_env,cp_lp);
+
+          if ( cpx_status ) {
+            fprintf (stderr, "Failed to optimize MIP.\n");
+            exit(1);
+          }
+
+          CPXsolution (cp_env, cp_lp, NULL, NULL, CPLEX_solution.direct_access(), NULL, NULL, NULL);
+
+          lp_solution = CPLEX_solution.direct_access();
+        }
 #endif
       }
       else
-	break;
+        break;
     }
 
     double thresh_energy = energy_offset;
@@ -1429,12 +1429,12 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     for (uint i=0; i < nVars; i++) {
       double val = lp_solution[i]; 
       if (val > 0.01 && val < 0.99)
-	nNonIntThresh++;
+        nNonIntThresh++;
       thresh_energy += cost[i] * val;
     }
 
     std::cerr << "energy of thresholded solution: " << thresh_energy 
-	      << "  (" << nNonIntThresh << " non-integral variables)" << std::endl;
+      << "  (" << nNonIntThresh << " non-integral variables)" << std::endl;
   }
   else {
 
