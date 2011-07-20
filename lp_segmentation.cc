@@ -257,6 +257,8 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   double gamma = options.gamma_;
   int neighborhood = options.neighborhood_;
   bool enforce_consistent_boundaries = options.enforce_consistent_boundaries_;
+  bool enforce_consistent_points = options.enforce_consistent_points_;
+  bool enforce_regionedge = options.enforce_regionedge_;
   bool prevent_crossings = options.prevent_crossings_;
   bool light_constraints = options.light_constraints_;
   bool bruckstein = options.bruckstein_;
@@ -299,6 +301,14 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   const uint consistency_con_offs = nConstraints;
   if (enforce_consistent_boundaries) {
     nConstraints += light_factor*mesh.nEdges();
+  }
+  const uint point_consistency_con_offs = nConstraints;
+  if (enforce_consistent_points) {
+    nConstraints += mesh.nPoints();
+  }
+  const uint regionedge_constraints_offs = nConstraints;
+  if (enforce_regionedge) {
+    nConstraints += 2*light_factor*mesh.nEdges();
   }
 
   Math1D::NamedVector<double> var_lb(nVars,0.0,MAKENAME(var_lb));
@@ -425,6 +435,13 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     //we also allocate space for the slack variables used with the convex solver
     nEntries += uint( light_factor*2*edge_pairs.size() + light_factor*mesh.nEdges()); 
   }
+  if (enforce_consistent_points) {
+    nEntries += uint( 2*edge_pairs.size() );
+  }
+  if (enforce_regionedge) {
+    nEntries += uint( 8*light_factor*edge_pairs.size() //Note: not exact number
+		      + 2*light_factor*mesh.nEdges() ); //we also allocate space for the slack variables used with the convex solver
+  }
 
   SparseMatrixDescription<double> lp_descr(nEntries, nConstraints, nVars);
 
@@ -544,6 +561,95 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
     Petter::statusOK();
   }
+
+
+  if (enforce_consistent_points) {
+    Petter::statusTry("Coding consistent points...");
+
+    for (uint c=point_consistency_con_offs; c < nConstraints; c++) {
+      rhs_upper[c] = 1.0;
+    }
+
+    for (uint j=0; j < edge_pairs.size(); j++) {
+      uint middle_point = edge_pairs[j].common_point_idx_;
+
+      lp_descr.add_entry(point_consistency_con_offs + middle_point, edge_pair_var_offs+2*j, 1);
+      lp_descr.add_entry(point_consistency_con_offs + middle_point, edge_pair_var_offs+2*j+1, 1);
+    }
+    Petter::statusOK();
+  }
+
+  if (enforce_regionedge) {
+    Petter::statusTry("Coding boundary/edge pair constr....");
+    uint rowoff = regionedge_constraints_offs;
+
+    for (uint edge=0; edge < mesh.nEdges(); edge++) {
+
+      //Get the two adjacent faces
+      if (mesh.adjacent_faces(edge).size() != 2)
+      {
+        //One of the edges is at the border of the image
+        continue;
+      }
+
+      uint x1 = mesh.adjacent_faces(edge)[0];
+      uint x2 = mesh.adjacent_faces(edge)[1];
+
+      lp_descr.add_entry(rowoff+2*light_factor*edge  , x1, 1);
+      lp_descr.add_entry(rowoff+2*light_factor*edge  , x2, 1);
+      lp_descr.add_entry(rowoff+2*light_factor*edge+1, x1, -1);
+      lp_descr.add_entry(rowoff+2*light_factor*edge+1, x2, -1);
+      if (!light_constraints) {
+        lp_descr.add_entry(rowoff+2*light_factor*edge+2, x1, 1);
+        lp_descr.add_entry(rowoff+2*light_factor*edge+2, x2, 1);
+        lp_descr.add_entry(rowoff+2*light_factor*edge+3, x1, -1);
+        lp_descr.add_entry(rowoff+2*light_factor*edge+3, x2, -1);
+      }
+
+      //NOTE (important for the construction with slacks: the binding constraints are in both cases the upper bounds)
+      rhs_lower[rowoff+2*light_factor*edge]   = 0;
+      rhs_upper[rowoff+2*light_factor*edge]   = 2;
+      rhs_lower[rowoff+2*light_factor*edge+1] = -2;
+      rhs_upper[rowoff+2*light_factor*edge+1] = 0;
+
+      if (!light_constraints) {
+        rhs_lower[rowoff+2*light_factor*edge+2] = 0;
+        rhs_upper[rowoff+2*light_factor*edge+2] = 2;
+        rhs_lower[rowoff+2*light_factor*edge+3] = -2;
+        rhs_upper[rowoff+2*light_factor*edge+3] = 0;
+      }
+    }
+
+    for (uint j=0; j < edge_pairs.size(); j++) {
+      uint first = edge_pairs[j].first_edge_idx_;
+      uint second = edge_pairs[j].second_edge_idx_;	
+
+      uint y = mesh.nFaces() + 2*j;
+
+      uint edge = first;
+      if (mesh.adjacent_faces(edge).size() == 2) {
+        lp_descr.add_entry(rowoff+2*light_factor*edge   ,y  , 1);
+        lp_descr.add_entry(rowoff+2*light_factor*edge+1 ,y  , 1);
+        if (!light_constraints) {
+          lp_descr.add_entry(rowoff+2*light_factor*edge+2 ,y+1, 1);
+          lp_descr.add_entry(rowoff+2*light_factor*edge+3 ,y+1, 1);
+        }
+      }
+
+      edge = second;
+      if (mesh.adjacent_faces(edge).size() == 2) {
+        lp_descr.add_entry(rowoff+2*light_factor*edge   ,y+1, 1);
+        lp_descr.add_entry(rowoff+2*light_factor*edge+1 ,y+1, 1);
+        if (!light_constraints) {
+          lp_descr.add_entry(rowoff+2*light_factor*edge+2 ,y  , 1);
+          lp_descr.add_entry(rowoff+2*light_factor*edge+3 ,y  , 1);
+        }
+      }
+    }
+
+    Petter::statusOK();
+  }
+
 
   Math1D::Vector<uint> row_start(nConstraints+1);
   lp_descr.sort_by_row(row_start);
