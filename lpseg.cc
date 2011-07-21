@@ -13,21 +13,6 @@
 #include "sampling.hh"
 #include "lp_segmenter.hh"
 
-/////
-//Temporary fix
-////
-double clique_lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
-				 Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels)
-{
-  return 0;
-}
-
-double clique_lp_segment_curvreg_maxsum_diffusion(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
-						  Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels)
-{
-  return 0;
-}
-
 //by Petter Strandmark
 #include "qpbo_segmentation.h"
 

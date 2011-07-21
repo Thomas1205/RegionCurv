@@ -32,9 +32,6 @@
 
 #include "conv_lp_solving.hh"
 
-#include "factorMPBP.hh"
-#include "factorDualOpt.hh"
-
 #define USE_PM_ONE_MATRIX
 
 #ifdef HAS_VNK_GRAPH

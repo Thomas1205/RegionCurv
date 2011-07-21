@@ -24,9 +24,7 @@
     <ClCompile Include="..\..\conv_lp_solving.cc" />
     <ClCompile Include="..\..\curvature.cc" />
     <ClCompile Include="..\..\draw_segmentation.cc" />
-    <ClCompile Include="..\..\extended_lp_segmentation.cc">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="..\..\extended_lp_segmentation.cc" />
     <ClCompile Include="..\..\gpcpetter.cc" />
     <ClCompile Include="..\..\grid.cc" />
     <ClCompile Include="..\..\label_components.cc" />
