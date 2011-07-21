@@ -282,11 +282,31 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   uint yDim = uint( data_term.yDim() );
 
   Mesh2D mesh;  
+  if (options.gridtype_ == options.Square) {
+    if (options.adaptive_mesh_n_ < 0) {
+      double xfac = double(xDim) / double(options.griddim_xDim_);
+      double yfac = double(yDim) / double(options.griddim_yDim_);
+      generate_mesh( options.griddim_xDim_, options.griddim_yDim_, neighborhood, mesh, false, fixed_labels);
+      mesh.enlarge(xfac,yfac);
+    }
+    else {
+      //Adaptive mesh
+      generate_adaptive_mesh(data_term, mesh, neighborhood, options.adaptive_mesh_n_);
+    }
+  }
+  else {
 
-  double xfac = double(xDim) / double(options.griddim_xDim_);
-  double yfac = double(yDim) / double(options.griddim_yDim_);
-  generate_mesh( options.griddim_xDim_, options.griddim_yDim_, neighborhood, mesh, false, fixed_labels);
-  mesh.enlarge(xfac,yfac);
+    if (options.adaptive_mesh_n_ < 0) {
+      double xfac = double(xDim) / double(options.griddim_xDim_);
+      double yfac = double(yDim) / double(options.griddim_yDim_);
+
+      generate_hexagonal_mesh( xDim, yDim, 0.5*(xfac+yfac), neighborhood,mesh); //TODO: proper handling of the factor
+    }
+    else {
+      //Adaptive mesh
+      generate_adaptive_hexagonal_mesh(data_term, mesh, neighborhood, options.adaptive_mesh_n_);
+    }
+  }
 
   std::vector<Mesh2DEdgePair> edge_pairs;
   Petter::statusTry("Generating edge pairs...");
