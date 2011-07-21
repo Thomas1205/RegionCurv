@@ -20,12 +20,13 @@ int main(int argc, char** argv) {
 	      << "  -o <filename> : name of the output segmentation" << std::endl
 	      << "  -fg-mask <filename> : file containing foreground seeds" << std::endl
 	      << "  -bg-mask <filename> : file containing background seeds" << std::endl
+	      << "  -boundary-constraints (tight | simple | extra | off) : constraints to ensure consistency of regions and boundaries." 
+	      << "     default is tight (= Strandmark&Kahl 11), extra unites simple and tight " << std::endl 
 	      << " [-n (4|8|16)]: size of neighborhood, default 8" << std::endl
 	      << " [-bruckstein]: curvature discretization according to Bruckstein et al." << std::endl
-	      << " [-enforce-boundary-consistency]: forbid opposing lines in LP for the curvature estimation" << std::endl
 	      << " [-ignore-crossings] : allow crossings of line pairs, e.g. when three regions meet in a point" << std::endl
               << " [-light-constraints] : take only half of the optional constraints" << std::endl
-	      << " -solver ( clp | gurobi | cplex | xpress ) : default clp" << std::endl;
+	      << " -solver ( clp | gurobi | mosek | cplex | xpress | own-conv ) : default clp" << std::endl;
 
     exit(0);
   }
@@ -33,10 +34,11 @@ int main(int argc, char** argv) {
  
   ParamDescr  params[] = {{"-i",mandInFilename,0,""},{"-lambda",optWithValue,1,"1.0"},
                           {"-gamma",optWithValue,1,"1.0"},{"-o",mandOutFilename,0,""},
-                          {"-n",optWithValue,1,"8"},{"-enforce-boundary-consistency",flag,0,""},
-                          {"-light-constraints",flag,0,""},{"-bruckstein",flag,0,""},{"-solver",optWithValue,1,"clp"},
+                          {"-n",optWithValue,1,"8"},{"-boundary-constraints",optWithValue,0,"tight"},{"-light-constraints",flag,0,""},
+                          {"-bruckstein",flag,0,""},{"-solver",optWithValue,1,"clp"},
                           {"-fg-mask",mandInFilename,0,""},{"-bg-mask",mandInFilename,0,""},
-                          {"-griddim",optWithValue,1,"-1"},{"-debug-svg",flag,0,""},{"-ignore-crossings",flag,0,""}};
+                          {"-griddim",optWithValue,1,"-1"},{"-debug-svg",flag,0,""},{"-ignore-crossings",flag,0,""},
+			  {"-no-touching-regions",flag,0,""}};
 
   const int nParams = sizeof(params)/sizeof(ParamDescr);
 
@@ -136,6 +138,26 @@ int main(int argc, char** argv) {
   LPSegOptions seg_opts;
   seg_opts.neighborhood_ = convert<uint>(app.getParam("-n"));
   seg_opts.lambda_ = lambda;
+  seg_opts.enforce_consistent_boundaries_ = false;
+  seg_opts.enforce_regionedge_ = false;
+
+  std::string constraint_string = app.getParam("-boundary-constraints");
+  if (constraint_string == "tight") {
+    seg_opts.enforce_regionedge_ = true;
+  }
+  else if (constraint_string == "simple") {
+    seg_opts.enforce_consistent_boundaries_ = true;
+  }
+  else if (constraint_string == "extra") {
+    seg_opts.enforce_regionedge_ = true;
+    seg_opts.enforce_consistent_boundaries_ = true;
+  }
+  else if (constraint_string != "off") {
+    USER_ERROR << "unknown boundary constraint mode \"" << constraint_string << "\"" << std::endl
+	       << " choose from (tight | simple | extra | off)" << std::endl
+	       << "  Exiting." << std::endl;
+    exit(1);
+  }
 
   if (gamma == 0.0) {
     
@@ -144,8 +166,8 @@ int main(int argc, char** argv) {
   else {
     seg_opts.gamma_ = gamma;
     seg_opts.bruckstein_ = app.is_set("-bruckstein");
-    seg_opts.enforce_consistent_boundaries_ = app.is_set("-enforce-boundary-consistency");
     seg_opts.prevent_crossings_ = !app.is_set("-ignore-crossings");
+    seg_opts.enforce_consistent_points_ = app.is_set("-no-touching-regions");
     seg_opts.light_constraints_ = app.is_set("-light-constraints");
     seg_opts.griddim_xDim_ = xDim;
     seg_opts.griddim_yDim_ = yDim;
