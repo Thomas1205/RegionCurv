@@ -591,7 +591,7 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
     logfile << time << " ";
 
     // Read out entire labelling again (as weak persistencies may have changed)
-    for (int nodeCount = 0; nodeCount < nvars; nodeCount++) {
+    for (int nodeCount = 0; nodeCount < mesh.nFaces(); nodeCount++) {
       labels[nodeCount] = (int)qpbo.GetLabel(mapping[nodeCount]/2);
       if (labels[nodeCount] >= 0)
         labels[nodeCount] = (labels[nodeCount] + mapping[nodeCount]) % 2;
