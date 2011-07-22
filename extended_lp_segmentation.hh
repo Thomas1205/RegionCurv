@@ -12,7 +12,7 @@ double lp_segment_pottscurvreg(const Math3D::Tensor<float>& data_term, const LPS
 double clique_lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
 				 Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels = 0);
 
-double clique_lp_segment_curvreg_maxsum_diffusion(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
+double clique_lp_segment_curvreg_minsum_diffusion(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
 						  Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels = 0);
 
 

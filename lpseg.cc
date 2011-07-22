@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
         }
 
         if (app.is_set("-diffusion"))
-          clique_lp_segment_curvreg_maxsum_diffusion(data_term, seg_opts, energy_offset, segmentation);
+          clique_lp_segment_curvreg_minsum_diffusion(data_term, seg_opts, energy_offset, segmentation);
         else
           clique_lp_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
       }
