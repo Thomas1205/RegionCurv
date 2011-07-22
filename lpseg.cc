@@ -69,12 +69,12 @@ int main(int argc, char** argv) {
   Application app(argc,argv,params,nParams);
 
   std::string base_filename = app.getParam("-o");
-  check_filename(base_filename + ".final.svg");
-  check_filename(base_filename + ".lp.svg");
-  check_filename(base_filename + ".lp_simple.svg");
+  //check_filename(base_filename + ".final.svg");
+  //check_filename(base_filename + ".lp.svg");
+  //check_filename(base_filename + ".lp_simple.svg");
   check_filename(base_filename + ".out.pgm");
   check_filename(base_filename + ".seg.pgm");
-  check_filename(base_filename + ".frac.pgm");
+  //check_filename(base_filename + ".frac.pgm");
 
   Math3D::NamedColorImage<float> color_image(app.getParam("-i"),MAKENAME(color_image));
 
