@@ -567,7 +567,7 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
   // Only probe if we have unlabeled nodes.
   // Also, do not probe if *every* variable is unlableled -- it will not work
   // but potentially take a very long time.
-  if (unlabelled > 0 &&  !no_regions_labeled ) {
+  if (unlabelled > 0 /*&&  !no_regions_labeled*/ ) {
     int *mapping = new int[qpbo.GetNodeNum()];
     int *tmp_mapping = new int[qpbo.GetNodeNum()];
     for (int i = 0; i < qpbo.GetNodeNum(); i++) {
