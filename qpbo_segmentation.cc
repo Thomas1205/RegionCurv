@@ -544,6 +544,7 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
 
   cerr << "Unlabelled regions    : " << unlabelled << " (" << 100*double(unlabelled)/double(mesh.nFaces()) << "%)" << endl;
   logfile << 100*double(unlabelled)/double(mesh.nFaces()) << " ";
+  bool no_regions_labeled = unlabelled == mesh.nFaces();
 
   unlabelled=0;
   for (int i=0; i<qpbo.GetNodeNum(); ++i) {
@@ -563,7 +564,10 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
     statusOK();
   }
 
-  if (unlabelled > 0) {
+  // Only probe if we have unlabeled nodes.
+  // Also, do not probe if *every* variable is unlableled -- it will not work
+  // but potentially take a very long time.
+  if (unlabelled > 0 &&  !no_regions_labeled ) {
     int *mapping = new int[qpbo.GetNodeNum()];
     int *tmp_mapping = new int[qpbo.GetNodeNum()];
     for (int i = 0; i < qpbo.GetNodeNum(); i++) {
@@ -630,6 +634,9 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
     //  mesh.draw_labels(options.base_filename + ".qpboi.svg",labels);
     //  statusOK();
     //}
+  }
+  else {
+    logfile << "-1 ";
   }
 
 
