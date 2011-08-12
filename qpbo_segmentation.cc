@@ -31,7 +31,7 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
   using namespace Petter;
 
   //Open the log file (append mode)
-  string logfile_name = options.base_filename + ".qpbolog";
+  string logfile_name = options.base_filename_ + ".qpbolog";
   ofstream logfile(logfile_name.c_str(), ios::app);
   logfile << options.lambda_ << " " << options.gamma_ << " ";
 
@@ -87,7 +87,7 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
     statusFailed();
   }
   else {
-    mesh.draw(options.base_filename + ".mesh.svg");
+    mesh.draw(options.base_filename_ + ".mesh.svg");
     statusOK();
   }
 
@@ -560,7 +560,7 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
     statusFailed();
   }
   else {
-    mesh.draw_labels(options.base_filename + ".qpbo.out.svg",labels);
+    mesh.draw_labels(options.base_filename_ + ".qpbo.out.svg",labels);
     statusOK();
   }
 
@@ -606,7 +606,7 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
       statusFailed();
     }
     else {
-      mesh.draw_labels(options.base_filename + ".qpbop.svg",labels);
+      mesh.draw_labels(options.base_filename_ + ".qpbop.svg",labels);
       statusOK();
     }
 
@@ -631,7 +631,7 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
     //  statusFailed();
     //}
     //else {
-    //  mesh.draw_labels(options.base_filename + ".qpboi.svg",labels);
+    //  mesh.draw_labels(options.base_filename_ + ".qpboi.svg",labels);
     //  statusOK();
     //}
   }
