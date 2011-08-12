@@ -264,7 +264,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   bool bruckstein = options.bruckstein_;
 
   //Open the log file (append mode)
-  std::string logfile_name = options.base_filename + ".lplog";
+  std::string logfile_name = options.base_filename_ + ".lplog";
   std::ofstream logfile(logfile_name.c_str(), std::ios::app);
   logfile << options.lambda_ << " " << options.gamma_ << " ";
 
@@ -1040,7 +1040,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       logfile << diff_seconds(tEndCLP,tStartCLP) << " ";
     if (mesh.nFaces() <= 20000) {
       Petter::statusTry("Saving SVG...");
-      mesh.draw_labels_with_pairs(options.base_filename + ".lp.svg",lp_solution,edge_pairs,xDim,yDim);
+      mesh.draw_labels_with_pairs(options.base_filename_ + ".lp.svg",lp_solution,edge_pairs,xDim,yDim);
       Petter::statusOK();
     }
   }
@@ -1264,7 +1264,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   if (mesh.nFaces() <= 20000) {
     Petter::statusTry("Saving SVG...");
-    mesh.draw_labels_with_pairs(options.base_filename + ".lp_simple.svg",lp_solution,edge_pairs,xDim,yDim);
+    mesh.draw_labels_with_pairs(options.base_filename_ + ".lp_simple.svg",lp_solution,edge_pairs,xDim,yDim);
     Petter::statusOK();
   }
 
@@ -1631,13 +1631,13 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     }
   }
 
-  frac_seg.savePGM(options.base_filename + ".frac.pgm",255);
+  frac_seg.savePGM(options.base_filename_ + ".frac.pgm",255);
 
   Petter::statusOK();
 
   if (mesh.nFaces() <= 20000) {
     Petter::statusTry("Saving SVG...");
-    mesh.draw_labels_with_pairs(options.base_filename + ".final.svg",lp_solution,edge_pairs,xDim,yDim);
+    mesh.draw_labels_with_pairs(options.base_filename_ + ".final.svg",lp_solution,edge_pairs,xDim,yDim);
     Petter::statusOK();
   }
 

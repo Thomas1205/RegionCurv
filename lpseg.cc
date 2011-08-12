@@ -141,7 +141,7 @@ int main(int argc, char** argv) {
   seg_opts.griddim_xDim_ = xDim;
   seg_opts.griddim_yDim_ = yDim;
   seg_opts.solver_ = app.getParam("-solver");
-  seg_opts.base_filename = base_filename;
+  seg_opts.base_filename_ = base_filename;
 
   std::string constraint_string = app.getParam("-boundary-constraints");
   if (constraint_string == "tight") {
