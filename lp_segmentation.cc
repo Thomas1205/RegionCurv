@@ -1569,10 +1569,6 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     std::cerr << "energy of thresholded solution: " << thresh_energy 
       << "  (" << nNonIntThresh << " non-integral variables)" << std::endl;
   }
-  else {
-
-    std::cerr << "computation of the integral energy is not implemented for this solver" << std::endl;
-  }
 
   uint nOpposingLinePairs = 0;
 
