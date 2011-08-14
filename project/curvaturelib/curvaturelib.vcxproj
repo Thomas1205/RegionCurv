@@ -100,7 +100,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>..\..\common;..\..\thirdparty;$(IncludePath)</IncludePath>
+    <IncludePath>..\..\HOCR;..\..\QPBO-v1.3.src;..\..\common;..\..\thirdparty;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
