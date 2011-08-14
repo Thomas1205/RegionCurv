@@ -9,6 +9,15 @@
 #include "timing.hh"
 #include "smoothing.hh"
 
+void check_filename(std::string name)
+{
+  std::ofstream fout(name.c_str());
+  if (!fout) {
+    std::cerr << "Cannot open " << name << std::endl;
+    exit(2);
+  }
+}
+
 int main(int argc, char** argv) {
 
   if (argc == 1 || (argc == 2 && strings_equal(argv[1],"-h"))) {
@@ -45,6 +54,14 @@ int main(int argc, char** argv) {
   Application app(argc,argv,params,nParams);
 
   Math3D::NamedColorImage<float> color_image(app.getParam("-i"),MAKENAME(color_image));
+
+  std::string base_filename = app.getParam("-o");
+  //check_filename(base_filename + ".final.svg");
+  //check_filename(base_filename + ".lp.svg");
+  //check_filename(base_filename + ".lp_simple.svg");
+  check_filename(base_filename + ".out.pgm");
+  check_filename(base_filename + ".seg.pgm");
+  //check_filename(base_filename + ".frac.pgm");
 
   uint xDim = uint( color_image.xDim() );
   uint yDim = uint( color_image.yDim() );
@@ -140,6 +157,7 @@ int main(int argc, char** argv) {
   seg_opts.lambda_ = lambda;
   seg_opts.enforce_consistent_boundaries_ = false;
   seg_opts.enforce_regionedge_ = false;
+  seg_opts.base_filename_ = base_filename;
 
   std::string constraint_string = app.getParam("-boundary-constraints");
   if (constraint_string == "tight") {
@@ -187,5 +205,5 @@ int main(int argc, char** argv) {
 
   std::cerr << "computation took " << diff_seconds(tEndComputation, tStartComputation) << " seconds." << std::endl;
 
-  segmentation.savePGM(app.getParam("-o"),255);
+  segmentation.savePGM(app.getParam("-o")+".out.pgm",255);
 }

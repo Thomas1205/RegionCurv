@@ -28,7 +28,7 @@ struct LPSegOptions
 
   std::string solver_;
   
-  std::string base_filename;
+  std::string base_filename_;
 
   double lambda_;
   double gamma_;
