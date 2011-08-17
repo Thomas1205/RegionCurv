@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
   //check_filename(base_filename + ".final.svg");
   //check_filename(base_filename + ".lp.svg");
   //check_filename(base_filename + ".lp_simple.svg");
-  check_filename(base_filename + ".out.pgm");
+  check_filename(base_filename + ".out.ppm");
   check_filename(base_filename + ".seg.pgm");
   //check_filename(base_filename + ".frac.pgm");
 
@@ -244,5 +244,5 @@ int main(int argc, char** argv) {
   
   draw_segmentation(scaled_seg, out_image, 250.0, 250.0, 150.0);
 
-  out_image.savePPM(base_filename + ".out.pgm");
+  out_image.savePPM(base_filename + ".out.ppm");
 }
