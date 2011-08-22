@@ -32,6 +32,8 @@ The call will write several output images:
 
 -sample_out.out.ppm contains the found boundary line superimposed on the input image
 -sample_out.seg.pgm contains the found segmentation in five-fold resolution
+-sample_out.frac.pgm contains a visualization of the integrality of the region variables,
+    encoded in shades of gray (white and black denote integral values)
 
 ****** Setting the number of regions ******
 
