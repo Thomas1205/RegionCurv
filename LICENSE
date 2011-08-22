@@ -51,7 +51,22 @@ relaxation, ICCV 2009".
 - "T. Schoenemann, Y. Kuang and F. Kahl - Curvature Regularity for Multi-Label
   Problems - Standard and Customized Linear Programming, EMMCVPR 2011".
 
+5. Some included images are from the Berkeley segmentation database at 
+http://www.eecs.berkeley.edu/Research/Projects/CS/vision/bsds/
+Please cite 
+@InProceedings{MartinFTM01,
+  author = {D. Martin and C. Fowlkes and D. Tal and J. Malik},
+  title = {A Database of Human Segmented Natural Images and its
+           Application to Evaluating Segmentation Algorithms and
+           Measuring Ecological Statistics},
+  booktitle = {Proc. 8th Int'l Conf. Computer Vision},
+  year = {2001},
+  month = {July},
+  volume = {2},
+  pages = {416--423}
+}
+if those images are used.
 
-5. Permission to use or distribute this software for commercial or
+6. Permission to use or distribute this software for commercial or
 military purposes is NOT granted unless directly implied by the Clp
 and/or GPC licenses.
