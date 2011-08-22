@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
   //check_filename(base_filename + ".final.svg");
   //check_filename(base_filename + ".lp.svg");
   //check_filename(base_filename + ".lp_simple.svg");
-  check_filename(base_filename + ".out.pgm");
+  check_filename(base_filename + ".out.ppm");
   check_filename(base_filename + ".seg.pgm");
   //check_filename(base_filename + ".frac.pgm");
 
@@ -205,5 +205,5 @@ int main(int argc, char** argv) {
 
   std::cerr << "computation took " << diff_seconds(tEndComputation, tStartComputation) << " seconds." << std::endl;
 
-  segmentation.savePGM(app.getParam("-o")+".out.pgm",255);
+  segmentation.savePGM(app.getParam("-o")+".out.ppm",255);
 }

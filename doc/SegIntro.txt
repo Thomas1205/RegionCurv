@@ -1,0 +1,158 @@
+This package generates three main programs:
+
+- one for unsupervised image segmentation
+- one for supervised image segmentation with seed node
+- one for inpainting 
+
+In all cases a discretized curvature model is employed and optimized via
+linear programming. 
+
+This introduction gives the main points one needs to know to work with the
+software. It currently only addresses segmentation.
+
+
+*** UNSUPERVISED IMAGE SEGMENTATION ***
+
+This performs segmentation with squared intensity differences in the data term.
+
+Assuming you want to segment an image sample.pgm (in PGM format) with curvature regularity,
+a typical call would look like this:
+
+bin/lpseg.debug.L64 -i sample.pgm -lambda 10 -gamma 10000 -o sample_out
+
+This sets a length weight of 10, a curvature weight of 10000, and uses an
+8-connectivity. Using a 16-connectivity works better, but needs more time and
+memory. To select this, add
+
+-n 16
+
+to the command line.
+
+The call will write several output images:
+
+-sample_out.out.ppm contains the found boundary line superimposed on the input image
+-sample_out.seg.pgm contains the found segmentation in five-fold resolution
+-sample_out.frac.pgm contains a visualization of the integrality of the region variables,
+    encoded in shades of gray (white and black denote integral values)
+
+****** Setting the number of regions ******
+
+To select the number of regions, add
+
+-regions <num>
+
+to the command line
+
+
+****** Selecting the constraint system *****
+
+When running in standard mode (derived from [Schoenemann, Kahl, Cremers ICCV
+2009]), you can select several constraint systems:
+
+-boundary-constraints tight  
+    this activates the constraints of [Strandmark & Kahl EMMCVPR 2011]. 
+    This is the default and recommened.
+-boundary-constraints simple
+    this activates a simpler set of constraints that results in a weaker segmentation.
+-boundary-constraints extra
+    this activates both sets of constrains
+-boundary-constraints off
+    in this mode there are only the constraints from ICCV 2009, which do not correctly
+    force the boundary variables to be the boundary of the region variables.
+
+If you add
+
+-light-constraints
+
+to the command lines, a memory-saving version of the above constraints is
+used. In practice it gives equal results, but this is not theoretically proven.
+
+Furthermore, you can add
+
+-ignore-crossings
+
+to the command line, to select a less intuitive treatment of points where
+three or more regions meet.
+
+**** Selecting alternative formulations ****
+
+If you do not want to use the kind of method started by [Schoenemann, Kahl, Cremers ICCV 2009],
+you have two options which both related to the same model:
+
+Selecting
+
+-method clique-lp 
+
+will address a model in the style [El Zehiry & Grady CVPR 2010, Strandmark & Kahl EMMCVPR 2011]  
+and solve it via linear programming. You can also select the option
+
+-diffusion
+
+to solve it via min-sum diffusion.
+
+Finally, selecting
+
+-method qpbo 
+
+will activate the QPBO-solver of Vladimir Kolmogorov. The underlying model is the same as for clique-lp .
+
+***** Selecting the mesh ******
+
+By default, each pixel is split into several basic regions. You can specify a coarser grid by adding
+any of the options
+
+-griddim <uint>
+-griddimx <uint>
+-griddimy <uint>
+
+You can also enable hexagonal meshes, which may result in less directional bias. To do this, add
+
+-hex-mesh 
+
+to the command line. To activate adaptive meshing [Strandmark & Kahl EMMCVPR 2011], add
+
+-adaptive <uint>
+
+**** Setting mean values ****
+
+Mean values for foreground and background can be set via
+
+-mu0 <double>
+-mu1 <double>
+
+**** Selecting the standard LP-solver ***/
+
+By default the solver CLP is used. You can also use Gurobi, CPLEX and Xpress, by
+adding
+
+-solver <solvername>
+
+where the solvername needs to be given in lowercase letters.
+
+Selecting -solver own-conv activates the augmented lagrangian implementation
+as in [Schoenemann, Kuang, Kahl EMMCVPR 2011].
+
+*** SUPERVISED IMAGE SEGMENTATION ***
+
+For supervised image segmentation, in addition to the input image you need to
+specify two more images that encode masks for foreground and background. These
+need to be in PGM format, and black values denote regions whose label is to be
+fixed to the respective region, white values denote regions that are to be
+segmented.  
+
+Here histograms are computed to derive the data terms.
+
+A sample call looks like this:
+
+bin/interactiveseg.debug.L64 -i sample.pgm -fg-mask fg_mask.pgm -bg-mask bg_mask.pgm -lambda 0.2 -gamma 4.0 -o sample_out
+
+Many of the options listed for unsupervised segmentation above apply here as
+well, in particular regarding the neighborhood and the constraint formulation.
+Others, like selecting the number of regions, are currently not
+implemented. Note that there are no mean values to set here.
+
+
+
+
+
+

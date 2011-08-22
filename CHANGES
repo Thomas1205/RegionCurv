@@ -5,6 +5,7 @@
 - corrected the implementation of min-sum diffusion
 - for the clique-based probelm there is now a stand-alone routine
   to compute the energy of a discrete labeling.
+- added an introduction
 
 **** version 0.9 ****
 - added contents of the papers [Strandmark & Kahl EMMCVPR 2011]
