@@ -1,5 +1,7 @@
 /**** written by Petter Strandmark as an employee of Lund University, Sweden, 2010 ****/
 
+#ifdef HAS_QPBO
+
 #include <stdexcept>
 
 #include "qpbo_segmentation.h"
@@ -680,4 +682,6 @@ double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegO
   return 0;
 }
 
+
+#endif //end of #ifdef HAS_QPBO
 

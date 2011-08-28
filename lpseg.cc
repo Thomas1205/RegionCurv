@@ -13,8 +13,10 @@
 #include "sampling.hh"
 #include "lp_segmenter.hh"
 
+#ifdef HAS_QPBO
 //by Petter Strandmark
 #include "qpbo_segmentation.h"
+#endif
 
 void check_filename(std::string name)
 {
@@ -213,7 +215,12 @@ int main(int argc, char** argv) {
         }
       }
       else if (method_string == "qpbo") {
+#ifdef HAS_QPBO
         qpbo_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
+#else
+	USER_ERROR << "method QPBO is not available in this pacakage" << std::endl;
+	exit(1);
+#endif
       }
       else {
 

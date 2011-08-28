@@ -28,8 +28,9 @@ Xpress and ILOG Cplex. In this case, please add -DHAS_GUROBI,
 Furthermore, you will need to download the General Polygon Clipper
 library from http://www.cs.man.ac.uk/~toby/alan/software/ .
 
-Lastly, you need the packages QPBO (by Vladimir Kolmogorov) and
-HOCR (by Hiroshi Ishikawa).
+
+Optionally, you can download the packages QPBO (by Vladimir Kolmogorov) and
+HOCR (by Hiroshi Ishikawa). These are needed for QPBO-based routines.
 
 A sample Makefile has been included, but you will most likely need to
 modify it.
