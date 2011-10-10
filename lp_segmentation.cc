@@ -14,6 +14,11 @@
 #include <coin/ClpSimplex.hpp>
 #include <coin/ClpPlusMinusOneMatrix.hpp>
 
+#ifdef ALLOW_CONVEX_PRIORS
+#include <coin/CbcModel.hpp>
+#include <coin/OsiClpSolverInterface.hpp>
+#endif
+
 #define USE_PM_ONE_MATRIX
 
 #ifdef HAS_VNK_GRAPH
@@ -260,6 +265,11 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   bool enforce_consistent_points = options.enforce_consistent_points_;
   bool enforce_regionedge = options.enforce_regionedge_;
   bool prevent_crossings = options.prevent_crossings_;
+  if (options.convex_prior_) {
+    prevent_crossings = false;
+  }
+  std::vector<double> convex_sol;
+
   bool light_constraints = options.light_constraints_;
   bool bruckstein = options.bruckstein_;
 
@@ -671,6 +681,119 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   }
 
 
+
+  if (options.convex_prior_) {
+    Petter::statusTry("Adding convexity constraints...");
+
+    for (uint j=0; j < edge_pairs.size(); j++) {
+      uint first = edge_pairs[j].first_edge_idx_;
+      uint second = edge_pairs[j].second_edge_idx_;
+
+      uint middle_point = edge_pairs[j].common_point_idx_;
+      uint first_edge = edge_pairs[j].first_edge_idx_;
+      uint second_edge = edge_pairs[j].second_edge_idx_;
+
+      //Vector of the first edge 
+      double from1_x = mesh.point(mesh.edge(first).from_idx_).x_;
+      double from1_y = mesh.point(mesh.edge(first).from_idx_).y_;
+      double to1_x = mesh.point(mesh.edge(first).to_idx_).x_;
+      double to1_y = mesh.point(mesh.edge(first).to_idx_).y_;
+      double dx1 = to1_x - from1_x;
+      double dy1 = to1_y - from1_y;
+      
+
+      //Vector of the second edge 
+      double from2_x = mesh.point(mesh.edge(second).from_idx_).x_;
+      double from2_y = mesh.point(mesh.edge(second).from_idx_).y_;
+      double to2_x = mesh.point(mesh.edge(second).to_idx_).x_;
+      double to2_y = mesh.point(mesh.edge(second).to_idx_).y_;
+      double dx2 = to2_x - from2_x;
+      double dy2 = to2_y - from2_y;
+
+      bool ok;
+      bool bothok=false;
+
+      // First edge determines direction
+      if (mesh.edge(first).from_idx_ == edge_pairs[j].common_point_idx_) {
+        //CASE A: First edge away from the center
+
+        if (mesh.edge(second).from_idx_ == edge_pairs[j].common_point_idx_) {
+          dx2 = -dx2;
+          dy2 = -dy2;
+        }
+
+        //    <-----o<-----
+
+        double det = dx2*dy1 - dx1*dy2;
+        if (det >= 1e-6) {
+          ok = false;
+        }
+        else if (det <= -1e-6) {
+          ok = true;
+        }
+        else {
+          bothok = true;
+        }
+
+      }
+      else {
+        //CASE B: First edge towards the center
+        
+        if (mesh.edge(second).from_idx_ == edge_pairs[j].common_point_idx_) {
+          dx2 = -dx2;
+          dy2 = -dy2;
+        }
+
+        //    ----->o----->
+
+        double det = dx1*dy2 - dx2*dy1;
+        if (det >= 1e-6) {
+          ok = false;
+        }
+        else if (det <= -1e-6) {
+          ok = true;
+        }
+        else {
+          bothok = true;
+        }
+
+      }
+
+
+      if (!bothok) {
+        if (ok) {
+          // The other pair is non-convex and not allowed
+          var_lb[edge_pair_var_offs+2*j+1] = 0;
+          var_ub[edge_pair_var_offs+2*j+1] = 0;
+        }
+        else {
+          // The first pair is non-convex and not allowed
+          var_lb[edge_pair_var_offs+2*j] = 0;
+          var_ub[edge_pair_var_offs+2*j] = 0;
+        }
+      }
+
+
+    }
+
+
+    /*for (int i=0; i<nVars; ++i) { 
+      if (cost[i] < 0) {
+        var_lb[i] = 1;
+        var_ub[i] = 1;
+      }
+      else {
+        var_lb[i] = 0;
+        var_ub[i] = 0;
+      }
+    }*/
+
+    Petter::statusOK();
+  }
+
+
+
+
   Math1D::Vector<uint> row_start(nConstraints+1);
   lp_descr.sort_by_row(row_start);
 
@@ -1018,10 +1141,57 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     //lpSolver.writeMps("curv.mps");
 
     tStartCLP = std::clock();
+    
 
-    lpSolver.dual();
+    if (options.convex_prior_) {
 
-    lp_solution = lpSolver.primalColumnSolution();
+#ifdef ALLOW_CONVEX_PRIORS
+      //
+      // We need an integer solver for this task.
+      // The LP solution will essentially be worthless. Unfortunately, this
+      // means that the convex constraints are of limited usefulness in practice.
+      //
+
+      OsiClpSolverInterface solver1;
+      CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
+				  lp_descr.value(),lp_descr.nEntries());
+      solver1.loadProblem(coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
+			    cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
+      for (int i=0;i<nVars;++i) {
+        solver1.setInteger(i);
+      }
+      solver1.setObjSense(1.0);
+
+      // Save the MPS file for other solvers to attack
+      //solver1.writeMps("convex","mps",1.0);
+
+      CbcModel model(solver1);
+      model.branchAndBound();
+      bool is_optimal = model.isProvenOptimal();
+      
+      if (is_optimal) {
+        std::cerr << "Optimal solution found!" << std::endl;
+      }
+
+      convex_sol.resize(nVars);
+      for (int i=0; i < nVars; ++i) {
+        convex_sol[i] = model.getColSolution()[i];
+      }
+      lp_solution = &convex_sol[0];
+#else
+      std::cerr << "Define ALLOW_CONVEX_PRIORS in order to compile with an integer solver." << std::endl;
+      std::exit(1);
+#endif
+    }
+    else {
+      lpSolver.dual();
+      lp_solution = lpSolver.primalColumnSolution();
+
+      error = 1 - lpSolver.isProvenOptimal();
+
+      if (error != 0)
+        std::cerr << "!!!!!!!!!!!!!!LP-solver failed!!!!!!!!!!!!!!!!!!!" << std::endl;
+    }
 
     //ClpSolve solve_options;
     //solve_options.setSolveType(ClpSolve::useDual);
@@ -1029,15 +1199,11 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     //solve_options.setPresolveType(ClpSolve::presolveNumber,5);
     //lpSolver.initialSolve(solve_options);
 
-    error = 1 - lpSolver.isProvenOptimal();
-
     tEndCLP = std::clock();
 
-    if (error != 0)
-      std::cerr << "!!!!!!!!!!!!!!LP-solver failed!!!!!!!!!!!!!!!!!!!" << std::endl;
 
-      std::cerr << "CLP-time: " << diff_seconds(tEndCLP,tStartCLP) << " seconds. " << std::endl;
-      logfile << diff_seconds(tEndCLP,tStartCLP) << " ";
+    std::cerr << "CLP-time: " << diff_seconds(tEndCLP,tStartCLP) << " seconds. " << std::endl;
+    logfile << diff_seconds(tEndCLP,tStartCLP) << " ";
     if (mesh.nFaces() <= 20000) {
       Petter::statusTry("Saving SVG...");
       mesh.draw_labels_with_pairs(options.base_filename_ + ".lp.svg",lp_solution,edge_pairs,xDim,yDim);
@@ -1268,7 +1434,8 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     Petter::statusOK();
   }
 
-  if (nNonInt > 0) {
+  if (nNonInt > 0 && !options.convex_prior_) { // Thresholding does not work with convex prior, because 
+                                               // the problem will most likely be infeasible
 
     std::cerr << nNonInt << " non-integral region variables. Computing thresholded solution" << std::endl;
 
@@ -1371,6 +1538,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       error = 1 - lpSolver.isProvenOptimal();
       assert(!error);
     }
+
 #ifdef HAS_GUROBI
     if (solver == "gurobi") {
 
@@ -1514,6 +1682,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
           lpSolver.dual();
           lp_solution = lpSolver.primalColumnSolution();
         }
+
 #ifdef HAS_GUROBI
         if (solver == "gurobi") {
 
@@ -1583,6 +1752,13 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   std::cerr << nOpposingLinePairs << " opposing line pairs" << std::endl;
 
+
+  if (mesh.nFaces() <= 20000) {
+    Petter::statusTry("Saving SVG...");
+    mesh.draw_labels_with_pairs(options.base_filename_ + ".final.svg",lp_solution,edge_pairs,xDim,yDim);
+    Petter::statusOK();
+  }
+
   Petter::statusTry("Building output...");
 
   Math1D::Vector<int> labels(mesh.nFaces());
@@ -1631,11 +1807,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   Petter::statusOK();
 
-  if (mesh.nFaces() <= 20000) {
-    Petter::statusTry("Saving SVG...");
-    mesh.draw_labels_with_pairs(options.base_filename_ + ".final.svg",lp_solution,edge_pairs,xDim,yDim);
-    Petter::statusOK();
-  }
+  
 
 #ifdef HAS_GUROBI
   if (grb_model != NULL)

@@ -28,7 +28,9 @@
     <ClCompile Include="..\..\gpcpetter.cc" />
     <ClCompile Include="..\..\label_components.cc" />
     <ClCompile Include="..\..\lp_inpainting.cc" />
-    <ClCompile Include="..\..\lp_segmentation.cc" />
+    <ClCompile Include="..\..\lp_segmentation.cc">
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ALLOW_CONVEX_PRIORS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
     <ClCompile Include="..\..\lp_segmenter.cc" />
     <ClCompile Include="..\..\mesh2D.cc" />
     <ClCompile Include="..\..\qpbo_segmentation.cc" />

@@ -41,9 +41,9 @@ int main(int argc, char** argv) {
               << "  -mu0 <double> -mu1 <double> : mean values for background and foreground, respectively" << std::endl
               << "  -griddim <uint> : dimension of the mesh, default is the image size" << std::endl
               << "     if you want a non-square mesh different from the image size, use -griddimx <uint> and -griddimy <uint>" << std::endl
-	      << "  -boundary-constraints (tight | simple | extra | off) : constraints to ensure consistency of regions and boundaries." 
-	      << "     default is tight (= Strandmark&Kahl 11), extra unites simple and tight " << std::endl 
-	      << " [-n (4|8|16)] : size of neighborhood, default 8" << std::endl
+              << "  -boundary-constraints (tight | simple | extra | off) : constraints to ensure consistency of regions and boundaries." 
+              << "     default is tight (= Strandmark&Kahl 11), extra unites simple and tight " << std::endl 
+              << " [-n (4|8|16)] : size of neighborhood, default 8" << std::endl
               << " [-ignore-crossings] : allow crossings of line pairs, e.g. when three regions meet in a point" << std::endl
               << " [-light-constraints] : take only half of the optional constraints" << std::endl
               << " [-hex-mesh] : use hexagonal mesh instead of squared mesh" << std::endl
@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
                           {"-light-constraints",flag,0,""},{"-debug-svg",flag,0,""},{"-mu0",optWithValue,1,"-1"},
                           {"-mu1",optWithValue,1,"-1"},{"-griddim",optWithValue,1,"-1"},{"-griddimx",optWithValue,1,"-1"},
                           {"-griddimy",optWithValue,1,"-1"},{"-solver",optWithValue,1,"clp"},
-                          {"-ignore-crossings",flag,0,""},{"-no-touching-regions",flag,0,""}};
+                          {"-ignore-crossings",flag,0,""},{"-no-touching-regions",flag,0,""},{"-convex",flag,0,""}};
 
   const int nParams = sizeof(params)/sizeof(ParamDescr);
 
@@ -144,6 +144,14 @@ int main(int argc, char** argv) {
   seg_opts.griddim_yDim_ = yDim;
   seg_opts.solver_ = app.getParam("-solver");
   seg_opts.base_filename_ = base_filename;
+  seg_opts.convex_prior_ =  app.is_set("-convex");
+
+  seg_opts.debug_svg_ = app.is_set("-debug-svg");
+
+  if (app.is_set("-hex-mesh"))
+    seg_opts.gridtype_ = LPSegOptions::Hex;
+  if (app.is_set("-adaptive"))
+    seg_opts.adaptive_mesh_n_ = convert<int>(app.getParam("-adaptive"));
 
   std::string constraint_string = app.getParam("-boundary-constraints");
   if (constraint_string == "tight") {
@@ -178,7 +186,7 @@ int main(int argc, char** argv) {
     seg_opts.output_factor_ = 1; // Usually no need to enlarge output now
   }
   
-  if (gamma == 0.0) {
+  if (gamma == 0.0 && !seg_opts.convex_prior_) {
       
     if (nRegions == 2)
       lp_segment_lenreg(data_term, seg_opts, energy_offset, segmentation);
@@ -194,13 +202,6 @@ int main(int argc, char** argv) {
   else {
 
     if (method_string != "edge-ilp") {
-
-      seg_opts.debug_svg_ = app.is_set("-debug-svg");
-
-      if (app.is_set("-hex-mesh"))
-        seg_opts.gridtype_ = LPSegOptions::Hex;
-      if (app.is_set("-adaptive"))
-        seg_opts.adaptive_mesh_n_ = convert<int>(app.getParam("-adaptive"));
 
       if (method_string == "lp") {
         if (nRegions == 2)

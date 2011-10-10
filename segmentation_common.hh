@@ -46,6 +46,8 @@ struct LPSegOptions
   bool debug_svg_;
 
   bool refine_;
+
+  bool convex_prior_;
 };
 
 //Generates a mesh with a given neighborhood structure

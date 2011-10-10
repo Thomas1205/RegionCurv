@@ -34,7 +34,8 @@ LPSegOptions::LPSegOptions() {
   bruckstein_ = true;
   output_factor_ = 5;
   debug_svg_ = false;
-  refine_ = false;
+  refine_ = false,
+  convex_prior_ = false;
 }
 
 void add_grid_output(uint region_index, double label, const Mesh2D& mesh, const Math2D::Matrix<double>& output)
