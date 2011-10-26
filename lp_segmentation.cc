@@ -273,10 +273,6 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   bool light_constraints = options.light_constraints_;
   bool bruckstein = options.bruckstein_;
 
-  //Open the log file (append mode)
-  std::string logfile_name = options.base_filename_ + ".lplog";
-  std::ofstream logfile(logfile_name.c_str(), std::ios::app);
-  logfile << options.lambda_ << " " << options.gamma_ << " ";
 
   std::string solver = options.solver_;
 
@@ -1059,6 +1055,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 #endif
 
   ClpSimplex lpSolver;
+  double solverTime = -1;
 
   if (!solver_known)
     solver = "clp";
@@ -1203,7 +1200,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
 
     std::cerr << "CLP-time: " << diff_seconds(tEndCLP,tStartCLP) << " seconds. " << std::endl;
-    logfile << diff_seconds(tEndCLP,tStartCLP) << " ";
+    solverTime = diff_seconds(tEndCLP,tStartCLP);
     if (mesh.nFaces() <= 20000) {
       Petter::statusTry("Saving SVG...");
       mesh.draw_labels_with_pairs(options.base_filename_ + ".lp.svg",lp_solution,edge_pairs,xDim,yDim);
@@ -1388,12 +1385,13 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   }      
   
 
-  double energy = energy_offset;
+  double lp_energy = 0;
   for (uint i=0; i < nVars; i++) {
-    energy += cost[i] * lp_solution[i];    
+    lp_energy += cost[i] * lp_solution[i];    
   }
-
-  std::cerr << "lp energy: " << (energy - energy_offset) << std::endl; 
+  double energy = energy_offset + lp_energy;
+  
+  std::cerr << "lp energy: " << lp_energy << std::endl; 
   std::cerr << "original relaxation energy: " << energy << std::endl;
 
   uint nNonInt = 0;
@@ -1420,8 +1418,22 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   std::cerr << nNonInt << " region variables are fractional" << std::endl;
   std::cerr << nNonIntAuxVars << " auxiliary (non-region) variables are fractional" << std::endl;
-  logfile << 100.0*double(nNonInt + nNonIntAuxVars)/double(nVars) << " ";
+  
 
+  uint nOpposingLinePairs = 0;
+
+  for (uint v=mesh.nFaces(); v < nVars; v+=2) {
+
+    double pair_sum = lp_solution[v] + lp_solution[v+1]; 
+
+    //if (pair_sum > 1.02) {
+    if (lp_solution[v] > 0.05 && lp_solution[v+1] > 0.05) {
+      nOpposingLinePairs++;
+    }
+  }
+
+  std::cerr << nOpposingLinePairs << " opposing line pairs" << std::endl;
+  
 
   Math1D::Vector<double> frac_solution(mesh.nFaces());
   for (uint k=0; k < mesh.nFaces(); k++) {
@@ -1739,19 +1751,19 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       << "  (" << nNonIntThresh << " non-integral variables)" << std::endl;
   }
 
-  uint nOpposingLinePairs = 0;
+  int nOpposingLinePairs_after = 0;
 
   for (uint v=mesh.nFaces(); v < nVars; v+=2) {
 
     double pair_sum = lp_solution[v] + lp_solution[v+1]; 
 
-    if (pair_sum > 1.02) {
-      nOpposingLinePairs++;
+    //if (pair_sum > 1.02) {
+    if (lp_solution[v] > 0.05 && lp_solution[v+1] > 0.05) {
+      nOpposingLinePairs_after++;
     }
   }
 
-  std::cerr << nOpposingLinePairs << " opposing line pairs" << std::endl;
-
+  std::cerr << nOpposingLinePairs_after << " opposing line pairs" << std::endl;
 
   if (mesh.nFaces() <= 20000) {
     Petter::statusTry("Saving SVG...");
@@ -1827,6 +1839,27 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     XPRSfree();
   }
 #endif
+
+
+
+  //
+  // Open the log file (append mode)
+  //
+  // <lambda> <gamma> <Clp time (s)> <fractional (%)> <fractional pairs (#)> <pairs overlapping (#)>
+  //
+  std::string logfile_name = options.base_filename_ + ".lplog";
+  std::ofstream logfile(logfile_name.c_str(), std::ios::app);
+  logfile << options.lambda_ << " "     // 0 
+          << options.gamma_  << " "     // 1
+          << solverTime      << " "     // 2
+		  << 100.0*double(nNonInt + nNonIntAuxVars)/double(nVars) << " " // 3
+          << nNonIntAuxVars  << ' '     // 4
+          << nOpposingLinePairs << ' '  // 5
+		  << mesh.nFaces()   << ' '     // 6
+		  << edge_pairs.size()  << ' '  // 7
+		  << lp_energy       << ' '     // 8
+		  ;
+
 
   //Close logfile
   logfile << std::endl;
