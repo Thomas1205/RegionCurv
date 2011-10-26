@@ -2,6 +2,16 @@
 
 #include "draw_segmentation.hh"
 
+int intabs(int i)
+{
+  return i>0?i:-i;
+}
+
+bool isedge(uint a, uint b)
+{
+  return intabs(int(a)-int(b)) > 100;
+}
+
 void draw_segmentation(const Math2D::Matrix<uint>& segmentation, Math3D::Tensor<float>& image,
 		       float r, float g, float b) {
 
@@ -15,17 +25,17 @@ void draw_segmentation(const Math2D::Matrix<uint>& segmentation, Math3D::Tensor<
   for (uint y=0; y < yDim; y++) {
     for (uint x=0; x < xDim; x++) {
       
-      uint cur_seg = segmentation(x,y);
+      int cur_seg = segmentation(x,y);
 
       bool edge = false;
-      if (x > 0 && segmentation(x-1,y) != cur_seg)
+      if (x > 0 && isedge(segmentation(x-1,y),cur_seg) )
 	edge = true;
-      if (x+1 < xDim  && segmentation(x+1,y) != cur_seg)
+      if (x+1 < xDim  && isedge(segmentation(x+1,y),cur_seg) )
 	edge = true;
 
-      if (y > 0 && segmentation(x,y-1) != cur_seg)
+      if (y > 0 && isedge(segmentation(x,y-1),cur_seg) )
 	edge = true;
-      if (y+1 < yDim && segmentation(x,y+1) != cur_seg)
+      if (y+1 < yDim && isedge(segmentation(x,y+1),cur_seg) )
 	edge = true;
 
       if (edge) {
