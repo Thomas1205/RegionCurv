@@ -291,9 +291,9 @@ void add_rect_to_mesh(const Rect& rect, uint neighborhood, Mesh2D& mesh)
   double x1 = (double) rect.x1;
   double x2 = (double) rect.x2;
   double y1 = (double) rect.y1;
-  //double y2 = (double)rect.y2;
+  double y2 = (double)rect.y2;
   double dx = double (x2-x1);
-  //double dy = double(x2-x1);
+  double dy = double(y2-y1);
 
   Mesh2D smallmesh;
   generate_mesh(1,1, neighborhood, smallmesh, true);
@@ -303,7 +303,7 @@ void add_rect_to_mesh(const Rect& rect, uint neighborhood, Mesh2D& mesh)
     Mesh2DPoint p =  smallmesh.point(i);
     //Convert to large mesh coordinate system
     p.x_ = x1 + dx*p.x_;
-    p.y_ = y1 + dx*p.y_;
+    p.y_ = y1 + dy*p.y_;
     s2l[i] = mesh.find_or_add_point(p);
   }
 
