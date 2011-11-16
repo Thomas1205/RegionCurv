@@ -1810,7 +1810,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
         sum += mesh.convex_area(face) * shares[k].share_ * lp_solution[face];
         frac_sum += mesh.convex_area(face) * shares[k].share_ * frac_solution[face];
       }
-      segmentation(x,y) = uint(sum*255.0);
+      double seg = int(sum*255.0 + 0.5);
+      if (seg > 255) seg = 255;
+      segmentation(x,y) = seg;
       frac_seg(x,y) = frac_sum * 255.0;
     }
   }
