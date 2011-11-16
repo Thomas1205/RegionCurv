@@ -1,9 +1,15 @@
+CHANGE history
+
+
+**** upcoming release (0.91?)
+
+- can optionally use a convex prior now
 
 **** version 0.905 ****
 
 - added some things that were accidentally forgotten in version 0.9
 - corrected the implementation of min-sum diffusion
-- for the clique-based probelm there is now a stand-alone routine
+- for the clique-based problem there is now a stand-alone routine
   to compute the energy of a discrete labeling.
 - added an introduction
 
