@@ -20,6 +20,7 @@ struct LPSegOptions
   bool enforce_regionedge_;
   bool prevent_crossings_;
   bool light_constraints_;
+  bool reduce_edge_pairs_;
   
   int neighborhood_;
   int griddim_xDim_;
@@ -95,6 +96,9 @@ struct PixelFaceRelation {
 
 void compute_pixel_shares(const Mesh2D& mesh, uint xDim, uint yDim, Storage1D<PixelFaceRelation>& shares,
 			  Math1D::Vector<uint>& share_start);
+
+size_t filter_edge_pairs(const Mesh2D& mesh, std::vector<Mesh2DEdgePair>& pairs, 
+			 double interior_threshold = 0.05, double corner_threshold = 1000.0);
 
 
 #endif

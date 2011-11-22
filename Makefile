@@ -13,13 +13,14 @@ INCLUDE = -I common/ -I thirdparty/ -I . -I $(COININCLUDEDIR) -DHAVE_CONFIG_H -I
 # if you have the any of the solvers Gurobi, Cplex or Xpress, please add -DHAS_GUROBI etc. to the INCLUDE options
 
 #if you don't have QPBO, outcomment the next three lines
+
 DEBUGFLAGS += -DHAS_QPBO
 OPTFLAGS += -DHAS_QPBO
 QPBO = QPBO-v1.3.src/QPBO.o QPBO-v1.3.src/QPBO_extra.o QPBO-v1.3.src/QPBO_maxflow.o QPBO-v1.3.src/QPBO_postprocessing.o 
 
 
 GPC = thirdparty/gpc.o
-EXTERNALS = -lClp -lCoinUtils -lOsiClp -lOsi -lCbc -lCgl
+EXTERNALS = -lClp -lCoinUtils -lOsiClp -lOsi -lCbc -lCgl -lz -lbz2
 
 all: bin/lpseg.debug.L64 bin/lpinpaint.debug.L64 bin/interactiveseg.debug.L64 
 

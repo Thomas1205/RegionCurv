@@ -8,8 +8,9 @@
 #include "tensor.hh"
 #include "sparse_matrix_description.hh"
 
-
 #include <coin/ClpSimplex.hpp>
+#include <coin/ClpPlusMinusOneMatrix.hpp>
+#include <coin/CbcModel.hpp>
 #include <coin/OsiClpSolverInterface.hpp>
 
 #ifdef HAS_GUROBI
@@ -32,7 +33,15 @@ public:
 
   const Math2D::Matrix<uint>& segmentation();
 
+  double curv_energy();
+
+  double curv_icm();
+
 protected:
+
+  double point_energy(uint point, const std::vector<Mesh2DEdgePair>& edge_pairs, 
+		      const NamedStorage1D<std::vector<uint> >& point_pair,
+		      const NamedStorage1D<std::vector<uint> >& point_edge);
 
   const Math2D::Matrix<float>& image_;
   Math3D::Tensor<float> data_term_;
@@ -73,6 +82,8 @@ protected:
 
   OsiClpSolverInterface lpSolver_;
   SparseMatrixDescription<char> lp_descr_;
+
+  Math1D::Vector<uint> integral_solution_;
 
   std::string solver_;
 

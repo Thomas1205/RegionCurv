@@ -101,6 +101,39 @@ bool lines_cross(Mesh2DPoint p1, Mesh2DPoint p2, Mesh2DPoint q1, Mesh2DPoint q2,
     return true;
 }
 
+bool line_pairs_with_meeting_point_cross(const Mesh2D& mesh, const Mesh2DEdgePair& pair1, const Mesh2DEdgePair& pair2) {
+
+  if (pair1.common_point_idx_ != pair2.common_point_idx_) {
+    INTERNAL_ERROR << " line pairs do not meet in a mesh point. Exiting..." << std::endl;
+    exit(1);
+  }
+  
+  uint point = pair1.common_point_idx_;
+
+  uint pair1_edge1 = pair1.first_edge_idx_;
+  uint pair1_edge2 = pair1.second_edge_idx_;
+  
+  uint p1_idx = (mesh.edge(pair1_edge1).from_idx_ != point) ? 
+    mesh.edge(pair1_edge1).from_idx_ : mesh.edge(pair1_edge1).to_idx_;
+  
+  uint p2_idx = (mesh.edge(pair1_edge2).from_idx_ != point) ? 
+    mesh.edge(pair1_edge2).from_idx_ : mesh.edge(pair1_edge2).to_idx_;
+  
+  uint pair2_edge1 = pair2.first_edge_idx_;
+  uint pair2_edge2 = pair2.second_edge_idx_;
+  
+  uint p3_idx = (mesh.edge(pair2_edge1).from_idx_ != point) ? 
+    mesh.edge(pair2_edge1).from_idx_ : mesh.edge(pair2_edge1).to_idx_;
+  
+  uint p4_idx = (mesh.edge(pair2_edge2).from_idx_ != point) ? 
+    mesh.edge(pair2_edge2).from_idx_ : mesh.edge(pair2_edge2).to_idx_;
+  
+  
+  return ( line_pairs_with_meeting_point_cross(mesh.point(p1_idx), mesh.point(p2_idx), mesh.point(p3_idx), 
+					       mesh.point(p4_idx), mesh.point(point)) );
+}
+
+
 bool line_pairs_with_meeting_point_cross(const Mesh2DPoint& p1, const Mesh2DPoint& p2, 
 					 const Mesh2DPoint& q1, const Mesh2DPoint& q2,
 					 const Mesh2DPoint& meeting_point) {

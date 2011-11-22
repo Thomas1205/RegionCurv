@@ -50,6 +50,7 @@ int main(int argc, char** argv) {
               << " [-adaptive (uint)] : use adaptive meshing" << std::endl
               << " [-diffusion]" << std::endl
               << " [-debug-svg]: draw SVG files for debugging" << std::endl
+	      << " [-reduce-pairs] : same some memory and run-time by not considering pairs with very high curvature" << std::endl
               << " -solver ( clp | gurobi | cplex | xpress | own-conv ) : default clp" << std::endl
               << std::endl;
 
@@ -64,7 +65,8 @@ int main(int argc, char** argv) {
                           {"-light-constraints",flag,0,""},{"-debug-svg",flag,0,""},{"-mu0",optWithValue,1,"-1"},
                           {"-mu1",optWithValue,1,"-1"},{"-griddim",optWithValue,1,"-1"},{"-griddimx",optWithValue,1,"-1"},
                           {"-griddimy",optWithValue,1,"-1"},{"-solver",optWithValue,1,"clp"},
-                          {"-ignore-crossings",flag,0,""},{"-no-touching-regions",flag,0,""},{"-convex",flag,0,""}};
+                          {"-ignore-crossings",flag,0,""},{"-no-touching-regions",flag,0,""},{"-convex",flag,0,""},
+			  {"-reduce-pairs",flag,0,""}};
 
   const int nParams = sizeof(params)/sizeof(ParamDescr);
 
@@ -99,6 +101,8 @@ int main(int argc, char** argv) {
   uint nRegions = convert<uint>(app.getParam("-regions"));
   uint neighborhood = convert<uint>(app.getParam("-n"));
 
+  std::string method_string = app.getParam("-method");
+
   Math2D::NamedMatrix<float> data_term(xDim,yDim,MAKENAME(data_term));
   Math2D::NamedMatrix<uint> segmentation(xDim,yDim,0,MAKENAME(segmentation));
 
@@ -122,13 +126,41 @@ int main(int argc, char** argv) {
     }
   }
 
+  Math3D::NamedTensor<float> multi_data_term(MAKENAME(multi_data_term));
+
+  if (nRegions > 2 && method_string != "lp") {
+
+    multi_data_term.resize(xDim,yDim,nRegions);
+
+    Math1D::Vector<double> mean(nRegions,0.0);
+
+    Math1D::Vector<float> intensity(gray_image.size());
+    for (uint i=0; i < gray_image.size(); i++)
+      intensity[i] = gray_image.direct_access(i);
+    std::sort(intensity.direct_access(),intensity.direct_access()+gray_image.size());
+    
+    //spread percentiles equally
+    double share = 1.0 / nRegions;
+    for (uint i=0; i < nRegions; i++) {
+      mean[i] = intensity[std::size_t(gray_image.size() * (i+0.5)*share)];
+    }
+    
+    for (uint y=0; y < yDim; y++) {
+      for (uint x=0; x < xDim; x++) {
+	float cur = gray_image(x,y);
+	for (uint r=0; r < nRegions; r++) {
+	  float data = float((cur-mean[r])*(cur-mean[r]));
+	  multi_data_term(x,y,r) = data;
+	}
+      }
+    }
+  }
+
   double lambda = convert<double>(app.getParam("-lambda"));
   double gamma = convert<double>(app.getParam("-gamma"));
 
   std::clock_t tStartComputation, tEndComputation;
   tStartComputation = std::clock();
-
-  std::string method_string = app.getParam("-method");
 
   LPSegOptions seg_opts;
   seg_opts.neighborhood_ = neighborhood;
@@ -148,6 +180,8 @@ int main(int argc, char** argv) {
 
   seg_opts.debug_svg_ = app.is_set("-debug-svg");
 
+  if (app.is_set("-reduce-pairs"))
+    seg_opts.reduce_edge_pairs_ = true;
   if (app.is_set("-hex-mesh"))
     seg_opts.gridtype_ = LPSegOptions::Hex;
   if (app.is_set("-adaptive"))
@@ -225,14 +259,18 @@ int main(int argc, char** argv) {
       }
       else {
 
-        if (nRegions != 2) {
-          std::cerr << "!!!WARNING: the number of regions ignored in this mode!!!" << std::endl;
-        }
-
-        if (app.is_set("-diffusion"))
-          clique_lp_segment_curvreg_minsum_diffusion(data_term, seg_opts, energy_offset, segmentation);
-        else
-          clique_lp_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
+        if (app.is_set("-diffusion")) {
+          //clique_lp_segment_curvreg_minsum_diffusion(data_term, seg_opts, energy_offset, segmentation);
+	  clique_lp_segment_curvreg_minsum_diffusion_memsave(multi_data_term, seg_opts, energy_offset, segmentation);
+	}
+        else {
+	  if (nRegions == 2)
+	    clique_lp_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
+	  else {
+	    //clique_lp_segment_pottscurvreg(multi_data_term, seg_opts, segmentation);
+	    clique_lp_segment_pottscurvreg_layered(multi_data_term, seg_opts, segmentation);
+	  }
+	}
       }
     }
   }
@@ -244,11 +282,28 @@ int main(int argc, char** argv) {
 
   segmentation.savePGM(base_filename + ".seg.pgm",255);
 
+
+
+  segmentation.savePGM(base_filename + ".seg.pgm",255);
+
   Math3D::NamedColorImage<float> out_image(MAKENAME(out_image));
   make_color_image(color_image,out_image);  
 
+  uint scale_fac = 255 / (nRegions - 1);
+  
+  Math2D::Matrix<float> true_seg(segmentation.xDim(),segmentation.yDim());
+  for (uint i=0; i < true_seg.size(); i++) {
+    
+    true_seg.direct_access(i) = double(segmentation.direct_access(i)) / double(scale_fac) + 0.5;
+  }
+  
+  Math2D::Matrix<float> fscaled_seg(xDim,yDim);
+  downsample_matrix(true_seg, fscaled_seg);
+  
   Math2D::Matrix<uint> scaled_seg(xDim,yDim);
-  downsample_matrix(segmentation, scaled_seg);
+  for (uint i=0; i < scaled_seg.size(); i++) {
+    scaled_seg.direct_access(i) = uint (fscaled_seg.direct_access(i) + 0.5);
+  }
   
   draw_segmentation(scaled_seg, out_image, 250.0, 250.0, 150.0);
 

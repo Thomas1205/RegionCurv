@@ -1,9 +1,17 @@
-CHANGE history
+CHANGE history for RegionCurv
 
 
-**** upcoming release (0.91?)
+**** upcoming release (0.95?)
 
 - can optionally use a convex prior now
+- strengthend the relaxation to ensure that boundaries do not cross
+- multi-region class (constraint-based) can now enforce that boundaries do not cross
+- factor-based routines are now available for multi-region problems
+- integrated stand-alone routines to compute the energy of an integral solution
+  (i.e. no longer solving a large-scale linear program there)
+- integrated ICM postprocessing stage
+- new implementation of min-sum diffusion, much faster in practice
+- added option to ignore some of the possible line pairs (does not give my speed-up)
 
 **** version 0.905 ****
 

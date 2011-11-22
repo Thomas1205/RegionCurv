@@ -22,6 +22,7 @@ LPSegOptions::LPSegOptions() {
   enforce_regionedge_ = false;
   prevent_crossings_ = false;
   light_constraints_ = false;
+  reduce_edge_pairs_ = false;
   griddim_xDim_ = 16;
   griddim_yDim_ = 16;
   adaptive_mesh_n_ = -1;
@@ -34,13 +35,12 @@ LPSegOptions::LPSegOptions() {
   bruckstein_ = true;
   output_factor_ = 5;
   debug_svg_ = false;
-  refine_ = false,
+  refine_ = false;
   convex_prior_ = false;
 }
 
 void add_grid_output(uint region_index, double label, const Mesh2D& mesh, const Math2D::Matrix<double>& output)
 {
-  //using namespace std;
 
   std::vector<Mesh2DPoint> points;
   mesh.get_polygon_points(region_index, points);
@@ -958,3 +958,61 @@ void compute_pixel_shares(const Mesh2D& mesh, uint xDim, uint yDim, Storage1D<Pi
   share_start[xDim*yDim] = nCur;
 }
 
+size_t filter_edge_pairs(const Mesh2D& mesh, std::vector<Mesh2DEdgePair>& pairs, 
+			 double interior_threshold, double corner_threshold) {
+
+  std::vector<Mesh2DEdgePair> new_pairs;
+
+  size_t nRemoved = 0;
+
+  for (size_t i=0; i < pairs.size(); i++) {
+
+    // if ((i % 100) == 0)
+    //   std::cerr << "i: " << i << ", size: " << pairs.size() << std::endl;
+
+    uint first = pairs[i].first_edge_idx_;
+    uint nFirstAdjacent = uint( mesh.adjacent_faces(first).size() );
+
+    uint second = pairs[i].second_edge_idx_;
+    uint nSecondAdjacent = uint( mesh.adjacent_faces(second).size() );
+
+    if (nFirstAdjacent == 2 && nSecondAdjacent == 2) {
+
+      double curvature  = curv_weight(mesh,pairs[i],1.0,false);
+      
+      //std::cerr << "curvature: " << curvature << std::endl;
+
+      uint p = pairs[i].common_point_idx_;
+      
+      Mesh2DPoint point = mesh.point(p);
+
+      int x = (int) (point.x_ + 0.5);
+      int y = (int) (point.y_ + 0.5);
+
+      double dx = fabs(point.x_  - x);
+      double dy = fabs(point.y_  - y);
+
+      bool remove = false;
+
+      if ((dx >= 0.01 || dy >= 0.01) && curvature >= interior_threshold)
+	remove = true;
+      else if (curvature >= corner_threshold)
+	remove = true;
+
+      if (remove) {
+	//std::cerr << "removing" << std::endl;
+	//pairs.erase(pairs.begin()+i);
+	nRemoved++;
+	//i--;
+      }
+      else
+	new_pairs.push_back(pairs[i]);
+    }
+  }
+
+  pairs = new_pairs;
+
+  std::cerr << "removed " << nRemoved << " edge pairs." << std::endl;
+
+  return nRemoved;
+}

@@ -8,6 +8,8 @@
 
 #include "makros.hh"
 
+class Mesh2D;
+struct Mesh2DEdgePair;
 
 struct Mesh2DPoint {
 
@@ -28,6 +30,8 @@ std::ostream& operator<<(std::ostream& os, const Mesh2DPoint& point);
 
 bool lines_cross(Mesh2DPoint p1, Mesh2DPoint p2, Mesh2DPoint q1, Mesh2DPoint q2, 
 		 std::pair<double,double>& crossing_point);
+
+bool line_pairs_with_meeting_point_cross(const Mesh2D& mesh, const Mesh2DEdgePair& pair1, const Mesh2DEdgePair& pair2);
 
 bool line_pairs_with_meeting_point_cross(const Mesh2DPoint& p1, const Mesh2DPoint& p2, 
 					 const Mesh2DPoint& q1, const Mesh2DPoint& q2,
@@ -63,7 +67,6 @@ std::ostream& operator<<(std::ostream& os, const Mesh2DEdgePair& pair);
 struct Mesh2DFace {
 
   std::vector<uint> edge_idx_;
-
 };
 
 
