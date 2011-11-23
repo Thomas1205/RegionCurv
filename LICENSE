@@ -1,6 +1,5 @@
-This code was by Thomas Schoenemann and Petter Strandmark (both Lund
-University, Sweden) in 2009-2001. They are refered to as the
-"copyright holders" below.
+This code was written by Thomas Schoenemann, Petter Strandmark and Yubin Kuang
+in 2009-2011. They are referred to as the "copyright holders" below. 
 
 The code may be used, modified and distributed at the below given conditions.
 
@@ -10,7 +9,7 @@ To use this software, you need the following packages:
 - GPC http://www.cs.man.ac.uk/~toby/alan/software/
 
 
-Conditions of usages: 
+Conditions for usage/modification/distribution: 
 
 1. Usage is only allowed if it does not violate the LICENSE conditions
 of either Clp or GPC. In case the license conditions of these

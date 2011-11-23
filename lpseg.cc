@@ -282,10 +282,6 @@ int main(int argc, char** argv) {
 
   segmentation.savePGM(base_filename + ".seg.pgm",255);
 
-
-
-  segmentation.savePGM(base_filename + ".seg.pgm",255);
-
   Math3D::NamedColorImage<float> out_image(MAKENAME(out_image));
   make_color_image(color_image,out_image);  
 
