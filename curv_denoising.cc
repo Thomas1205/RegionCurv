@@ -6,6 +6,7 @@
 #include <coin/ClpFactorization.hpp>
 #include <coin/OsiClpSolverInterface.hpp>
 
+
 #include "tensor.hh"
 #include "timing.hh"
 
@@ -51,6 +52,11 @@ void curv_denoise(const Math3D::Tensor<float>& image, const LPSegOptions& option
     std::cerr << "WARNING: currently only the first channel is denoised" << std::endl;
   }
 
+  Math2D::Matrix<float> gray_image(xDim,yDim);
+  for (uint y=0; y < yDim; y++)
+    for (uint x=0; x < xDim; x++)
+      gray_image(x,y) = image(x,y,0);
+
   Mesh2D mesh;  
   if (options.gridtype_ == options.Square) {
     if (options.adaptive_mesh_n_ < 0) {
@@ -61,7 +67,7 @@ void curv_denoise(const Math3D::Tensor<float>& image, const LPSegOptions& option
     }
     else {
       //Adaptive mesh
-      TODO("adaptive meshing");
+      generate_adaptive_mesh(gray_image, mesh, neighborhood, options.adaptive_mesh_n_);
     }
   }
   else {
@@ -74,7 +80,7 @@ void curv_denoise(const Math3D::Tensor<float>& image, const LPSegOptions& option
     }
     else {
       //Adaptive mesh
-      TODO("adaptive meshing");
+      generate_adaptive_mesh(gray_image, mesh, neighborhood, options.adaptive_mesh_n_);
     }
   }
 
