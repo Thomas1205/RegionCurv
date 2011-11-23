@@ -2,3 +2,13 @@ This code was written by Thomas Schoenemann, Petter Strandmark and Yubin Kuang
 in 2009-2011. Thomas Schoenemann worked on this in his free time, at Lund
 University, Sweden, and at the University of Pisa, Italy. Petter Strandmark
 and Yubin Kuang worked on this at Lund Univeristy, Sweden.
+
+
+The first version was written by Thomas Schoenemann in 2009, based on
+open publications. Later, the code was completed and augmented at Lund
+University, Sweden. This was done jointly by Thomas Schoenemann and
+Petter Strandmark, with additional assistance by Yubin Kuang and
+Fredrik Kahl.
+
+Furthermore, the project includes parts of the C++-Toolbox in version
+0.925, written by Thomas Schoenemann.

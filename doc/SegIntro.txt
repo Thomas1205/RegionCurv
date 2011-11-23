@@ -51,7 +51,7 @@ When running in standard mode (derived from [Schoenemann, Kahl, Cremers ICCV
 
 -boundary-constraints tight  
     this activates the constraints of [Strandmark & Kahl EMMCVPR 2011]. 
-    This is the default and recommened.
+    This is the default and recommended.
 -boundary-constraints simple
     this activates a simpler set of constraints that results in a weaker segmentation.
 -boundary-constraints extra

@@ -17,7 +17,7 @@ squared differences of intensities and specified mean values.
 To get a list of available options, call the programs without any options.
 
 In all cases, the underlying optimization scheme relies on a standard
-LP-solver. You will have to download Clp and Osi from www.coin-or.org. We
+LP-solver. You will have to download Cbc from www.coin-or.org. We
 recommend to download Cbc from the same project line, which includes
 these packages.
 
@@ -38,15 +38,11 @@ modify it.
 
 ************ CREDITS ********** 
 
-The first version was written by Thomas Schoenemann in 2009, based on
-open publications. Later, the code was completed and augmented at Lund
-University, Sweden. This was done jointly by Thomas Schoenemann and
-Petter Strandmark, with additional assistance by Yubin Kuang and
-Fredrik Kahl.
+See file CREDITS
 
-Furthermore, the project includes parts of the C++-Toolbox in version
-0.925, written by Thomas Schoenemann.
+************ DOCUMENTATION *********
 
+See file doc/SegIntro.txt
 
 ************ Tested Platforms ***********
 

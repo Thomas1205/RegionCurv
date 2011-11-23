@@ -35,6 +35,7 @@ int main(int argc, char** argv) {
 	      << " [-bruckstein]: curvature discretization according to Bruckstein et al." << std::endl
 	      << " [-ignore-crossings] : allow crossings of line pairs, e.g. when three regions meet in a point" << std::endl
               << " [-light-constraints] : take only half of the optional constraints" << std::endl
+	      << " [-reduce-pairs] : same some memory and run-time by not considering pairs with very high curvature" << std::endl
 	      << " -solver ( clp | gurobi | mosek | cplex | xpress | own-conv ) : default clp" << std::endl;
 
     exit(0);
@@ -47,7 +48,7 @@ int main(int argc, char** argv) {
                           {"-bruckstein",flag,0,""},{"-solver",optWithValue,1,"clp"},
                           {"-fg-mask",mandInFilename,0,""},{"-bg-mask",mandInFilename,0,""},
                           {"-griddim",optWithValue,1,"-1"},{"-debug-svg",flag,0,""},{"-ignore-crossings",flag,0,""},
-			  {"-no-touching-regions",flag,0,""}};
+			  {"-no-touching-regions",flag,0,""},{"-reduce-pairs",flag,0,""}};
 
   const int nParams = sizeof(params)/sizeof(ParamDescr);
 
@@ -158,6 +159,9 @@ int main(int argc, char** argv) {
   seg_opts.enforce_consistent_boundaries_ = false;
   seg_opts.enforce_regionedge_ = false;
   seg_opts.base_filename_ = base_filename;
+
+  if (app.is_set("-reduce-pairs"))
+    seg_opts.reduce_edge_pairs_ = true;
 
   std::string constraint_string = app.getParam("-boundary-constraints");
   if (constraint_string == "tight") {
