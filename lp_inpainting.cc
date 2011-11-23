@@ -1,5 +1,5 @@
 /******** written by Thomas Schoenemann as an employee of Lund University, Sweden, June 2010 ****/
-/******** hybrid version writtem by Yubin Kuang as an employee of Lund University, Sweden, September 2010 ****/
+/******** hybrid version written by Yubin Kuang as an employee of Lund University, Sweden, September 2010 ****/
 
 #include"lp_inpainting.hh"
 
@@ -12,12 +12,15 @@
 #include "outer_product.hh"
 #include "timing.hh"
 #include "smoothing.hh"
+#include "segmentation_common.hh"
 
+#ifndef LINUX
 template<typename T>
 int round(T t) 
 {
-	return int(t + 0.5);
+  return int(t + 0.5);
 }
+#endif
 
 enum InpaintStatus {ToInpaint, Border, Irrelevant};
 enum EdgeStatus {InteriorEdge, BorderEdge};
@@ -796,8 +799,8 @@ void compute_orientations(const Math2D::Matrix<float>& image, const Math2D::Matr
 }
 
 
-double curv_weight(const Mesh2D& mesh, const Mesh2DEdgePair& pair, double curv_power=2.0,
-		   double override_first = -100.0, double override_second = -100.0) {
+double inp_curv_weight(const Mesh2D& mesh, const Mesh2DEdgePair& pair, double curv_power=2.0,
+		       double override_first = -100.0, double override_second = -100.0) {
 
   Mesh2DEdge e1 = mesh.edge(pair.first_edge_idx_);
   Mesh2DEdge e2 = mesh.edge(pair.second_edge_idx_);
@@ -864,7 +867,7 @@ double curv_weight(const Mesh2D& mesh, const Mesh2DEdgePair& pair, double curv_p
 double lp_inpaint(const Math2D::Matrix<float>& image, const Math2D::Matrix<float>& mask,
 		  double lambda, double gamma, double curv_power, uint neighborhood, double energy_offset, std::string solver,
 		  Math2D::Matrix<float>& inpainted_image, bool enforce_consistent_boundaries, 
-		  bool enforce_regionedge, bool light_constraints, bool legacy) {
+		  bool enforce_regionedge, bool light_constraints, bool reduce_pairs, bool legacy) {
 
   //DEBUG
   //legacy = true;
@@ -956,6 +959,11 @@ double lp_inpaint(const Math2D::Matrix<float>& image, const Math2D::Matrix<float
   std::vector<Mesh2DEdgePair> edge_pairs;
   mesh.generate_edge_pair_list(edge_pairs);
 
+  size_t nRemoved = 0;
+  if (reduce_pairs) {
+    nRemoved = filter_edge_pairs(mesh, edge_pairs); 
+  }
+
   std::cerr << edge_pairs.size() << " edge pairs." << std::endl;
 
   uint nVars = mesh.nFaces() + 2*edge_pairs.size();
@@ -979,7 +987,7 @@ double lp_inpaint(const Math2D::Matrix<float>& image, const Math2D::Matrix<float
     uint first = edge_pairs[j].first_edge_idx_;
     uint second = edge_pairs[j].second_edge_idx_;
     double weight = 0.5*lambda*(mesh.edge_length(first) + mesh.edge_length(second))
-      + gamma * curv_weight(mesh,edge_pairs[j],curv_power);
+      + gamma * inp_curv_weight(mesh,edge_pairs[j],curv_power);
 
     cost[edge_pair_offset+2*j] = weight;
     cost[edge_pair_offset+2*j+1] = weight;
@@ -1161,8 +1169,8 @@ double lp_inpaint(const Math2D::Matrix<float>& image, const Math2D::Matrix<float
 	Mesh2DEdgePair rev_pair = edge_pairs[j];
 	std::swap(rev_pair.first_edge_idx_,rev_pair.second_edge_idx_);
 	
-	double cw = std::min(curv_weight(mesh,edge_pairs[j],curv_power,override_first,override_second),
-			     curv_weight(mesh,rev_pair,curv_power,override_second,override_first));
+	double cw = std::min(inp_curv_weight(mesh,edge_pairs[j],curv_power,override_first,override_second),
+			     inp_curv_weight(mesh,rev_pair,curv_power,override_second,override_first));
 	
 	double weight = 0.5*lambda*(mesh.edge_length(first) + mesh.edge_length(second))
 	  + gamma * cw;
@@ -1878,7 +1886,8 @@ double lp_inpaint(const Math2D::Matrix<float>& image, const Math2D::Matrix<float
 double lp_inpaint_hybrid(const Math2D::Matrix<float>& image, const Math2D::Matrix<float>& mask,
 			 double lambda, double gamma, double curv_power, uint neighborhood, uint nBin, double energy_offset, std::string solver,
 			 Math2D::Matrix<float>& inpainted_image, bool enforce_consistent_boundaries, 
-			 bool enforce_regionedge, bool enforce_level_consistency,  bool light_constraints, bool legacy) {
+			 bool enforce_regionedge, bool enforce_level_consistency,  bool light_constraints, 
+			 bool reduce_pairs, bool legacy) {
 
   uint light_factor = (light_constraints) ? 1 : 2;
 
@@ -1960,6 +1969,11 @@ double lp_inpaint_hybrid(const Math2D::Matrix<float>& image, const Math2D::Matri
   std::vector<Mesh2DEdgePair> edge_pairs;
   mesh.generate_edge_pair_list(edge_pairs);
 
+  size_t nRemoved = 0;
+  if (reduce_pairs) {
+    nRemoved = filter_edge_pairs(mesh, edge_pairs); 
+  }
+
   std::cerr << edge_pairs.size() << " edge pairs." << std::endl;
 
   uint nVarsPerLayer = mesh.nFaces() + 2*edge_pairs.size();
@@ -1988,7 +2002,7 @@ double lp_inpaint_hybrid(const Math2D::Matrix<float>& image, const Math2D::Matri
     uint first = edge_pairs[j].first_edge_idx_;
     uint second = edge_pairs[j].second_edge_idx_;
     double weight = 0.5*lambda*(mesh.edge_length(first) + mesh.edge_length(second))
-      + gamma * curv_weight(mesh,edge_pairs[j],curv_power);
+      + gamma * inp_curv_weight(mesh,edge_pairs[j],curv_power);
     
     for (uint kk=0; kk < nBin; kk++){
       cost[kk*nVarsPerLayer+edge_pair_offset+2*j] = weight;
@@ -2235,8 +2249,8 @@ double lp_inpaint_hybrid(const Math2D::Matrix<float>& image, const Math2D::Matri
 	  Mesh2DEdgePair rev_pair = edge_pairs[j];
 	  std::swap(rev_pair.first_edge_idx_,rev_pair.second_edge_idx_);
 
-	  double cw = std::min(curv_weight(mesh,edge_pairs[j],curv_power,override_first,override_second),
-			       curv_weight(mesh,rev_pair,curv_power,override_second,override_first));
+	  double cw = std::min(inp_curv_weight(mesh,edge_pairs[j],curv_power,override_first,override_second),
+			       inp_curv_weight(mesh,rev_pair,curv_power,override_second,override_first));
 
 	  double weight = 0.5*lambda*(mesh.edge_length(first) + mesh.edge_length(second))
 	    + gamma * cw;

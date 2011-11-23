@@ -11,7 +11,7 @@ CHANGE history for RegionCurv
   (i.e. no longer solving a large-scale linear program there)
 - integrated ICM postprocessing stage
 - new implementation of min-sum diffusion, much faster in practice
-- added option to ignore some of the possible line pairs (does not give my speed-up)
+- added option to ignore some of the possible line pairs (does not give much speed-up)
 
 **** version 0.905 ****
 

@@ -21,19 +21,20 @@ int main(int argc, char** argv) {
 	      << " [-n (4|8|16)]: size of neighborhood, default 8" << std::endl
 	      << " [-b <uint>]: number of bins for the levels" << std::endl
 	      << " [-enforce-levelcon]: enforce the level constraint" << std::endl
+	      << " [-reduce-pairs] : same some memory and run-time by not considering pairs with very high curvature" << std::endl
 	      << "  -boundary-constraints (tight | simple | extra | off) : constraints to ensure consistency of regions and boundaries." 
 	      << "     default is simple, extra unites simple and tight " << std::endl;
     exit(0);
   }
 
-  const int nParams = 13;
+  const int nParams = 14;
   ParamDescr  params[nParams] = {{"-i",mandInFilename,0,""},{"-lambda",optWithValue,1,"0.001"},
 				 {"-gamma",optWithValue,1,"1.0"},{"-o",mandOutFilename,0,""},
 				 {"-mask",mandInFilename,0,""},{"-n",optWithValue,1,"8"},{"-b",optWithValue,1,"1"},
 				 {"-boundary-constraints",optWithValue,1,"simple"},
 				 {"-enforce-levelcon",flag,0,""},{"-light-constraints",flag,0,""},
 				 {"-solver",optWithValue,1,"clp"},{"-curv-power",optWithValue,1,"2.0"},
-				 {"-sequential",flag,0,""}};
+				 {"-sequential",flag,0,""},{"-reduce-pairs",flag,0,""}};
 
   Application app(argc,argv,params,nParams);
 
@@ -171,7 +172,7 @@ int main(int argc, char** argv) {
 	  
 	  double energy = lp_inpaint(temp_image, mask, lambda, gamma, curv_power, neighborhood, 0.0, app.getParam("-solver"),
 				     temp_image, enforce_boundary_consistency, enforce_region_edge_consistency,
-				     app.is_set("-light-constraints"));
+				     app.is_set("-light-constraints"),app.is_set("-reduce_pairs"));
 	  
 	  if (energy != 0.0)
 	    first_level_found = true;
@@ -189,13 +190,13 @@ int main(int argc, char** argv) {
       else if (nBins == 1) {
 	lp_inpaint(inpainted_image, mask, lambda, gamma, curv_power, neighborhood, 0.0, app.getParam("-solver"),
 		   inpainted_image, enforce_boundary_consistency, enforce_region_edge_consistency,
-		   app.is_set("-light-constraints"));
+		   app.is_set("-light-constraints"),app.is_set("-reduce-pairs"));
       }
       else {
 	
 	lp_inpaint_hybrid(inpainted_image, mask, lambda, gamma, curv_power, neighborhood,nBins, 0.0, app.getParam("-solver"),
 			  inpainted_image, enforce_boundary_consistency, enforce_region_edge_consistency,
-			  app.is_set("-enforce-levelcon"),app.is_set("-light-constraints"));
+			  app.is_set("-enforce-levelcon"),app.is_set("-light-constraints"),app.is_set("-reduce-pairs"));
       }
     }
 

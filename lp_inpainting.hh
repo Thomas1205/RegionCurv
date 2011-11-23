@@ -9,13 +9,14 @@
 double lp_inpaint(const Math2D::Matrix<float>& image, const Math2D::Matrix<float>& mask,
 		  double lambda, double gamma, double curv_power, uint neighborhood, double energy_offset, std::string solver,
 		  Math2D::Matrix<float>& inpainted_image, bool enforce_boundary_consistency,
-		  bool enforce_region_edge_consistency, bool light_constraints, bool legacy = false);
+		  bool enforce_region_edge_consistency, bool light_constraints, bool reduce_pairs, bool legacy = false);
 
 
 double lp_inpaint_hybrid(const Math2D::Matrix<float>& image, const Math2D::Matrix<float>& mask,
 			 double lambda, double gamma, double curv_power, uint neighborhood, uint nBin, double energy_offset, std::string solver,
 			 Math2D::Matrix<float>& inpainted_image, bool enforce_boundary_consistency,
-			 bool enforce_region_edge_consistency,bool enforce_level_consistency,  bool light_constraints, bool legacy = false);
+			 bool enforce_region_edge_consistency,bool enforce_level_consistency,  bool light_constraints, 
+			 bool reduce_pairs, bool legacy = false);
 
 
 #endif
