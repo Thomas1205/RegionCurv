@@ -22,7 +22,7 @@ QPBO = QPBO-v1.3.src/QPBO.o QPBO-v1.3.src/QPBO_extra.o QPBO-v1.3.src/QPBO_maxflo
 GPC = thirdparty/gpc.o
 EXTERNALS = -lClp -lCoinUtils -lOsiClp -lOsi -lCbc -lCgl -lz -lbz2
 
-all: bin/lpseg.debug.L64 bin/lpinpaint.debug.L64 bin/interactiveseg.debug.L64 
+all: bin/lpseg.debug.L64 bin/lpinpaint.debug.L64 bin/interactiveseg.debug.L64 bin/curvdenoise.debug.L64 
 
 bin/lpseg.debug.L64 : lpseg.cc $(DEBUGDIR)/gpcpetter.o $(DEBUGDIR)/lp_segmentation.o $(DEBUGDIR)/extended_lp_segmentation.o $(DEBUGDIR)/lp_segmenter.o $(DEBUGDIR)/segmentation_common.o $(DEBUGDIR)/qpbo_segmentation.o $(DEBUGDIR)/curvature.o $(DEBUGDIR)/mesh2D.o $(DEBUGDIR)/grid.o $(DEBUGDIR)/adaptive_mesh.o $(DEBUGDIR)/svg.o $(DEBUGDIR)/draw_segmentation.o $(DEBUGDIR)/conversion.o $(DEBUGDIR)/curvature.o $(QPBO) $(GPC) common/lib/commonlib.debug 
 	$(LINKER) $(DEBUGFLAGS) -L $(COINLIBDIR) $(INCLUDE) lpseg.cc $(DEBUGDIR)/gpcpetter.o $(DEBUGDIR)/qpbo_segmentation.o $(DEBUGDIR)/lp_segmentation.o $(DEBUGDIR)/adaptive_mesh.o $(DEBUGDIR)/extended_lp_segmentation.o $(DEBUGDIR)/lp_segmenter.o $(DEBUGDIR)/segmentation_common.o $(DEBUGDIR)/mesh2D.o $(DEBUGDIR)/grid.o $(DEBUGDIR)/svg.o $(DEBUGDIR)/draw_segmentation.o $(DEBUGDIR)/conversion.o $(DEBUGDIR)/curvature.o common/lib/commonlib.debug $(QPBO) $(GPC) $(EXTERNALS) -lblas -llapack -o $@
@@ -33,6 +33,7 @@ bin/interactiveseg.debug.L64 : interactive_seg.cc $(DEBUGDIR)/gpcpetter.o $(DEBU
 bin/lpinpaint.debug.L64 : lpinpaint.cc $(DEBUGDIR)/gpcpetter.o $(DEBUGDIR)/lp_inpainting.o $(DEBUGDIR)/segmentation_common.o $(DEBUGDIR)/label_components.o $(DEBUGDIR)/color_conversion.o $(DEBUGDIR)/curvature.o $(DEBUGDIR)/mesh2D.o $(DEBUGDIR)/grid.o $(DEBUGDIR)/svg.o $(DEBUGDIR)/draw_segmentation.o $(DEBUGDIR)/conversion.o $(DEBUGDIR)/curvature.o $(QPBO) $(GPC) common/lib/commonlib.debug
 	$(LINKER) -L $(COINLIBDIR) $(DEBUGFLAGS) $(INCLUDE) lpinpaint.cc $(DEBUGDIR)/gpcpetter.o $(DEBUGDIR)/label_components.o $(DEBUGDIR)/color_conversion.o $(DEBUGDIR)/lp_inpainting.o $(DEBUGDIR)/segmentation_common.o $(DEBUGDIR)/mesh2D.o $(DEBUGDIR)/grid.o $(DEBUGDIR)/svg.o $(DEBUGDIR)/draw_segmentation.o $(DEBUGDIR)/conversion.o $(DEBUGDIR)/curvature.o common/lib/commonlib.debug $(QPBO) $(GPC) $(EXTERNALS) -lblas -llapack -o $@
 
-
+bin/curvdenoise.debug.L64 : curvdenoise.cc $(DEBUGDIR)/gpcpetter.o $(DEBUGDIR)/curv_denoising.o $(DEBUGDIR)/segmentation_common.o $(DEBUGDIR)/label_components.o $(DEBUGDIR)/color_conversion.o $(DEBUGDIR)/curvature.o $(DEBUGDIR)/mesh2D.o $(DEBUGDIR)/grid.o $(DEBUGDIR)/svg.o $(DEBUGDIR)/draw_segmentation.o $(DEBUGDIR)/conversion.o $(DEBUGDIR)/curvature.o $(QPBO) $(GPC) common/lib/commonlib.debug
+	$(LINKER) -L $(COINLIBDIR) $(DEBUGFLAGS) $(INCLUDE) curvdenoise.cc $(DEBUGDIR)/gpcpetter.o $(DEBUGDIR)/label_components.o $(DEBUGDIR)/color_conversion.o $(DEBUGDIR)/curv_denoising.o $(DEBUGDIR)/segmentation_common.o $(DEBUGDIR)/mesh2D.o $(DEBUGDIR)/grid.o $(DEBUGDIR)/svg.o $(DEBUGDIR)/draw_segmentation.o $(DEBUGDIR)/conversion.o $(DEBUGDIR)/curvature.o common/lib/commonlib.debug $(QPBO) $(GPC) $(EXTERNALS) -lblas -llapack -o $@
 
 include common/Makefile.finish

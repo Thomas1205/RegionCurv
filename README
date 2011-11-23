@@ -1,4 +1,4 @@
-This project generates three executables:
+This project generates four executables:
 
 - lpseg.debug.L64 : a program for unsupervised region-based
 segmentation with length and curvature regularity. The data terms are
@@ -13,6 +13,9 @@ squared differences of intensities and specified mean values.
  formalism to the problem of image inpainting. It supports gray-level
  and color images. Color images are transformed to YUV first, then
  each channel is inpainted separately.
+
+- curvdenoise.debug.L64 : denoising of images with curvature and length
+ priors.
 
 To get a list of available options, call the programs without any options.
 

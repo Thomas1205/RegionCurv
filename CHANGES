@@ -3,6 +3,7 @@ CHANGE history for RegionCurv
 
 **** upcoming release (0.95?)
 
+- released curvature denoising
 - can optionally use a convex prior now
 - strengthend the relaxation to ensure that boundaries do not cross
 - multi-region class (constraint-based) can now enforce that boundaries do not cross
