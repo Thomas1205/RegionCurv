@@ -28,3 +28,18 @@ $(DEVELDIR)/%.o : %.cc
 
 asm/%.s : %.cc
 	$(COMPILER) $(INCLUDE) $(OPTFLAGS) -c $< -S -o $@
+
+bin:
+	mkdir bin
+
+$(DEBUGDIR):
+	mkdir $(DEBUGDIR)
+
+$(OPTDIR):
+	mkdir $(OPTDIR)
+
+lib:
+	mkdir lib
+
+$(LIB):
+	mkdir $(LIB)
