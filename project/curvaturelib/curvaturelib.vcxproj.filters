@@ -96,6 +96,9 @@
     <ClCompile Include="..\..\extended_lp_segmentation.cc">
       <Filter>curvature</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\ImageIntegrator.cpp">
+      <Filter>curvature</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\common\application.hh">
@@ -213,6 +216,9 @@
       <Filter>curvature</Filter>
     </None>
     <None Include="..\..\tensor_interpolation.hh">
+      <Filter>curvature</Filter>
+    </None>
+    <None Include="..\..\ImageIntegrator.hh">
       <Filter>curvature</Filter>
     </None>
   </ItemGroup>
