@@ -66,7 +66,8 @@ int main(int argc, char** argv) {
   {"-mu1",optWithValue,1,"-1"},{"-griddim",optWithValue,1,"-1"},{"-griddimx",optWithValue,1,"-1"},
   {"-griddimy",optWithValue,1,"-1"},{"-solver",optWithValue,1,"clp"},
   {"-ignore-crossings",flag,0,""},{"-no-touching-regions",flag,0,""},{"-convex",flag,0,""},
-  {"-reduce-pairs",flag,0,""},{"-mode",optWithValue,1,"standard"}};
+  {"-reduce-pairs",flag,0,""},{"-mode",optWithValue,1,"standard"},
+  {"-refine",flag,0,""}};
 
   const int nParams = sizeof(params)/sizeof(ParamDescr);
 
@@ -178,6 +179,7 @@ int main(int argc, char** argv) {
   seg_opts.solver_ = app.getParam("-solver");
   seg_opts.base_filename_ = base_filename;
   seg_opts.convex_prior_ =  app.is_set("-convex");
+  seg_opts.refine_ =  app.is_set("-refine");
 
   seg_opts.debug_svg_ = app.is_set("-debug-svg");
 

@@ -7,6 +7,7 @@
 #include "sparse_matrix_description.hh"
 #include "timing.hh"
 #include "curvature.hh"
+#include "ImageIntegrator.hh"
 
 #include "segmentation_common.hh"
 #include "stl_out.hh"
@@ -756,8 +757,28 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   Math1D::NamedVector<double> cost(nVars,0.0,MAKENAME(cost));
 
   Petter::statusTry("Creating data terms...");
+  Math2D::Matrix<float> ones(xDim,yDim,1.0);
+  ImageIntegrator integrator(data_term);
+  ImageIntegrator area(ones);
   for (uint i=0; i<mesh.nFaces(); ++i) {
     cost[i] = calculate_data_term(i, mesh, data_term);
+
+
+    // Get polygon coordinates
+    std::vector<Mesh2DPoint> coord;
+    mesh.get_polygon_points(i, coord);
+    // Integrate the data term
+    double cost2 = integrator.integral(coord);
+    if (area.integral(coord) < 0) {
+      cost2 = -cost2;
+    }
+    // TEST: compare the two values
+    double avgabs = ( abs(cost[i]) + abs(cost2) ) / 2.0;
+    double absdiff = abs(cost[i] - cost2);
+    if ( absdiff / avgabs > 1e-4 && avgabs > 1e-4) {
+      std::cerr << "Difference in data term : " << cost[i] << " <--> " << cost2 << std::endl;
+    }
+
 
     if (options.fix_regions_) {
       //Fix region variables
@@ -2363,13 +2384,14 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   segmentation.resize(xDim*out_factor,yDim*out_factor);
   Math2D::Matrix<double> frac_seg(xDim*out_factor,yDim*out_factor);
 
-  mesh.enlarge(out_factor,out_factor);
+  Mesh2D large_mesh = mesh;
+  large_mesh.enlarge(out_factor,out_factor);
 
   Storage1D<PixelFaceRelation> shares;
   Math1D::Vector<uint> share_start;
 
   //re-compute pixel shares for the now larger mesh
-  compute_pixel_shares(mesh, out_factor*xDim, out_factor*yDim, shares, share_start);
+  compute_pixel_shares(large_mesh, out_factor*xDim, out_factor*yDim, shares, share_start);
 
   for (uint i=0;i<mesh.nFaces();++i) {
     if (lp_solution[i] > 0.99) {
@@ -2390,8 +2412,8 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       double frac_sum = 0.0;
       for (uint k= share_start[y*(xDim*out_factor)+x]; k < share_start[y*(xDim*out_factor)+x+1]; k++) {
         uint face = shares[k].face_idx_;
-        sum += mesh.convex_area(face) * shares[k].share_ * lp_solution[face];
-        frac_sum += mesh.convex_area(face) * shares[k].share_ * frac_solution[face];
+        sum      += large_mesh.convex_area(face) * shares[k].share_ * lp_solution[face];
+        frac_sum += large_mesh.convex_area(face) * shares[k].share_ * frac_solution[face];
       }
       double seg = int(sum*255.0 + 0.5);
       if (seg > 255) seg = 255;
@@ -2448,6 +2470,109 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   //Close logfile
   logfile << std::endl;
+
+
+  //
+  // Refine
+  //
+  if (options.refine_) {
+    Petter::statusTry("Extracting curves...");
+    std::vector<SegmentationCurve> curves;
+    std::vector<bool> pair_used(edge_pairs.size(), false);
+
+    // Extract curves until no more are found
+    bool succeeded;
+    do {
+      succeeded = true;
+      std::vector<Mesh2DPoint> coord;
+
+      //Find a starting pair of the boundary
+      int start;
+      for (start=0;start<edge_pairs.size();++start) {
+        if ( !pair_used[start] && 
+            (lp_solution[ mesh.nFaces() + 2*start ] > 0.9 ||
+             lp_solution[ mesh.nFaces() + 2*start + 1 ] > 0.9 )
+           )
+        {
+            break;
+        }
+      }
+
+      // We found no more pair to use
+      if (start == edge_pairs.size()) {
+        succeeded = false;
+        break;
+      }
+
+
+      int prev = -1;
+      int curr = start;
+      //Walk through the boundary
+      while (true) {
+
+        uint ip = edge_pairs[curr].common_point_idx_;
+        coord.push_back( mesh.point(ip) );
+
+        // Find the next edge pair along the curve
+        int next;
+        for ( next=0;next<edge_pairs.size();++next) {
+          if (  !pair_used[next] && 
+                (  lp_solution[ mesh.nFaces() + 2*next ] > 0.9 ||
+                   lp_solution[ mesh.nFaces() + 2*next + 1 ] > 0.9) &&
+                next != curr && 
+                next != prev &&
+                (  edge_pairs[next].first_edge_idx_ == edge_pairs[curr].first_edge_idx_ ||
+                   edge_pairs[next].first_edge_idx_ == edge_pairs[curr].second_edge_idx_ ||
+                   edge_pairs[next].second_edge_idx_ == edge_pairs[curr].first_edge_idx_ ||
+                   edge_pairs[next].second_edge_idx_ == edge_pairs[curr].second_edge_idx_ 
+                )
+             ) 
+          {
+            pair_used[next] = true;
+            prev = curr;
+            curr = next;
+            break;
+          }
+        }
+
+        // Did we fail to continue along the curve?
+        if (next == edge_pairs.size()) {
+          succeeded = false;
+          break;
+        }
+
+        // Did we end up in the beginning?
+        if (curr == start) {
+          break;
+        }
+      }
+
+      if (succeeded) {
+        // Add these points as a new curve
+        curves.push_back(SegmentationCurve(coord,integrator,lambda,gamma,2.0,bruckstein));
+      }
+
+
+    } while (succeeded);
+
+    Petter::statusOK();
+
+    std::cerr << "Solution consists of " << curves.size() << " curves.\n";
+
+    if (curves.size() == 0) {
+      return energy;
+    }
+
+    if (mesh.nFaces() <= 20000) {
+      Petter::statusTry("Saving SVGs...");
+      for (int i=0;i<curves.size();++i) {
+        std::stringstream sout;
+        sout << options.base_filename_ << "-refinement-" << (i+1) << ".svg";
+        curves[i].draw(sout.str(), data_term);
+      }
+      Petter::statusOK();
+    }
+  }
 
   return energy;
 }
