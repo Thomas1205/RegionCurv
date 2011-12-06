@@ -1016,3 +1016,72 @@ size_t filter_edge_pairs(const Mesh2D& mesh, std::vector<Mesh2DEdgePair>& pairs,
 
   return nRemoved;
 }
+
+void create_mesh(const LPSegOptions& options, const Math2D::Matrix<float>& data_term, 
+		 const Math2D::Matrix<int>* fixed_labels, Mesh2D& mesh) {
+
+  const uint xDim = data_term.xDim();
+  const uint yDim = data_term.yDim();
+  const uint neighborhood = options.neighborhood_;
+
+  if (options.gridtype_ == options.Square) {
+    if (options.adaptive_mesh_n_ < 0) {
+      double xfac = double(xDim) / double(options.griddim_xDim_);
+      double yfac = double(yDim) / double(options.griddim_yDim_);
+      generate_mesh( options.griddim_xDim_, options.griddim_yDim_, neighborhood, mesh, false, fixed_labels);
+      mesh.enlarge(xfac,yfac);
+    }
+    else {
+      //Adaptive mesh
+      generate_adaptive_mesh(data_term, mesh, neighborhood, options.adaptive_mesh_n_);
+    }
+  }
+  else {
+
+    if (options.adaptive_mesh_n_ < 0) {
+      double xfac = double(xDim) / double(options.griddim_xDim_);
+      double yfac = double(yDim) / double(options.griddim_yDim_);
+
+      generate_hexagonal_mesh( xDim, yDim, 0.5*(xfac+yfac), neighborhood,mesh); //TODO: proper handling of the factor
+    }
+    else {
+      //Adaptive mesh
+      generate_adaptive_hexagonal_mesh(data_term, mesh, neighborhood, options.adaptive_mesh_n_);
+    }
+  }
+}
+
+
+void create_mesh(const LPSegOptions& options, const Math3D::Tensor<float>& data_term, 
+		 const Math2D::Matrix<int>* fixed_labels, Mesh2D& mesh) {
+
+  const uint xDim = data_term.xDim();
+  const uint yDim = data_term.yDim();
+  const uint neighborhood = options.neighborhood_;
+
+  if (options.gridtype_ == options.Square) {
+    if (options.adaptive_mesh_n_ < 0) {
+      double xfac = double(xDim) / double(options.griddim_xDim_);
+      double yfac = double(yDim) / double(options.griddim_yDim_);
+      generate_mesh( options.griddim_xDim_, options.griddim_yDim_, neighborhood, mesh, false, fixed_labels);
+      mesh.enlarge(xfac,yfac);
+    }
+    else {
+      //Adaptive mesh
+      TODO("combination of multi-region and adaptive meshes");
+    }
+  }
+  else {
+
+    if (options.adaptive_mesh_n_ < 0) {
+      double xfac = double(xDim) / double(options.griddim_xDim_);
+      double yfac = double(yDim) / double(options.griddim_yDim_);
+      
+      generate_hexagonal_mesh( xDim, yDim, 0.5*(xfac+yfac), neighborhood,mesh); //TODO: proper handling of the factor
+    }
+    else {
+      //Adaptive mesh
+      TODO("combination of multi-region and adaptive hexagonal meshes");
+    }
+  }
+}
