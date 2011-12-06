@@ -529,7 +529,7 @@ double curv_energy(const uint* solution, const double* region_cost, const Mesh2D
 }
 
 double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
-		double lambda, double gamma, bool bruckstein, bool crossings_allowed = false) { 
+		double lambda, double gamma, bool bruckstein, double energy_offset, bool crossings_allowed = false) { 
 
   double energy = 0.0;
 
@@ -627,12 +627,60 @@ double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
       }
     }
 
-    std::cerr << "energy " << energy << "(" << nChanges << " changes)"<< std::endl;
+    std::cerr << "energy " << energy << ", (" << (energy + energy_offset) << "), " 
+	      << nChanges << " changes"<< std::endl;
   }
 
   return energy;
 }
 
+/*******************/
+
+double curv_icm(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset,
+		Math2D::Matrix<uint>& segmentation) { 
+
+  int neighborhood = options.neighborhood_;
+  
+  assert(neighborhood <= 16); 
+
+  uint xDim = uint( data_term.xDim() );
+  uint yDim = uint( data_term.yDim() );
+
+  Mesh2D mesh;  
+  create_mesh(options, data_term, 0, mesh);
+
+  Math1D::Vector<double> region_cost(mesh.nFaces());
+  Math1D::Vector<uint> face_label(mesh.nFaces(),0);
+
+  for (uint f=0; f < mesh.nFaces(); f++) {
+
+    region_cost[f] = calculate_data_term(f, mesh, data_term);
+    if (region_cost[f] < 0.0)
+      face_label[f] = 1;
+  }
+
+  double energy = curv_icm(face_label.direct_access(), region_cost.direct_access(), mesh,
+			   options.lambda_, options.gamma_, options.bruckstein_, energy_offset,
+			   !options.prevent_crossings_);
+
+  const uint out_factor = options.output_factor_;
+
+  segmentation.resize(xDim*out_factor,yDim*out_factor);
+
+  mesh.enlarge(out_factor,out_factor);
+  
+  Math2D::Matrix<double> output(xDim*out_factor,yDim*out_factor,0);
+  for (uint i=0; i < mesh.nFaces(); ++i) {
+    add_grid_output(i,face_label[i],mesh,output);	
+  }
+  for (uint y=0; y < yDim*out_factor; y++) {
+    for (uint x=0; x < xDim*out_factor; x++) {
+      segmentation(x,y) = uint(output(x,y)*255.0);
+    }
+  }
+
+  return energy;
+}
 
 /***********************************************************************************************************************/
 
@@ -671,31 +719,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   uint yDim = uint( data_term.yDim() );
 
   Mesh2D mesh;  
-  if (options.gridtype_ == options.Square) {
-    if (options.adaptive_mesh_n_ < 0) {
-      double xfac = double(xDim) / double(options.griddim_xDim_);
-      double yfac = double(yDim) / double(options.griddim_yDim_);
-      generate_mesh( options.griddim_xDim_, options.griddim_yDim_, neighborhood, mesh, false, fixed_labels);
-      mesh.enlarge(xfac,yfac);
-    }
-    else {
-      //Adaptive mesh
-      generate_adaptive_mesh(data_term, mesh, neighborhood, options.adaptive_mesh_n_);
-    }
-  }
-  else {
-
-    if (options.adaptive_mesh_n_ < 0) {
-      double xfac = double(xDim) / double(options.griddim_xDim_);
-      double yfac = double(yDim) / double(options.griddim_yDim_);
-
-      generate_hexagonal_mesh( xDim, yDim, 0.5*(xfac+yfac), neighborhood,mesh); //TODO: proper handling of the factor
-    }
-    else {
-      //Adaptive mesh
-      generate_adaptive_hexagonal_mesh(data_term, mesh, neighborhood, options.adaptive_mesh_n_);
-    }
-  }
+  create_mesh(options, data_term, fixed_labels, mesh);
 
   std::vector<Mesh2DEdgePair> edge_pairs;
   Petter::statusTry("Generating edge pairs...");
@@ -929,7 +953,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     }
   }
   Petter::statusOK();
-  uint nStandardEntries = lp_descr.nEntries();
+  //uint nStandardEntries = lp_descr.nEntries();
 
   if (enforce_consistent_boundaries) {
 
@@ -1900,7 +1924,8 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   std::cerr << "integral energy according to independent routine: " << integral_energy << std::endl;
 
   double icm_energy = curv_icm(labeling.direct_access(), cost.direct_access(), mesh,
-			       lambda, gamma, bruckstein, !prevent_crossings) + energy_offset;
+			       lambda, gamma, bruckstein, energy_offset, !prevent_crossings) 
+    + energy_offset;
 
   std::cerr << "energy after ICM: " << icm_energy << std::endl;
 

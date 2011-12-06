@@ -101,4 +101,11 @@ size_t filter_edge_pairs(const Mesh2D& mesh, std::vector<Mesh2DEdgePair>& pairs,
 			 double interior_threshold = 0.05, double corner_threshold = 1000.0);
 
 
+void create_mesh(const LPSegOptions& options, const Math2D::Matrix<float>& data_term, 
+		 const Math2D::Matrix<int>* fixed_labels, Mesh2D& mesh);
+
+void create_mesh(const LPSegOptions& options, const Math3D::Tensor<float>& data_term, 
+		 const Math2D::Matrix<int>* fixed_labels, Mesh2D& mesh);
+
+
 #endif

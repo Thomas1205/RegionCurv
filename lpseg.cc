@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
               << "  -lambda <double> : length weight" << std::endl
               << "  -gamma <double> : curvature weight" << std::endl
               << "  -o <filename> : name of the output segmentation" << std::endl
-              << "  -method (lp | clique-lp | qpbo) " << std::endl
+              << "  -method (lp | factor-lp) " << std::endl
               << "  -regions <uint>" << std::endl
               << "  -mu0 <double> -mu1 <double> : mean values for background and foreground, respectively" << std::endl
               << "  -griddim <uint> : dimension of the mesh, default is the image size" << std::endl
@@ -48,10 +48,10 @@ int main(int argc, char** argv) {
               << " [-light-constraints] : take only half of the optional constraints" << std::endl
               << " [-hex-mesh] : use hexagonal mesh instead of squared mesh" << std::endl
               << " [-adaptive (uint)] : use adaptive meshing" << std::endl
-              << " [-diffusion]" << std::endl
               << " [-debug-svg]: draw SVG files for debugging" << std::endl
 	      << " [-reduce-pairs] : same some memory and run-time by not considering pairs with very high curvature" << std::endl
               << " -solver ( clp | gurobi | cplex | xpress | own-conv ) : default clp" << std::endl
+	      << " -mode ( standard | msed | qpbo | icm )" << std::endl
               << std::endl;
 
     exit(0);
@@ -60,13 +60,13 @@ int main(int argc, char** argv) {
   ParamDescr  params[] = {{"-i",mandInFilename,0,""},{"-lambda",optWithValue,1,"1.0"},
                           {"-gamma",optWithValue,1,"1.0"},{"-o",mandOutFilename,0,""},{"-n",optWithValue,1,"8"},
                           {"-boundary-constraints",optWithValue,1,"tight"},
-                          {"-method",optWithValue,1,"lp"},{"-bruckstein",flag,0,""},{"-diffusion",flag,0,""},
+                          {"-method",optWithValue,1,"lp"},{"-bruckstein",flag,0,""},
                           {"-adaptive",optWithValue,0,""},{"-hex-mesh",flag,0,""},{"-regions",optWithValue,1,"2"},
                           {"-light-constraints",flag,0,""},{"-debug-svg",flag,0,""},{"-mu0",optWithValue,1,"-1"},
                           {"-mu1",optWithValue,1,"-1"},{"-griddim",optWithValue,1,"-1"},{"-griddimx",optWithValue,1,"-1"},
                           {"-griddimy",optWithValue,1,"-1"},{"-solver",optWithValue,1,"clp"},
                           {"-ignore-crossings",flag,0,""},{"-no-touching-regions",flag,0,""},{"-convex",flag,0,""},
-			  {"-reduce-pairs",flag,0,""}};
+			  {"-reduce-pairs",flag,0,""},{"-mode",optWithValue,1,"standard"}};
 
   const int nParams = sizeof(params)/sizeof(ParamDescr);
 
@@ -102,6 +102,7 @@ int main(int argc, char** argv) {
   uint neighborhood = convert<uint>(app.getParam("-n"));
 
   std::string method_string = app.getParam("-method");
+  std::string mode_string = app.getParam("-mode");
 
   Math2D::NamedMatrix<float> data_term(xDim,yDim,MAKENAME(data_term));
   Math2D::NamedMatrix<uint> segmentation(xDim,yDim,0,MAKENAME(segmentation));
@@ -128,7 +129,7 @@ int main(int argc, char** argv) {
 
   Math3D::NamedTensor<float> multi_data_term(MAKENAME(multi_data_term));
 
-  if (nRegions > 2 && method_string != "lp") {
+  if (nRegions > 2) {
 
     multi_data_term.resize(xDim,yDim,nRegions);
 
@@ -235,30 +236,48 @@ int main(int argc, char** argv) {
   }
   else {
 
-    if (method_string != "edge-ilp") {
-
-      if (method_string == "lp") {
-        if (nRegions == 2)
-          lp_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
-        else {
-
-          LpSegmenter lp_segmenter(gray_image, seg_opts, nRegions, false);
-
-          lp_segmenter.segment(1);
-
-          segmentation = lp_segmenter.segmentation();
-        }
+    if (method_string == "lp") {
+      if (nRegions == 2) {
+	if (mode_string == "icm")
+	  curv_icm(data_term, seg_opts, energy_offset, segmentation);
+	else
+	  lp_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
       }
-      else if (method_string == "qpbo") {
+      else {
+
+	if (mode_string == "icm") {
+	  multi_curv_icm(multi_data_term, seg_opts, segmentation);
+	}
+	else {
+	  LpSegmenter lp_segmenter(gray_image, seg_opts, nRegions, false);
+	  
+	  lp_segmenter.segment(1);
+	  
+	  segmentation = lp_segmenter.segmentation();
+	}
+      }
+    }
+    else {
+      
+      if (mode_string == "msd") {
+	//clique_lp_segment_curvreg_minsum_diffusion(data_term, seg_opts, energy_offset, segmentation);
+	factor_lp_segment_curvreg_minsum_diffusion_memsave(multi_data_term, seg_opts, energy_offset, segmentation);
+      }
+      else if (mode_string == "qpbo") {
 #ifdef HAS_QPBO
-        qpbo_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
+	qpbo_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
 #else
 	USER_ERROR << "method QPBO is not available in this pacakage" << std::endl;
 	exit(1);
 #endif
       }
+      else if (mode_string == "icm") {
+	if (nRegions == 2)
+	  factor_curv_icm(data_term, seg_opts, energy_offset, segmentation);
+	else
+	  factor_curv_icm(multi_data_term, seg_opts, segmentation);
+      }
       else {
-
         if (app.is_set("-diffusion")) {
           //clique_lp_segment_curvreg_minsum_diffusion(data_term, seg_opts, energy_offset, segmentation);
           clique_lp_segment_curvreg_minsum_diffusion_memsave(multi_data_term, seg_opts, energy_offset, segmentation);
