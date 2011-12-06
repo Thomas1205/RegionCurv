@@ -147,11 +147,11 @@ int main(int argc, char** argv) {
     
     for (uint y=0; y < yDim; y++) {
       for (uint x=0; x < xDim; x++) {
-	float cur = gray_image(x,y);
-	for (uint r=0; r < nRegions; r++) {
-	  float data = float((cur-mean[r])*(cur-mean[r]));
-	  multi_data_term(x,y,r) = data;
-	}
+        float cur = gray_image(x,y);
+        for (uint r=0; r < nRegions; r++) {
+          float data = float((cur-mean[r])*(cur-mean[r]));
+          multi_data_term(x,y,r) = data;
+        }
       }
     }
   }
@@ -261,16 +261,16 @@ int main(int argc, char** argv) {
 
         if (app.is_set("-diffusion")) {
           //clique_lp_segment_curvreg_minsum_diffusion(data_term, seg_opts, energy_offset, segmentation);
-	  clique_lp_segment_curvreg_minsum_diffusion_memsave(multi_data_term, seg_opts, energy_offset, segmentation);
-	}
+          clique_lp_segment_curvreg_minsum_diffusion_memsave(multi_data_term, seg_opts, energy_offset, segmentation);
+        }
         else {
-	  if (nRegions == 2)
-	    clique_lp_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
-	  else {
-	    //clique_lp_segment_pottscurvreg(multi_data_term, seg_opts, segmentation);
-	    clique_lp_segment_pottscurvreg_layered(multi_data_term, seg_opts, segmentation);
-	  }
-	}
+          if (nRegions == 2)
+            clique_lp_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
+          else {
+            //clique_lp_segment_pottscurvreg(multi_data_term, seg_opts, segmentation);
+            clique_lp_segment_pottscurvreg_layered(multi_data_term, seg_opts, segmentation);
+          }
+        }
       }
     }
   }

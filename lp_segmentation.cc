@@ -258,13 +258,13 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
   //NOTE: if crossings are ALLOWED, this routine only APPROXIMATES the energy
 
   double energy = 0.0;
-  
+
   Math1D::Vector<double> drop(point_edge[point].size(),0.0);
-  
+
   double abs_drop_sum = 0.0;
-    
+
   std::map<uint,uint> drop_idx;
-  
+
   for (uint e=0; e < drop.size(); e++) {
 
     uint edge = point_edge[point][e];
@@ -280,11 +280,11 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
       uint cur_label = solution[face];
 
       if (cur_label != 0) 
-	cur_drop += mesh.match(face,edge);
+        cur_drop += mesh.match(face,edge);
     }
 
     drop[e] = cur_drop;
-      
+
     abs_drop_sum += fabs(cur_drop);
   }
 
@@ -300,28 +300,28 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
 
       for (uint j=0; j < point_pair[point].size(); j++) {
 
-	const Mesh2DEdgePair& cur_edge_pair = edge_pairs[point_pair[point][j]];
+        const Mesh2DEdgePair& cur_edge_pair = edge_pairs[point_pair[point][j]];
 
-	uint first = cur_edge_pair.first_edge_idx_;
-	uint second = cur_edge_pair.second_edge_idx_;
+        uint first = cur_edge_pair.first_edge_idx_;
+        uint second = cur_edge_pair.second_edge_idx_;
 
-	if (drop[drop_idx[first]] != 0.0 && drop[drop_idx[second]] != 0.0) {
+        if (drop[drop_idx[first]] != 0.0 && drop[drop_idx[second]] != 0.0) {
 
-	  uint nFirstAdjacent = uint( mesh.adjacent_faces(first).size() );
-	  uint nSecondAdjacent = uint( mesh.adjacent_faces(second).size() );
-	    
-	  double weight = 0.0;
-	  if (nFirstAdjacent > 1)
-	    weight += 0.5*lambda*mesh.edge_length(first);
-	  if (nSecondAdjacent > 1)
-	    weight += 0.5*lambda*mesh.edge_length(second);
-	  //do not penalize the image corners for their curvature
-	  if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
-	    weight += gamma * curv_weight(mesh,cur_edge_pair,2.0,bruckstein);
-	    
-	  //since the cost are identical for both orientations, we don't care about orientation here
-	  energy += weight;
-	}
+          uint nFirstAdjacent = uint( mesh.adjacent_faces(first).size() );
+          uint nSecondAdjacent = uint( mesh.adjacent_faces(second).size() );
+
+          double weight = 0.0;
+          if (nFirstAdjacent > 1)
+            weight += 0.5*lambda*mesh.edge_length(first);
+          if (nSecondAdjacent > 1)
+            weight += 0.5*lambda*mesh.edge_length(second);
+          //do not penalize the image corners for their curvature
+          if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
+            weight += gamma * curv_weight(mesh,cur_edge_pair,2.0,bruckstein);
+
+          //since the cost are identical for both orientations, we don't care about orientation here
+          energy += weight;
+        }
       }
     }
     else {
@@ -334,54 +334,54 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
       Math1D::Vector<double> var_lb(nVars,0.0);
       Math1D::Vector<double> var_ub(nVars,1.0);
       Math1D::Vector<double> lp_cost(nVars,0.0);
-	
+
       //set cost and remove pairs that cannot be active
       for (uint j=0; j < point_pair[point].size(); j++) {
 
-	const Mesh2DEdgePair& cur_edge_pair = edge_pairs[point_pair[point][j]];
+        const Mesh2DEdgePair& cur_edge_pair = edge_pairs[point_pair[point][j]];
 
-	uint first = cur_edge_pair.first_edge_idx_;
-	uint second = cur_edge_pair.second_edge_idx_;
+        uint first = cur_edge_pair.first_edge_idx_;
+        uint second = cur_edge_pair.second_edge_idx_;
 
-	uint nFirstAdjacent = uint( mesh.adjacent_faces(first).size() );
-	uint nSecondAdjacent = uint( mesh.adjacent_faces(second).size() );
-	  
-	double weight = 0.0;
-	if (nFirstAdjacent > 1)
-	  weight += 0.5*lambda*mesh.edge_length(first);
-	if (nSecondAdjacent > 1)
-	  weight += 0.5*lambda*mesh.edge_length(second);
-	//do not penalize the image corners for their curvature
-	if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
-	  weight += gamma * curv_weight(mesh,cur_edge_pair,2.0,bruckstein);
+        uint nFirstAdjacent = uint( mesh.adjacent_faces(first).size() );
+        uint nSecondAdjacent = uint( mesh.adjacent_faces(second).size() );
 
-	lp_cost[2*j]   = weight;
-	lp_cost[2*j+1] = weight;
+        double weight = 0.0;
+        if (nFirstAdjacent > 1)
+          weight += 0.5*lambda*mesh.edge_length(first);
+        if (nSecondAdjacent > 1)
+          weight += 0.5*lambda*mesh.edge_length(second);
+        //do not penalize the image corners for their curvature
+        if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
+          weight += gamma * curv_weight(mesh,cur_edge_pair,2.0,bruckstein);
 
-	if (drop[drop_idx[first]] == 0.0 || drop[drop_idx[second]] == 0.0) {
-	  var_ub[2*j] = 0.0;
-	  var_ub[2*j+1] = 0.0;
-	}
+        lp_cost[2*j]   = weight;
+        lp_cost[2*j+1] = weight;
+
+        if (drop[drop_idx[first]] == 0.0 || drop[drop_idx[second]] == 0.0) {
+          var_ub[2*j] = 0.0;
+          var_ub[2*j+1] = 0.0;
+        }
       }
 
       std::vector<std::pair<uint,uint> > conflicts;
 
       //find conflicting pairs
       for (uint p1=0; p1 < point_pair[point].size(); p1++) {
-	for (uint p2=p1+1; p2 < point_pair[point].size(); p2++) {
+        for (uint p2=p1+1; p2 < point_pair[point].size(); p2++) {
 
-	  uint pair1 = point_pair[point][p1];
-	  uint pair2 = point_pair[point][p2];
+          uint pair1 = point_pair[point][p1];
+          uint pair2 = point_pair[point][p2];
 
-	  if (line_pairs_with_meeting_point_cross(mesh, edge_pairs[pair1], edge_pairs[pair2]) ) {
-	    conflicts.push_back(std::make_pair(p1,p2));
-	  }
-	}
+          if (line_pairs_with_meeting_point_cross(mesh, edge_pairs[pair1], edge_pairs[pair2]) ) {
+            conflicts.push_back(std::make_pair(p1,p2));
+          }
+        }
       }
 
       if (crossings_allowed && ads != 4)
-	conflicts.clear();
-	
+        conflicts.clear();
+
       uint nConstraints = 2*point_edge[point].size() + conflicts.size();
       uint nMatrixEntries = 4*point_pair.size() + 4*conflicts.size();
 
@@ -391,70 +391,70 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
       Math1D::Vector<double> rhs_upper(nConstraints,0.0);
 
       for (uint e=0; e < drop.size(); e++) {
-	rhs_lower[e] = -drop[e];
-	rhs_upper[e] = -drop[e];
-	rhs_upper[drop.size()+e] = 1.0;
+        rhs_lower[e] = -drop[e];
+        rhs_upper[e] = -drop[e];
+        rhs_upper[drop.size()+e] = 1.0;
       }
 
       /*** code constraint system ***/
       for (uint j=0; j < point_pair[point].size(); j++) {
 
-	const Mesh2DEdgePair& cur_edge_pair = edge_pairs[point_pair[point][j]];
+        const Mesh2DEdgePair& cur_edge_pair = edge_pairs[point_pair[point][j]];
 
-	uint first_edge = cur_edge_pair.first_edge_idx_;
-	uint second_edge = cur_edge_pair.second_edge_idx_;
+        uint first_edge = cur_edge_pair.first_edge_idx_;
+        uint second_edge = cur_edge_pair.second_edge_idx_;
 
-	uint middle_point = cur_edge_pair.common_point_idx_;
+        uint middle_point = cur_edge_pair.common_point_idx_;
 
-	lp_descr.add_entry(drop.size()+drop_idx[first_edge],2*j,1);
-	lp_descr.add_entry(drop.size()+drop_idx[first_edge],2*j+1,1);
+        lp_descr.add_entry(drop.size()+drop_idx[first_edge],2*j,1);
+        lp_descr.add_entry(drop.size()+drop_idx[first_edge],2*j+1,1);
 
-	lp_descr.add_entry(drop.size()+drop_idx[second_edge],2*j,1);
-	lp_descr.add_entry(drop.size()+drop_idx[second_edge],2*j+1,1);
+        lp_descr.add_entry(drop.size()+drop_idx[second_edge],2*j,1);
+        lp_descr.add_entry(drop.size()+drop_idx[second_edge],2*j+1,1);
 
-	if (mesh.edge(first_edge).to_idx_ == middle_point) {
-	  lp_descr.add_entry(drop_idx[first_edge],2*j,1);
-	  lp_descr.add_entry(drop_idx[first_edge],2*j+1,-1);
-	}
-	else {
-	  lp_descr.add_entry(drop_idx[first_edge],2*j,-1);
-	  lp_descr.add_entry(drop_idx[first_edge],2*j+1,1);
-	}
-	  
-	if (mesh.edge(second_edge).to_idx_ == middle_point) {
-	  lp_descr.add_entry(drop_idx[second_edge],2*j,-1);
-	  lp_descr.add_entry(drop_idx[second_edge],2*j+1,1);
-	}
-	else {
-	  lp_descr.add_entry(drop_idx[second_edge],2*j,1);
-	  lp_descr.add_entry(drop_idx[second_edge],2*j+1,-1);
-	}
+        if (mesh.edge(first_edge).to_idx_ == middle_point) {
+          lp_descr.add_entry(drop_idx[first_edge],2*j,1);
+          lp_descr.add_entry(drop_idx[first_edge],2*j+1,-1);
+        }
+        else {
+          lp_descr.add_entry(drop_idx[first_edge],2*j,-1);
+          lp_descr.add_entry(drop_idx[first_edge],2*j+1,1);
+        }
+
+        if (mesh.edge(second_edge).to_idx_ == middle_point) {
+          lp_descr.add_entry(drop_idx[second_edge],2*j,-1);
+          lp_descr.add_entry(drop_idx[second_edge],2*j+1,1);
+        }
+        else {
+          lp_descr.add_entry(drop_idx[second_edge],2*j,1);
+          lp_descr.add_entry(drop_idx[second_edge],2*j+1,-1);
+        }
       }
 
       for (uint k=0; k < conflicts.size(); k++) {
 
-	uint row = 2*point_edge[point].size() + k;
-	rhs_upper[row] = 1.0;
+        uint row = 2*point_edge[point].size() + k;
+        rhs_upper[row] = 1.0;
 
-	uint first = conflicts[k].first;
-	uint second = conflicts[k].second;
+        uint first = conflicts[k].first;
+        uint second = conflicts[k].second;
 
-	lp_descr.add_entry(row, 2*first, 1.0);
-	lp_descr.add_entry(row, 2*first+1, 1.0);
-	lp_descr.add_entry(row, 2*second, 1.0);
-	lp_descr.add_entry(row, 2*second+1, 1.0);
+        lp_descr.add_entry(row, 2*first, 1.0);
+        lp_descr.add_entry(row, 2*first+1, 1.0);
+        lp_descr.add_entry(row, 2*second, 1.0);
+        lp_descr.add_entry(row, 2*second+1, 1.0);
       }
 
       OsiClpSolverInterface lpSolver;
-	
+
       CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
-				  lp_descr.value(),lp_descr.nEntries());
+        lp_descr.value(),lp_descr.nEntries());
 
       lpSolver.loadProblem (coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
-			    lp_cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
+        lp_cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
 
       for (int v=0; v < lpSolver.getNumCols(); v++) {
-	lpSolver.setInteger(v);
+        lpSolver.setInteger(v);
       }
 
       //ILP
@@ -466,18 +466,18 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
 
       if (!cbc_model.isProvenOptimal()) {
 
-	std::cerr << "ERROR: the optimal solution could not be found. Exiting..." << std::endl;
-	exit(1);
+        std::cerr << "ERROR: the optimal solution could not be found. Exiting..." << std::endl;
+        exit(1);
       }
       if (cbc_model.isProvenInfeasible()) {
-	  
-	std::cerr << "ERROR: problem marked as infeasible. Exiting..." << std::endl;
-	exit(1);
+
+        std::cerr << "ERROR: problem marked as infeasible. Exiting..." << std::endl;
+        exit(1);
       }
       if (cbc_model.isAbandoned()) {
-	  
-	std::cerr << "ERROR: problem was abandoned. Exiting..." << std::endl;
-	exit(1);
+
+        std::cerr << "ERROR: problem was abandoned. Exiting..." << std::endl;
+        exit(1);
       }
     }
   }
@@ -534,7 +534,7 @@ double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
   double energy = 0.0;
 
   uint edge_pair_var_offs = mesh.nFaces();
-  
+
   for (uint f=0; f < mesh.nFaces(); f++)
     energy += region_cost[f] * double(solution[f]);
 
@@ -542,7 +542,7 @@ double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
   mesh.generate_edge_pair_list(edge_pairs);
 
   //std::cerr << "unary terms: " << energy << std::endl;
-  
+
   NamedStorage1D<std::vector<uint> > point_pair(mesh.nPoints(),MAKENAME(point_pair));
   NamedStorage1D<std::vector<uint> > point_edge(mesh.nEdges(),MAKENAME(point_edge));
 
@@ -561,15 +561,15 @@ double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
   }
 
   Math1D::Vector<double> cur_point_energy(mesh.nPoints());
-  
+
   for (uint p=0; p < mesh.nPoints(); p++) {
 
     cur_point_energy[p] = point_energy(p, solution, mesh, edge_pairs, point_pair, point_edge, 
-				       lambda, gamma, bruckstein, crossings_allowed);
+      lambda, gamma, bruckstein, crossings_allowed);
 
     energy += cur_point_energy[p];
   }
-  
+
 
   bool changes = true;
 
@@ -577,53 +577,53 @@ double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
 
     changes = false;
     uint nChanges = 0;
-    
+
     std::cerr << "ICM iteration " << iter << std::endl;
 
     for (uint f=0; f < mesh.nFaces(); f++) {
-      
+
       uint cur_label = solution[f];
-      
+
       double cur_energy = 0.0;
       if (cur_label == 1)
-	cur_energy += region_cost[f];
-      
+        cur_energy += region_cost[f];
+
       std::vector<uint> point_indices;
       mesh.get_polygon_points(f, point_indices);
-      
+
       for (uint k=0; k < point_indices.size(); k++) 
-	cur_energy += cur_point_energy[point_indices[k]];
+        cur_energy += cur_point_energy[point_indices[k]];
 
       uint hyp_label = 1 - cur_label;
-      
+
       //temporarily modify the solution
       solution[f] = hyp_label;
-      
+
       Math1D::Vector<double> hyp_point_cost(point_indices.size());
-      
+
       double hyp_energy = 0.0;
       if (hyp_label == 1)
-	hyp_energy += region_cost[f];
-      
+        hyp_energy += region_cost[f];
+
       for (uint k=0; k < point_indices.size(); k++) {
-	hyp_point_cost[k] = point_energy(point_indices[k], solution, mesh, edge_pairs, point_pair, point_edge, 
-					 lambda, gamma, bruckstein, crossings_allowed);
-	hyp_energy += hyp_point_cost[k];
+        hyp_point_cost[k] = point_energy(point_indices[k], solution, mesh, edge_pairs, point_pair, point_edge, 
+          lambda, gamma, bruckstein, crossings_allowed);
+        hyp_energy += hyp_point_cost[k];
       }
-      
+
       if (cur_energy <= hyp_energy) {
-	solution[f] = cur_label;
+        solution[f] = cur_label;
       }
       else {
-	//update point cost
-	for (uint k=0; k < point_indices.size(); k++) {
-	  uint idx = point_indices[k];
-	  cur_point_energy[idx] = hyp_point_cost[k];
-	}
-	changes = true;
-	nChanges++;
+        //update point cost
+        for (uint k=0; k < point_indices.size(); k++) {
+          uint idx = point_indices[k];
+          cur_point_energy[idx] = hyp_point_cost[k];
+        }
+        changes = true;
+        nChanges++;
 
-	energy -= (cur_energy - hyp_energy);
+        energy -= (cur_energy - hyp_energy);
       }
     }
 
