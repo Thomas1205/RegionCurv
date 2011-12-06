@@ -16,6 +16,7 @@
 #include <coin/ClpPlusMinusOneMatrix.hpp>
 #include <coin/ClpFactorization.hpp>
 #include <coin/OsiClpSolverInterface.hpp>
+#include <coin/CbcModel.hpp>
 
 #include "conv_lp_solving.hh"
 
@@ -37,6 +38,486 @@
 #include "xprs.h" 
 #endif
 
+double multi_point_energy(const Mesh2D& mesh, uint point, const LPSegOptions& options, 
+			  const Storage1D<uint>& integral_solution, uint nRegions,
+			  const std::vector<Mesh2DEdgePair>& edge_pairs, 
+			  const NamedStorage1D<std::vector<uint> >& point_pair,
+			  const NamedStorage1D<std::vector<uint> >& point_edge) {
+
+
+  double energy = 0.0;
+
+  //std::cerr << "**** point_energy(" << point << ") ****" << std::endl;
+  //std::cerr << "nRegions: " << nRegions << std::endl;
+
+  double lambda = 0.5*options.lambda_;
+  double gamma = 0.5*options.gamma_;
+  bool bruckstein = options.bruckstein_;
+  bool crossings_allowed = !options.prevent_crossings_;
+  
+  Storage1D<Math1D::Vector<double> > drop(nRegions);
+  for (uint i=0; i < nRegions; i++)
+    drop[i].resize(point_edge[point].size(),0.0);
+  
+  Math1D::Vector<double> abs_drop_sum(nRegions,0.0);
+  
+  std::map<uint,uint> drop_idx;
+
+  uint nEdges = point_edge[point].size();
+
+  for (uint e=0; e < nEdges; e++) {
+
+    uint edge = point_edge[point][e];
+    drop_idx[edge] = e;
+
+    //std::cerr << "edge " << edge << std::endl;
+
+    const std::vector<uint>& adjacent_faces = mesh.adjacent_faces(edge);
+
+    Math1D::Vector<double> cur_drop(nRegions,0.0);
+
+    for (uint i=0; i < adjacent_faces.size(); i++) {
+      uint face = adjacent_faces[i];
+
+      uint cur_label = integral_solution[face];
+
+      //std::cerr << "face " << face << " ---> label " << cur_label << std::endl;
+
+      cur_drop[cur_label] += mesh.match(face,edge);
+    }
+
+    for (uint r=0; r < nRegions; r++) {
+      drop[r][e] = cur_drop[r];
+      
+      abs_drop_sum[r] += fabs(cur_drop[r]);
+    }
+  }
+
+  //std::cerr << "abs_drop_sum: " << abs_drop_sum << std::endl;
+
+  //can now solve for each region independently
+  for (uint r=0; r < nRegions; r++) {
+
+    if (abs_drop_sum[r] > 0.0) {
+
+      //std::cerr << "pair present" << std::endl;
+
+      int ads = int (abs_drop_sum[r]+0.5);
+      assert((ads % 2) == 0);
+
+      if (ads == 2) {
+	//simple case
+	
+	for (uint j=0; j < point_pair[point].size(); j++) {
+	  
+	  const Mesh2DEdgePair& cur_edge_pair = edge_pairs[point_pair[point][j]];
+
+	  uint first = cur_edge_pair.first_edge_idx_;
+	  uint second = cur_edge_pair.second_edge_idx_;
+	  
+	  if (drop[r][drop_idx[first]] != 0.0 && drop[r][drop_idx[second]] != 0.0) {
+
+	    uint nFirstAdjacent = uint( mesh.adjacent_faces(first).size() );
+	    uint nSecondAdjacent = uint( mesh.adjacent_faces(second).size() );
+	    
+	    double weight = 0.0;
+	    if (nFirstAdjacent > 1)
+	      weight += 0.5*lambda*mesh.edge_length(first);
+	    if (nSecondAdjacent > 1)
+	      weight += 0.5*lambda*mesh.edge_length(second);
+	    //do not penalize the image corners for their curvature
+	    if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
+	      weight += gamma * curv_weight(mesh,cur_edge_pair,2.0,bruckstein);
+	    
+	    //since the cost are identical for both orientations, we don't care about orientation here
+	    energy += weight;
+	  }
+	}
+      }
+      else {
+	//use Integer Linear Programming
+	
+	uint nVars = 2* point_pair[point].size();
+	
+	//std::cerr << "ILP, r=" << r << std::endl;
+	//std::cerr << "nVars: " << nVars << std::endl;
+	//std::cerr << "drop_sum: " << abs_drop_sum[r] << std::endl;
+	//std::cerr << "drop: " << drop[r] << std::endl;
+	
+	Math1D::Vector<double> var_lb(nVars,0.0);
+	Math1D::Vector<double> var_ub(nVars,1.0);
+	Math1D::Vector<double> lp_cost(nVars,0.0);
+	
+	//set cost and remove pairs that cannot be active
+	for (uint j=0; j < point_pair[point].size(); j++) {
+	  
+	  const Mesh2DEdgePair& cur_edge_pair = edge_pairs[point_pair[point][j]];
+
+	  uint first = cur_edge_pair.first_edge_idx_;
+	  uint second = cur_edge_pair.second_edge_idx_;
+	  
+	  uint nFirstAdjacent = uint( mesh.adjacent_faces(first).size() );
+	  uint nSecondAdjacent = uint( mesh.adjacent_faces(second).size() );
+	  
+	  double weight = 0.0;
+	  if (nFirstAdjacent > 1)
+	    weight += 0.5*lambda*mesh.edge_length(first);
+	  if (nSecondAdjacent > 1)
+	    weight += 0.5*lambda*mesh.edge_length(second);
+	  //do not penalize the image corners for their curvature
+	  if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
+	    weight += gamma * curv_weight(mesh,cur_edge_pair,2.0,bruckstein);
+	  
+	  lp_cost[2*j]   = weight;
+	  lp_cost[2*j+1] = weight;
+	  
+	  if (drop[r][drop_idx[first]] == 0.0 || drop[r][drop_idx[second]] == 0.0) {
+	    var_ub[2*j] = 0.0;
+	    var_ub[2*j+1] = 0.0;
+	  }
+	}
+
+	std::vector<std::pair<uint,uint> > conflicts;
+
+	//find conflicting pairs
+	for (uint p1=0; p1 < point_pair[point].size(); p1++) {
+	  for (uint p2=p1+1; p2 < point_pair[point].size(); p2++) {
+	    
+	    uint pair1 = point_pair[point][p1];
+	    uint pair2 = point_pair[point][p2];
+	    
+	    if (line_pairs_with_meeting_point_cross(mesh, edge_pairs[pair1], edge_pairs[pair2]) ) {
+	      conflicts.push_back(std::make_pair(p1,p2));
+	    }
+	  }
+	}
+	
+	if (crossings_allowed && ads != 4)
+	  conflicts.clear();
+
+	//std::cerr << conflicts.size() << " conflicts" << std::endl;
+	
+	uint nConstraints = 2*nEdges + conflicts.size();
+	uint nMatrixEntries = 4*point_pair.size() + 4*conflicts.size();
+	
+	SparseMatrixDescription<double> lp_descr(nMatrixEntries, nConstraints, nVars);
+
+	Math1D::Vector<double> rhs_lower(nConstraints,0.0);
+	Math1D::Vector<double> rhs_upper(nConstraints,0.0);
+	
+	for (uint e=0; e < nEdges; e++) {
+	  rhs_lower[e] = -drop[r][e];
+	  rhs_upper[e] = -drop[r][e];
+	  rhs_upper[nEdges+e] = 1.0;
+	}
+	
+	/*** code constraint system ***/
+	for (uint j=0; j < point_pair[point].size(); j++) {
+	  
+	  const Mesh2DEdgePair& cur_edge_pair = edge_pairs[point_pair[point][j]];
+	  
+	  uint first_edge = cur_edge_pair.first_edge_idx_;
+	  uint second_edge = cur_edge_pair.second_edge_idx_;
+	  
+	  uint middle_point = cur_edge_pair.common_point_idx_;
+	  
+	  lp_descr.add_entry(nEdges+drop_idx[first_edge],2*j,1);
+	  lp_descr.add_entry(nEdges+drop_idx[first_edge],2*j+1,1);
+	  
+	  lp_descr.add_entry(nEdges+drop_idx[second_edge],2*j,1);
+	  lp_descr.add_entry(nEdges+drop_idx[second_edge],2*j+1,1);
+	  
+	  if (mesh.edge(first_edge).to_idx_ == middle_point) {
+	    lp_descr.add_entry(drop_idx[first_edge],2*j,1);
+	    lp_descr.add_entry(drop_idx[first_edge],2*j+1,-1);
+	  }
+	  else {
+	    lp_descr.add_entry(drop_idx[first_edge],2*j,-1);
+	    lp_descr.add_entry(drop_idx[first_edge],2*j+1,1);
+	  }
+	  
+	  if (mesh.edge(second_edge).to_idx_ == middle_point) {
+	    lp_descr.add_entry(drop_idx[second_edge],2*j,-1);
+	    lp_descr.add_entry(drop_idx[second_edge],2*j+1,1);
+	  }
+	  else {
+	    lp_descr.add_entry(drop_idx[second_edge],2*j,1);
+	    lp_descr.add_entry(drop_idx[second_edge],2*j+1,-1);
+	  }
+	}
+	
+	for (uint k=0; k < conflicts.size(); k++) {
+
+	  uint row = 2*point_edge[point].size() + k;
+	  rhs_upper[row] = 1.0;
+	  
+	  uint first = conflicts[k].first;
+	  uint second = conflicts[k].second;
+	  
+	  lp_descr.add_entry(row, 2*first, 1.0);
+	  lp_descr.add_entry(row, 2*first+1, 1.0);
+	  lp_descr.add_entry(row, 2*second, 1.0);
+	  lp_descr.add_entry(row, 2*second+1, 1.0);
+	}
+
+	OsiClpSolverInterface lpSolver;
+	lpSolver.messageHandler()->setLogLevel(5);
+	
+	CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
+				    lp_descr.value(),lp_descr.nEntries());
+	
+	lpSolver.loadProblem (coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
+			      lp_cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
+	
+	for (int v=0; v < lpSolver.getNumCols(); v++) {
+	  lpSolver.setInteger(v);
+	}
+	
+	//ILP
+	CbcModel cbc_model(lpSolver);
+	cbc_model.setLogLevel(0);
+	//cbc_model.solver()->messageHandler()->setLogLevel(5);
+
+	cbc_model.branchAndBound();
+
+	energy += cbc_model.getObjValue();
+	
+	if (!cbc_model.isProvenOptimal()) {
+	  
+	  std::cerr << "ERROR: the optimal solution could not be found. Exiting..." << std::endl;
+	  exit(1);
+	}
+	if (cbc_model.isProvenInfeasible()) {
+	  
+	  std::cerr << "ERROR: problem marked as infeasible. Exiting..." << std::endl;
+	  exit(1);
+	}
+	if (cbc_model.isAbandoned()) {
+	  
+	  std::cerr << "ERROR: problem was abandoned. Exiting..." << std::endl;
+	  exit(1);
+	}
+      }
+    }
+  }
+
+  //std::cerr << "leaving" << std::endl;
+
+  return energy;
+}
+
+
+double multi_curv_energy(const Mesh2D& mesh, const Storage1D<uint>& integral_solution, 
+			 const Math1D::Vector<double>& cost, const LPSegOptions& options, uint nRegions) {
+
+  double energy = 0.0;
+
+  for (uint f=0; f < mesh.nFaces(); f++) {
+    uint label = integral_solution[f];
+    energy += cost[f*nRegions+label];
+  }
+    
+  std::vector<Mesh2DEdgePair> edge_pairs;
+  mesh.generate_edge_pair_list(edge_pairs);
+
+  //std::cerr << "unary terms: " << energy << std::endl;
+  
+  NamedStorage1D<std::vector<uint> > point_pair(mesh.nPoints(),MAKENAME(point_pair));
+  NamedStorage1D<std::vector<uint> > point_edge(mesh.nEdges(),MAKENAME(point_edge));
+
+  for (uint e=0; e < edge_pairs.size(); e++) {
+
+    uint point = edge_pairs[e].common_point_idx_;
+
+    point_pair[point].push_back(e);
+    uint first = edge_pairs[e].first_edge_idx_;
+    uint second = edge_pairs[e].second_edge_idx_;
+
+    if (std::find(point_edge[point].begin(), point_edge[point].end(), first) == point_edge[point].end())
+      point_edge[point].push_back(first);
+    if (std::find(point_edge[point].begin(), point_edge[point].end(), second) == point_edge[point].end())
+      point_edge[point].push_back(second);
+  }
+
+  for (uint p=0; p < mesh.nPoints(); p++) {
+
+    energy += multi_point_energy(mesh, p, options, integral_solution, nRegions,
+				 edge_pairs, point_pair, point_edge);
+  }
+
+  return energy;
+}
+
+double multi_curv_icm(const Mesh2D& mesh, const Storage1D<uint>& integral_solution, 
+		      const Math1D::Vector<double>& cost, const LPSegOptions& options, uint nRegions) {
+
+  double energy = 0.0;
+
+  for (uint f=0; f < mesh.nFaces(); f++) {
+    uint label = integral_solution[f];
+    energy += cost[f*nRegions+label];
+  }
+    
+  std::vector<Mesh2DEdgePair> edge_pairs;
+  mesh.generate_edge_pair_list(edge_pairs);
+  
+  //std::cerr << "unary terms: " << energy << std::endl;
+  //std::cerr << "nRegions: " << nRegions << std::endl;
+  
+  NamedStorage1D<std::vector<uint> > point_pair(mesh.nPoints(),MAKENAME(point_pair));
+  NamedStorage1D<std::vector<uint> > point_edge(mesh.nEdges(),MAKENAME(point_edge));
+  
+  for (uint e=0; e < edge_pairs.size(); e++) {
+    
+    uint point = edge_pairs[e].common_point_idx_;
+    
+    point_pair[point].push_back(e);
+    uint first = edge_pairs[e].first_edge_idx_;
+    uint second = edge_pairs[e].second_edge_idx_;
+    
+    if (std::find(point_edge[point].begin(), point_edge[point].end(), first) == point_edge[point].end())
+      point_edge[point].push_back(first);
+    if (std::find(point_edge[point].begin(), point_edge[point].end(), second) == point_edge[point].end())
+      point_edge[point].push_back(second);
+  }
+  
+  Math1D::Vector<double> cur_point_energy(mesh.nPoints());
+  
+  for (uint p=0; p < mesh.nPoints(); p++) {
+  
+    cur_point_energy[p] = multi_point_energy(mesh, p, options, integral_solution, nRegions,
+					     edge_pairs, point_pair, point_edge);
+    
+    energy += cur_point_energy[p];
+  }
+  
+  
+  std::cerr << "ICM. Initial energy: " << energy << std::endl;
+  
+  bool changes = true;
+  
+  for (uint iter=1; changes && iter <= 15; iter++) {
+    
+    changes = false;
+    uint nChanges = 0;
+    
+    std::cerr << "ICM iteration " << iter << std::endl;
+    
+    for (uint f=0; f < mesh.nFaces(); f++) {
+      
+      for (uint hyp_label = 0; hyp_label < nRegions; hyp_label++) {
+	
+	uint cur_label = integral_solution[f];
+	if (cur_label == hyp_label)
+	  continue;
+	
+	double cur_energy = 0.0;
+	cur_energy += cost[f*nRegions+cur_label];
+	
+	std::vector<uint> point_indices;
+	mesh.get_polygon_points(f, point_indices);
+	
+	for (uint k=0; k < point_indices.size(); k++) 
+	  cur_energy += cur_point_energy[point_indices[k]];
+	
+	//temporarily modify the solution
+	integral_solution[f] = hyp_label;
+	
+	Math1D::Vector<double> hyp_point_cost(point_indices.size());
+	
+	double hyp_energy = 0.0;
+	hyp_energy += cost[f*nRegions+hyp_label];
+	
+	for (uint p=0; p < point_indices.size(); p++) {
+	  hyp_point_cost[p] = multi_point_energy(mesh, p, options, integral_solution, nRegions,
+						 edge_pairs, point_pair, point_edge);
+	  hyp_energy += hyp_point_cost[p];
+	}
+	
+	if (cur_energy <= hyp_energy) {
+	  integral_solution[f] = cur_label;
+	}
+	else {
+	  //update point cost
+	  for (uint k=0; k < point_indices.size(); k++) {
+	    uint idx = point_indices[k];
+	    cur_point_energy[idx] = hyp_point_cost[k];
+	  }
+	  changes = true;
+	  nChanges++;
+	  
+	  energy -= (cur_energy - hyp_energy);
+	}
+      }
+    }
+
+    std::cerr << "energy " << energy << " (" << nChanges << " changes)"<< std::endl;
+  }
+
+  return energy;
+}
+
+double multi_curv_icm(const Math3D::Tensor<float>& data_term, const LPSegOptions& options,
+		      Math2D::Matrix<uint>& segmentation) {
+
+  uint nRegions = data_term.zDim();
+
+  int neighborhood = options.neighborhood_;
+  
+  assert(neighborhood <= 16); 
+
+  uint xDim = uint( data_term.xDim() );
+  uint yDim = uint( data_term.yDim() );
+
+  Mesh2D mesh;  
+  create_mesh(options, data_term, 0, mesh);
+
+  Math1D::Vector<double> region_cost(nRegions * mesh.nFaces());
+  Math1D::Vector<uint> face_label(mesh.nFaces(),0);
+
+  for (uint f=0; f < mesh.nFaces(); f++) {
+
+    double best = 1e300;
+    uint arg_best = 0;
+
+    for (uint l=0; l < nRegions; l++) {
+
+      double hyp = calculate_data_term(f, l, mesh, data_term);
+
+      region_cost[f*nRegions+l] = hyp;
+
+      if (hyp < best) {
+	
+	best = hyp;
+	arg_best = l;
+      }
+    }
+    
+    face_label[f] = arg_best;
+  }
+
+  //std::cerr << "calling main for " << data_term.zDim() << " regions" << std::endl;
+
+  double energy = multi_curv_icm(mesh, face_label, region_cost, options, data_term.zDim());
+
+  const uint out_factor = options.output_factor_;
+
+  segmentation.resize(xDim*out_factor,yDim*out_factor);
+
+  mesh.enlarge(out_factor,out_factor);
+  
+  Math2D::Matrix<double> output(xDim*out_factor,yDim*out_factor,0);
+  for (uint i=0; i < mesh.nFaces(); ++i) {
+    add_grid_output(i,face_label[i],mesh,output);	
+  }
+  for (uint y=0; y < yDim*out_factor; y++) {
+    for (uint x=0; x < xDim*out_factor; x++) {
+      segmentation(x,y) = uint(output(x,y)*(255 / (nRegions-1)));
+    }
+  }
+
+  return energy;
+}
 
 double lp_segment_pottscurvreg(const Math3D::Tensor<float>& data_term, const LPSegOptions& options, Math2D::Matrix<uint>& segmentation) {
 
@@ -63,33 +544,7 @@ double lp_segment_pottscurvreg(const Math3D::Tensor<float>& data_term, const LPS
   uint nRegions = uint( data_term.zDim() );
 
   Mesh2D mesh;  
-  if (options.gridtype_ == options.Square) {
-    if (options.adaptive_mesh_n_ < 0) {
-      double xfac = double(xDim) / double(options.griddim_xDim_);
-      double yfac = double(yDim) / double(options.griddim_yDim_);
-      generate_mesh( options.griddim_xDim_, options.griddim_yDim_, neighborhood, mesh, false, 0);
-      mesh.enlarge(xfac,yfac);
-    }
-    else {
-      //Adaptive mesh
-      TODO("combination of curvature potts model and adaptive meshes");
-      //generate_adaptive_mesh(data_term, mesh, neighborhood, options.adaptive_mesh_n_);
-    }
-  }
-  else {
-
-    if (options.adaptive_mesh_n_ < 0) {
-      double xfac = double(xDim) / double(options.griddim_xDim_);
-      double yfac = double(yDim) / double(options.griddim_yDim_);
-      
-      generate_hexagonal_mesh( xDim, yDim, 0.5*(xfac+yfac), neighborhood,mesh); //TODO: proper handling of the factor
-    }
-    else {
-      //Adaptive mesh
-      TODO("combination of curvature potts model and adaptive hexagonal meshes");
-      //generate_adaptive_hexagonal_mesh(data_term, mesh, neighborhood, options.adaptive_mesh_n_);
-    }
-  }
+  create_mesh(options, data_term, 0, mesh);
 
   Storage1D<PixelFaceRelation> shares;
   Math1D::Vector<uint> share_start;
@@ -291,7 +746,7 @@ double lp_segment_pottscurvreg(const Math3D::Tensor<float>& data_term, const LPS
     }
   }
 
-  uint nStandardEntries = lp_descr.nEntries();
+  //uint nStandardEntries = lp_descr.nEntries();
 
   if (enforce_consistent_boundaries) {
 
@@ -463,7 +918,31 @@ double lp_segment_pottscurvreg(const Math3D::Tensor<float>& data_term, const LPS
   
   std::cerr << nFrac << "/" << nVars << " variables are fractional" << std::endl;
 
-  //TODO: threshold and re-run the solver.
+  //threshold, compute energy and post-process
+  Math1D::Vector<uint> face_labeling(mesh.nFaces(),0);
+  for (uint i=0; i < mesh.nFaces();++i) {
+    
+    uint arg_max = MAX_UINT;
+    double max_val = 0.0;
+    
+    for (uint r=0; r < nRegions; r++) {
+      
+      double val = lp_solution[i*nRegions + r];
+      if (val > max_val) {
+
+	max_val = val;
+	arg_max = r;
+      }
+    }
+    
+    face_labeling[i] = arg_max;
+  }
+
+  double thresh_energy = multi_curv_energy(mesh, face_labeling, cost, options, nRegions);
+  std::cerr << "energy of thresholded solution: " << thresh_energy << std::endl;
+
+  double icm_energy = multi_curv_icm(mesh, face_labeling, cost, options, nRegions);
+  std::cerr << "energy of ICM solution: " << icm_energy << std::endl;
 
   /**** generate output ****/
 
@@ -770,7 +1249,7 @@ double factor_energy(const Mesh2DEdgePair& edge_pair, const Mesh2D& mesh, const 
   return energy;
 }
 
-double clique_curv_energy(Mesh2D& mesh, const std::vector<Mesh2DEdgePair>& edge_pairs,
+double factor_curv_energy(Mesh2D& mesh, const std::vector<Mesh2DEdgePair>& edge_pairs,
 			  const Math2D::Matrix<float>& data_term, const LPSegOptions& options,
 			  const Math1D::Vector<uint>& face_label) {
 
@@ -791,7 +1270,7 @@ double clique_curv_energy(Mesh2D& mesh, const std::vector<Mesh2DEdgePair>& edge_
   return energy;
 }
 
-double clique_curv_energy(Mesh2D& mesh, const std::vector<Mesh2DEdgePair>& edge_pairs,
+double factor_curv_energy(Mesh2D& mesh, const std::vector<Mesh2DEdgePair>& edge_pairs,
 			  const Math3D::Tensor<float>& data_term, const LPSegOptions& options,
 			  const Math1D::Vector<uint>& face_label) {
 
@@ -811,8 +1290,8 @@ double clique_curv_energy(Mesh2D& mesh, const std::vector<Mesh2DEdgePair>& edge_
   return energy;
 }
 
-double clique_curv_icm(Mesh2D& mesh, const std::vector<Mesh2DEdgePair>& edge_pairs,
-		       const Math2D::Matrix<float>& data_term, const LPSegOptions& options,
+double factor_curv_icm(Mesh2D& mesh, const std::vector<Mesh2DEdgePair>& edge_pairs,
+		       const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset,
 		       Math1D::Vector<uint>& face_label) {
 
   double energy = 0.0;
@@ -893,7 +1372,7 @@ double clique_curv_icm(Mesh2D& mesh, const std::vector<Mesh2DEdgePair>& edge_pai
 
     }
 
-    std::cerr << "energy: " << energy << std::endl;
+    std::cerr << "energy: " << energy << " (" << (energy + energy_offset) << ")" << std::endl;
     if (last_energy == energy)
       break;
   }
@@ -901,7 +1380,57 @@ double clique_curv_icm(Mesh2D& mesh, const std::vector<Mesh2DEdgePair>& edge_pai
   return energy;
 }
 
-double clique_curv_icm(Mesh2D& mesh, const std::vector<Mesh2DEdgePair>& edge_pairs,
+
+double factor_curv_icm(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset,
+		       Math2D::Matrix<uint>& segmentation) {
+
+  //Get the options
+  int neighborhood = options.neighborhood_;
+  
+  assert(neighborhood <= 16); 
+
+  uint xDim = uint( data_term.xDim() );
+  uint yDim = uint( data_term.yDim() );
+
+  Mesh2D mesh;  
+  create_mesh(options, data_term, 0, mesh);
+
+  std::vector<Mesh2DEdgePair> edge_pairs;
+  mesh.generate_edge_pair_list(edge_pairs);
+
+  Math1D::Vector<uint> face_label(mesh.nFaces(),0);
+
+  for (uint f = 0; f < mesh.nFaces(); f++) {
+
+    double cur_dt = calculate_data_term(f, mesh, data_term);
+
+    if (cur_dt < 0)
+      face_label[f] = 1;
+  }
+
+  double energy = factor_curv_icm(mesh, edge_pairs, data_term, options, energy_offset, face_label);
+
+  const uint out_factor = options.output_factor_;
+
+  segmentation.resize(xDim*out_factor,yDim*out_factor);
+
+  mesh.enlarge(out_factor,out_factor);
+  
+  Math2D::Matrix<double> output(xDim*out_factor,yDim*out_factor,0);
+  for (uint i=0; i < mesh.nFaces(); ++i) {
+    add_grid_output(i,face_label[i],mesh,output);	
+  }
+  for (uint y=0; y < yDim*out_factor; y++) {
+    for (uint x=0; x < xDim*out_factor; x++) {
+      segmentation(x,y) = uint(output(x,y)*255.0);
+    }
+  }
+
+  return energy;
+}
+
+
+double factor_curv_icm(Mesh2D& mesh, const std::vector<Mesh2DEdgePair>& edge_pairs,
 		       const Math3D::Tensor<float>& data_term, const LPSegOptions& options,
 		       Math1D::Vector<uint>& face_label) {
 
@@ -995,8 +1524,65 @@ double clique_curv_icm(Mesh2D& mesh, const std::vector<Mesh2DEdgePair>& edge_pai
   return energy;
 }
 
+double factor_curv_icm(const Math3D::Tensor<float>& data_term, const LPSegOptions& options,
+		       Math2D::Matrix<uint>& segmentation) {
 
-double clique_lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
+  //Get the options
+  int neighborhood = options.neighborhood_;
+  
+  assert(neighborhood <= 16); 
+
+  uint xDim = uint( data_term.xDim() );
+  uint yDim = uint( data_term.yDim() );
+
+  Mesh2D mesh;  
+  create_mesh(options, data_term, 0, mesh);
+
+  std::vector<Mesh2DEdgePair> edge_pairs;
+  mesh.generate_edge_pair_list(edge_pairs);
+
+  Math1D::Vector<uint> face_label(mesh.nFaces(),0);
+
+  for (uint f=0; f < mesh.nFaces(); f++) {
+    
+    double best = 1e300;
+    uint best_label = 0;
+
+    for (uint l=0; l < data_term.zDim(); l++) {
+      double hyp = calculate_data_term(f, l, mesh, data_term);
+
+      if (hyp < best) {
+	best = hyp;
+	best_label = l;
+      }
+    }
+    
+    face_label[f] = best_label;
+  }
+
+  double energy = factor_curv_icm(mesh, edge_pairs, data_term, options, face_label);
+
+  const uint out_factor = options.output_factor_;
+
+  segmentation.resize(xDim*out_factor,yDim*out_factor);
+
+  mesh.enlarge(out_factor,out_factor);
+  
+  Math2D::Matrix<double> output(xDim*out_factor,yDim*out_factor,0);
+  for (uint i=0; i < mesh.nFaces(); ++i) {
+    add_grid_output(i,face_label[i],mesh,output);	
+  }
+  for (uint y=0; y < yDim*out_factor; y++) {
+    for (uint x=0; x < xDim*out_factor; x++) {
+      segmentation(x,y) = uint(output(x,y)*(255  / (data_term.zDim() - 1)));
+    }
+  }
+
+  return energy;
+}
+
+
+double factor_lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
 				 Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels) {
   
   //Get the options
@@ -1012,34 +1598,8 @@ double clique_lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const L
   uint yDim = uint( data_term.yDim() );
 
   Mesh2D mesh;  
-  if (options.gridtype_ == options.Square) {
-    if (options.adaptive_mesh_n_ < 0) {
-      double xfac = double(xDim) / double(options.griddim_xDim_); 
-      double yfac = double(yDim) / double(options.griddim_yDim_); 
-      generate_mesh( options.griddim_xDim_, options.griddim_yDim_, neighborhood, mesh);
-      mesh.enlarge(xfac,yfac);
-    }
-    else {
-      std::cerr << "adaptive square mesh" << std::endl;
+  create_mesh(options, data_term, fixed_labels, mesh);
 
-      //Adaptive mesh
-      generate_adaptive_mesh(data_term, mesh, neighborhood, options.adaptive_mesh_n_);
-    }
-  }
-  else {
-    if (options.adaptive_mesh_n_ < 0) {
-      double xfac = double(xDim) / double(options.griddim_xDim_); 
-      double yfac = double(yDim) / double(options.griddim_yDim_); 
-      generate_hexagonal_mesh( xDim, yDim, 0.5*(xfac+yfac), neighborhood,mesh); //TODO: proper handling of non-square images
-    }
-    else {
-      std::cerr << "adaptive hex. mesh" << std::endl;
-
-      //Adaptive mesh
-      generate_adaptive_hexagonal_mesh(data_term, mesh, neighborhood, options.adaptive_mesh_n_);
-    }
-  }
-  
   std::vector<Mesh2DEdgePair> edge_pairs;
   mesh.generate_edge_pair_list(edge_pairs);
 
@@ -1048,7 +1608,6 @@ double clique_lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const L
     nRemoved = filter_edge_pairs(mesh, edge_pairs); 
     std::cerr << "removed " << nRemoved << " edge pairs." << std::endl;
   }
-
 
   std::cerr << edge_pairs.size() << " edge pairs." << std::endl;
 
@@ -1511,7 +2070,7 @@ double clique_lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const L
   
   double energy = lp_energy;
 
-  double disc_energy = clique_curv_energy(mesh, edge_pairs, data_term, options, face_uint_solution)
+  double disc_energy = factor_curv_energy(mesh, edge_pairs, data_term, options, face_uint_solution)
     + energy_offset;
 
   std::cerr << "solution energy found by discrete routine: " << disc_energy << std::endl;
@@ -1618,7 +2177,7 @@ double clique_lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const L
   return energy + energy_offset; 
 }
 
-double clique_lp_segment_pottscurvreg(const Math3D::Tensor<float>& data_term, const LPSegOptions& options, 
+double factor_lp_segment_pottscurvreg(const Math3D::Tensor<float>& data_term, const LPSegOptions& options, 
 				      Math2D::Matrix<uint>& segmentation) {
 
 
@@ -1639,28 +2198,8 @@ double clique_lp_segment_pottscurvreg(const Math3D::Tensor<float>& data_term, co
   uint nLabels = data_term.zDim();
 
   Mesh2D mesh;  
-  if (options.gridtype_ == options.Square) {
-    if (options.adaptive_mesh_n_ < 0) {
-      double xfac = double(xDim) / double(options.griddim_xDim_); 
-      double yfac = double(yDim) / double(options.griddim_yDim_); 
-      generate_mesh( options.griddim_xDim_, options.griddim_yDim_, neighborhood, mesh);
-      mesh.enlarge(xfac,yfac);
-    }
-    else {
-      TODO("adaptive square mesh");
-    }
-  }
-  else {
-    if (options.adaptive_mesh_n_ < 0) {
-      double xfac = double(xDim) / double(options.griddim_xDim_); 
-      double yfac = double(yDim) / double(options.griddim_yDim_); 
-      generate_hexagonal_mesh( xDim, yDim, 0.5*(xfac+yfac), neighborhood,mesh); //TODO: proper handling of non-square images
-    }
-    else {
-      TODO("adaptive hex. mesh");
-    }
-  }
-  
+  create_mesh(options, data_term, 0, mesh);
+
   std::vector<Mesh2DEdgePair> edge_pairs;
   mesh.generate_edge_pair_list(edge_pairs);
 
@@ -1669,7 +2208,6 @@ double clique_lp_segment_pottscurvreg(const Math3D::Tensor<float>& data_term, co
     nRemoved = filter_edge_pairs(mesh, edge_pairs); 
     std::cerr << "removed " << nRemoved << " edge pairs." << std::endl;
   }
-
 
   std::cerr << edge_pairs.size() << " edge pairs." << std::endl;
 
@@ -2056,7 +2594,7 @@ double clique_lp_segment_pottscurvreg(const Math3D::Tensor<float>& data_term, co
   return lp_energy; 
 }
 
-double clique_lp_segment_pottscurvreg_layered(const Math3D::Tensor<float>& data_term, const LPSegOptions& options, 
+double factor_lp_segment_pottscurvreg_layered(const Math3D::Tensor<float>& data_term, const LPSegOptions& options, 
 					      Math2D::Matrix<uint>& segmentation) {
 
 
@@ -2077,28 +2615,8 @@ double clique_lp_segment_pottscurvreg_layered(const Math3D::Tensor<float>& data_
   uint nLabels = data_term.zDim();
 
   Mesh2D mesh;  
-  if (options.gridtype_ == options.Square) {
-    if (options.adaptive_mesh_n_ < 0) {
-      double xfac = double(xDim) / double(options.griddim_xDim_); 
-      double yfac = double(yDim) / double(options.griddim_yDim_); 
-      generate_mesh( options.griddim_xDim_, options.griddim_yDim_, neighborhood, mesh);
-      mesh.enlarge(xfac,yfac);
-    }
-    else {
-      TODO("adaptive square mesh");
-    }
-  }
-  else {
-    if (options.adaptive_mesh_n_ < 0) {
-      double xfac = double(xDim) / double(options.griddim_xDim_); 
-      double yfac = double(yDim) / double(options.griddim_yDim_); 
-      generate_hexagonal_mesh( xDim, yDim, 0.5*(xfac+yfac), neighborhood,mesh); //TODO: proper handling of non-square images
-    }
-    else {
-      TODO("adaptive hex. mesh");
-    }
-  }
-  
+  create_mesh(options, data_term, 0, mesh);
+
   std::vector<Mesh2DEdgePair> edge_pairs;
   mesh.generate_edge_pair_list(edge_pairs);
 
@@ -2512,7 +3030,7 @@ double clique_lp_segment_pottscurvreg_layered(const Math3D::Tensor<float>& data_
 
 
 
-double clique_lp_segment_curvreg_minsum_diffusion(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
+double factor_lp_segment_curvreg_minsum_diffusion(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
 						  Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels) {
 
   //NOTE: fixed_labels is currently ignored
@@ -2530,34 +3048,8 @@ double clique_lp_segment_curvreg_minsum_diffusion(const Math2D::Matrix<float>& d
   uint yDim = uint( data_term.yDim() );
 
   Mesh2D mesh;  
-  if (options.gridtype_ == options.Square) {
-    if (options.adaptive_mesh_n_ < 0) {
-      double xfac = double(xDim) / double(options.griddim_xDim_); 
-      double yfac = double(yDim) / double(options.griddim_yDim_); 
-      generate_mesh( options.griddim_xDim_, options.griddim_yDim_, neighborhood, mesh);
-      mesh.enlarge(xfac,yfac);
-    }
-    else {
-      std::cerr << "adaptive square mesh" << std::endl;
+  create_mesh(options, data_term, fixed_labels, mesh);
 
-      //Adaptive mesh
-      generate_adaptive_mesh(data_term, mesh, neighborhood, options.adaptive_mesh_n_);
-    }
-  }
-  else {
-    if (options.adaptive_mesh_n_ < 0) {
-      double xfac = double(xDim) / double(options.griddim_xDim_); 
-      double yfac = double(yDim) / double(options.griddim_yDim_); 
-      generate_hexagonal_mesh( xDim, yDim, 0.5*(xfac+yfac), neighborhood,mesh); //TODO: proper handling of non-square images
-    }
-    else {
-      std::cerr << "adaptive hex. mesh" << std::endl;
-
-      //Adaptive mesh
-      generate_adaptive_hexagonal_mesh(data_term, mesh, neighborhood, options.adaptive_mesh_n_);
-    }
-  }
-  
   std::vector<Mesh2DEdgePair> edge_pairs;
   mesh.generate_edge_pair_list(edge_pairs);
 
@@ -2935,12 +3427,12 @@ double clique_lp_segment_curvreg_minsum_diffusion(const Math2D::Matrix<float>& d
     }
   }
 
-  double disc_energy = clique_curv_energy(mesh, edge_pairs, data_term, options, face_uint_solution)
+  double disc_energy = factor_curv_energy(mesh, edge_pairs, data_term, options, face_uint_solution)
     + energy_offset;
   
   std::cerr << "solution found by stand-alone routine: " << disc_energy << std::endl;
 
-  double icm_energy = clique_curv_icm(mesh, edge_pairs, data_term, options, face_uint_solution)
+  double icm_energy = factor_curv_icm(mesh, edge_pairs, data_term, options, energy_offset, face_uint_solution)
     + energy_offset;
 
   std::cerr << "energy of ICM solution: " << icm_energy << std::endl;
@@ -3019,7 +3511,7 @@ double clique_lp_segment_curvreg_minsum_diffusion(const Math2D::Matrix<float>& d
   return lower_bound;
 }
 
-double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<float>& data_term, 
+double factor_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<float>& data_term, 
 							  const LPSegOptions& options, double energy_offset, 
 							  Math2D::Matrix<uint>& segmentation, 
 							  const Math2D::Matrix<int>* fixed_labels) {
@@ -3040,35 +3532,7 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
   uint yDim = uint( data_term.yDim() );
 
   Mesh2D mesh;  
-  if (options.gridtype_ == options.Square) {
-    if (options.adaptive_mesh_n_ < 0) {
-      double xfac = double(xDim) / double(options.griddim_xDim_); 
-      double yfac = double(yDim) / double(options.griddim_yDim_); 
-      generate_mesh( options.griddim_xDim_, options.griddim_yDim_, neighborhood, mesh);
-      mesh.enlarge(xfac,yfac);
-    }
-    else {
-      std::cerr << "adaptive square mesh" << std::endl;
-
-      TODO("adaptive mesh");
-      //Adaptive mesh
-      //generate_adaptive_mesh(data_term, mesh, neighborhood, options.adaptive_mesh_n_);
-    }
-  }
-  else {
-    if (options.adaptive_mesh_n_ < 0) {
-      double xfac = double(xDim) / double(options.griddim_xDim_); 
-      double yfac = double(yDim) / double(options.griddim_yDim_); 
-      generate_hexagonal_mesh( xDim, yDim, 0.5*(xfac+yfac), neighborhood,mesh); //TODO: proper handling of non-square images
-    }
-    else {
-      std::cerr << "adaptive hex. mesh" << std::endl;
-
-      //Adaptive mesh
-      TODO("adaptive hex mesh");
-      //generate_adaptive_hexagonal_mesh(data_term, mesh, neighborhood, options.adaptive_mesh_n_);
-    }
-  }
+  create_mesh(options, data_term, fixed_labels, mesh);
 
   Math2D::Matrix<double> var_cost(mesh.nFaces(),nLabels,0.0);
   for (uint f=0; f < mesh.nFaces(); f++) {
@@ -3088,9 +3552,9 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 
   std::cerr << edge_pairs.size() << " edge pairs." << std::endl;
 
-  Math1D::Vector<float> clique_weight(edge_pairs.size());
+  Math1D::Vector<float> factor_weight(edge_pairs.size());
   Math1D::Vector<uint> repar_start(edge_pairs.size()+1,MAX_UINT);
-  Math1D::Vector<uchar> clique_type(edge_pairs.size(),255);
+  Math1D::Vector<uchar> factor_type(edge_pairs.size(),255);
 
   uint repar_size = 0;
 
@@ -3114,9 +3578,9 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
     if (adj2.size() > 1)
       boundary_cost += 0.5*lambda*mesh.edge_length(second_edge);
 
-    clique_weight[p] = boundary_cost;
+    factor_weight[p] = boundary_cost;
 
-    if (fabs(clique_weight[p]) < 0.001)
+    if (fabs(factor_weight[p]) < 0.001)
       continue;
 
     std::set<uint> adjacent_regions_set;
@@ -3132,7 +3596,7 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
     repar_size += adjacent_regions_set.size();
   }
 
-  Math1D::Vector<uint> clique_face(repar_size);
+  Math1D::Vector<uint> factor_face(repar_size);
   Math1D::Vector<double> repar(nLabels*repar_size,0.0);
 
   uint cur_pos = 0;
@@ -3223,7 +3687,7 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 
     repar_start[p] = cur_pos;
 
-    if (fabs(clique_weight[p]) < 0.001)
+    if (fabs(factor_weight[p]) < 0.001)
       continue;
 
     //std::cerr << "p: " << p << std::endl;
@@ -3280,12 +3744,12 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 	std::swap(v3,v4);
       }
 
-      clique_face[cur_pos + 0] = v1;
-      clique_face[cur_pos + 1] = v2;
-      clique_face[cur_pos + 2] = v3;
-      clique_face[cur_pos + 3] = v4;
+      factor_face[cur_pos + 0] = v1;
+      factor_face[cur_pos + 1] = v2;
+      factor_face[cur_pos + 2] = v3;
+      factor_face[cur_pos + 3] = v4;
 
-      clique_type[p] = 0;
+      factor_type[p] = 0;
       cur_pos += 4;
     }
     else if (adjacent_regions.size() == 3) {
@@ -3304,11 +3768,11 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 	if (match2[v2]*mul2 != m1)
 	  std::swap(v2,v3);
 
-	clique_face[cur_pos + 0] = v1;
-	clique_face[cur_pos + 1] = v2;
-	clique_face[cur_pos + 2] = v3;
+	factor_face[cur_pos + 0] = v1;
+	factor_face[cur_pos + 1] = v2;
+	factor_face[cur_pos + 2] = v3;
 	
-	clique_type[p] = 1;
+	factor_type[p] = 1;
       }
       else if (adj2.size() == 1) {
 
@@ -3325,11 +3789,11 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 
 	//this is symmetric to the above case
 
-	clique_face[cur_pos + 0] = v1;
-	clique_face[cur_pos + 1] = v2;
-	clique_face[cur_pos + 2] = v3;
+	factor_face[cur_pos + 0] = v1;
+	factor_face[cur_pos + 1] = v2;
+	factor_face[cur_pos + 2] = v3;
 	
-	clique_type[p] = 1;
+	factor_type[p] = 1;
       }
       else {
 	//interior edge pair with a region that borders both edges
@@ -3356,11 +3820,11 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 	assert(v1 < MAX_UINT);
 	assert(v2 < MAX_UINT);	  
 
-	clique_face[cur_pos + 0] = shared;
-	clique_face[cur_pos + 1] = v1;
-	clique_face[cur_pos + 2] = v2;
+	factor_face[cur_pos + 0] = shared;
+	factor_face[cur_pos + 1] = v1;
+	factor_face[cur_pos + 2] = v2;
 
-	clique_type[p] = 2;	
+	factor_type[p] = 2;	
       }
 
       cur_pos += 3;
@@ -3377,11 +3841,11 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 	double val2 = match2[adj2[0]] * mul2;
 	
 	if (val1 == val2) { //both regions are on the same side of the line pair
-	  clique_type[p] = 3;
+	  factor_type[p] = 3;
 	}
 	else {
 	  std::cerr << "should this happen???" << std::endl;
-	  clique_type[p] = 4;
+	  factor_type[p] = 4;
 	}
       }
       else {
@@ -3393,7 +3857,7 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 	//there should only be one shared region
 	assert(adj1.size() == 1 || adj2.size() == 1);
 
-	clique_type[p] = 5;
+	factor_type[p] = 5;
 
 	if (find(adj1.begin(),adj1.end(),adjacent_regions[0]) != adj1.end()
 	    && find(adj2.begin(),adj2.end(),adjacent_regions[0]) != adj2.end()) {
@@ -3403,8 +3867,8 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 	  std::swap(v1,v2);
       }
 
-      clique_face[cur_pos + 0] = v1;
-      clique_face[cur_pos + 1] = v2;
+      factor_face[cur_pos + 0] = v1;
+      factor_face[cur_pos + 1] = v2;
 
       cur_pos += 2;
     }
@@ -3437,11 +3901,11 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 
       uint start_pos = repar_start[p];
 
-      uchar cur_type = clique_type[p];
+      uchar cur_type = factor_type[p];
 
       double* cur_repar = repar.direct_access() + nLabels*start_pos;
 
-      double cur_weight = clique_weight[p];
+      double cur_weight = factor_weight[p];
 
       double best = 1e300;
 
@@ -3516,19 +3980,19 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 
       uint start_pos = repar_start[p];
 
-      uchar cur_type = clique_type[p];
+      uchar cur_type = factor_type[p];
 
       double* cur_repar = repar.direct_access() + nLabels*start_pos;
 
-      double cur_weight = clique_weight[p];
+      double cur_weight = factor_weight[p];
 
       if (cur_type == 0) {
 	//4-clique
 
-	uint v1 = clique_face[start_pos];
-	uint v2 = clique_face[start_pos+1];
-	uint v3 = clique_face[start_pos+2];
-	uint v4 = clique_face[start_pos+3];
+	uint v1 = factor_face[start_pos];
+	uint v2 = factor_face[start_pos+1];
+	uint v3 = factor_face[start_pos+2];
+	uint v4 = factor_face[start_pos+3];
 
 	//repar v1
 	for (uint l1=0; l1 < nLabels; l1++) {
@@ -3638,9 +4102,9 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 	//3-clique
 	const Math3D::Tensor<float>& cost = (cur_type == 1) ? cost1 : cost2;
 
-	uint v1 = clique_face[start_pos];
-	uint v2 = clique_face[start_pos+1];
-	uint v3 = clique_face[start_pos+2];
+	uint v1 = factor_face[start_pos];
+	uint v2 = factor_face[start_pos+1];
+	uint v3 = factor_face[start_pos+2];
 	
 	//repar v1
 	for (uint l1=0; l1 < nLabels; l1++) {
@@ -3718,8 +4182,8 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 	//2-clique
 	const Math2D::Matrix<float>& cost = (cur_type == 3) ? cost3 : ((cur_type == 4) ? cost4 : cost5);
 
-	uint v1 = clique_face[start_pos];
-	uint v2 = clique_face[start_pos+1];
+	uint v1 = factor_face[start_pos];
+	uint v2 = factor_face[start_pos+1];
 
 	//repar v1
 	for (uint l1=0; l1 < nLabels; l1++) {
@@ -3775,12 +4239,12 @@ double clique_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 
   std::cerr << "offset: " << energy_offset << std::endl;
 
-  double disc_energy = clique_curv_energy(mesh, edge_pairs, data_term, options, face_uint_solution)
+  double disc_energy = factor_curv_energy(mesh, edge_pairs, data_term, options, face_uint_solution)
     + energy_offset;
   
   std::cerr << "solution found by stand-alone routine: " << disc_energy << std::endl;
 
-  double icm_energy = clique_curv_icm(mesh, edge_pairs, data_term, options, face_uint_solution)
+  double icm_energy = factor_curv_icm(mesh, edge_pairs, data_term, options, face_uint_solution)
     + energy_offset;
 
   std::cerr << "energy of ICM solution: " << icm_energy << std::endl;
