@@ -2,10 +2,22 @@
 
 # Created by program
 *last_call
+bin/output/
 bin/output/*.svg
 bin/output/*.pgm
 bin/output/*log
 bin/output/*.info
+bin/*.svg
+bin/*.pgm
+bin/*.ppm
+bin/*log
+bin/*.info
+images/b*.pgm
+images/b*.jpg
+
+
+*.cmd
+*.mps
 
 # Compiled files
 x64/
