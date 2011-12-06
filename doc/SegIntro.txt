@@ -1,8 +1,9 @@
-This package generates three main programs:
+This package generates four main programs:
 
 - one for unsupervised image segmentation
 - one for supervised image segmentation with seed node
 - one for inpainting 
+- one for image denoising
 
 In all cases a discretized curvature model is employed and optimized via
 linear programming. 
@@ -21,8 +22,8 @@ a typical call would look like this:
 bin/lpseg.debug.L64 -i sample.pgm -lambda 10 -gamma 10000 -o sample_out
 
 This sets a length weight of 10, a curvature weight of 10000, and uses an
-8-connectivity. Using a 16-connectivity works better, but needs more time and
-memory. To select this, add
+8-connectivity. Using a 16-connectivity gives better results, but needs more
+time and memory. To select this, add
 
 -n 16
 
@@ -76,12 +77,34 @@ three or more regions meet.
 
 **** Selecting alternative formulations ****
 
-If you do not want to use the kind of method started by [Schoenemann, Kahl, Cremers ICCV 2009],
-you have two options which both related to the same model:
+There are two kinds of formulations supported by RegionCurv at the moment. By default,
+the kind started by [Schoenemann, Kahl, Cremers ICCV 2009] is selected. You can activate 
+it explicitly, by adding
+
+-method lp 
+
+to the command line. Here there are two computational methods available: 
+
+-mode standard : will use an lp-solver.
+-mode icm      : use iterated conditional modes (evolution of integral solutions)
+
+
+Alternatively, there are factor-based methods. Select the by adding
+
+-method factor-lp
+
+to the command line. There are some more modes here:
+
+-mode standard : will use an lp-solver.
+-mode icm      : use iterated conditional modes (evolution of integral solutions)
+-mode msd      : use min-sum diffusion as in [Schoenemann, Kuang, Kahl EMMCVPR 2011]
+-mode qpbo     : 
+
+
 
 Selecting
 
--method clique-lp 
+-method factor-lp 
 
 will address a model in the style [El Zehiry & Grady CVPR 2010, Strandmark & Kahl EMMCVPR 2011]  
 and solve it via linear programming. You can also select the option
