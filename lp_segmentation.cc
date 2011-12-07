@@ -251,10 +251,10 @@ double lp_segment_lenreg(const Math2D::Matrix<float>& data_term, const LPSegOpti
 /***********************************************************************************************************************/
 
 double point_energy(uint point, const uint* solution, const Mesh2D& mesh, 
-		    const std::vector<Mesh2DEdgePair>& edge_pairs, 
-		    const NamedStorage1D<std::vector<uint> >& point_pair,
-		    const NamedStorage1D<std::vector<uint> >& point_edge, 
-		    double lambda, double gamma, bool bruckstein, bool crossings_allowed = false) {
+        const std::vector<Mesh2DEdgePair>& edge_pairs, 
+        const NamedStorage1D<std::vector<uint> >& point_pair,
+        const NamedStorage1D<std::vector<uint> >& point_edge, 
+        double lambda, double gamma, bool bruckstein, bool crossings_allowed = false) {
 
   //NOTE: if crossings are ALLOWED, this routine only APPROXIMATES the energy
 
@@ -489,7 +489,7 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
 
 //currently assuming that crossing prevention is active
 double curv_energy(const uint* solution, const double* region_cost, const Mesh2D& mesh,
-		   double lambda, double gamma, bool bruckstein, bool crossings_allowed = false) { 
+       double lambda, double gamma, bool bruckstein, bool crossings_allowed = false) { 
 
   double energy = 0.0;
 
@@ -521,7 +521,7 @@ double curv_energy(const uint* solution, const double* region_cost, const Mesh2D
   for (uint p=0; p < mesh.nPoints(); p++) {
 
     energy += point_energy(p, solution, mesh, edge_pairs, point_pair, point_edge, 
-			   lambda, gamma, bruckstein, crossings_allowed);
+         lambda, gamma, bruckstein, crossings_allowed);
   }
 
   //std::cerr << "final energy: " << energy << std::endl;
@@ -530,7 +530,7 @@ double curv_energy(const uint* solution, const double* region_cost, const Mesh2D
 }
 
 double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
-		double lambda, double gamma, bool bruckstein, double energy_offset, bool crossings_allowed = false) { 
+    double lambda, double gamma, bool bruckstein, double energy_offset, bool crossings_allowed = false) { 
 
   double energy = 0.0;
 
@@ -564,7 +564,7 @@ double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
   for (uint p=0; p < mesh.nPoints(); p++) {
 
     cur_point_energy[p] = point_energy(p, solution, mesh, edge_pairs, point_pair, point_edge, 
-				       lambda, gamma, bruckstein, crossings_allowed);
+               lambda, gamma, bruckstein, crossings_allowed);
 
     energy += cur_point_energy[p];
   }
@@ -636,7 +636,7 @@ double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
 /*******************/
 
 double curv_icm(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset,
-		Math2D::Matrix<uint>& segmentation) { 
+    Math2D::Matrix<uint>& segmentation) { 
 
   int neighborhood = options.neighborhood_;
   
@@ -659,8 +659,8 @@ double curv_icm(const Math2D::Matrix<float>& data_term, const LPSegOptions& opti
   }
 
   double energy = curv_icm(face_label.direct_access(), region_cost.direct_access(), mesh,
-			   options.lambda_, options.gamma_, options.bruckstein_, energy_offset,
-			   !options.prevent_crossings_);
+         options.lambda_, options.gamma_, options.bruckstein_, energy_offset,
+         !options.prevent_crossings_);
 
   const uint out_factor = options.output_factor_;
 
@@ -670,7 +670,7 @@ double curv_icm(const Math2D::Matrix<float>& data_term, const LPSegOptions& opti
   
   Math2D::Matrix<double> output(xDim*out_factor,yDim*out_factor,0);
   for (uint i=0; i < mesh.nFaces(); ++i) {
-    add_grid_output(i,face_label[i],mesh,output);	
+    add_grid_output(i,face_label[i],mesh,output);  
   }
   for (uint y=0; y < yDim*out_factor; y++) {
     for (uint x=0; x < xDim*out_factor; x++) {
@@ -685,7 +685,7 @@ double curv_icm(const Math2D::Matrix<float>& data_term, const LPSegOptions& opti
 
 //solves a segmentation problem with length and curvature regularity via an LP
 double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
-			  Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels) {
+        Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels) {
 
   //Get the options
   double lambda = options.lambda_;
@@ -827,9 +827,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
         match *= -1;
 
       if (match == -1)
-	      var_ub[y+1] = 0.0;
+        var_ub[y+1] = 0.0;
       else if (match == 1)
-	      var_ub[y] = 0.0;
+        var_ub[y] = 0.0;
     }
 
     edge = second;
@@ -839,12 +839,12 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       uint y = edge_pair_var_offs+2*j;
 
       if (edge_pairs[j].common_point_idx_ == mesh.edge(edge).from_idx_)
-	      match *= -1;
+        match *= -1;
 
       if (match == -1)
-	      var_ub[y] = 0.0;
+        var_ub[y] = 0.0;
       else if (match == 1)
-	      var_ub[y+1] = 0.0;
+        var_ub[y+1] = 0.0;
     }
   }
   Petter::statusOK();
@@ -1083,7 +1083,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
     for (uint j=0; j < edge_pairs.size(); j++) {
       uint first = edge_pairs[j].first_edge_idx_;
-      uint second = edge_pairs[j].second_edge_idx_;	
+      uint second = edge_pairs[j].second_edge_idx_;  
 
       uint y = mesh.nFaces() + 2*j;
 
@@ -1262,7 +1262,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     Storage1D<char> vtype(nVars,GRB_CONTINUOUS);
 
     error = GRBaddvars(grb_model,nVars,0,NULL,NULL,NULL,cost.direct_access(),var_lb.direct_access(),
-		       var_ub.direct_access(),vtype.direct_access(),NULL);
+           var_ub.direct_access(),vtype.direct_access(),NULL);
     assert(!error);
 
     error = GRBupdatemodel(grb_model);
@@ -1374,7 +1374,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       row_count[c] = row_start[c+1] - row_start[c];
 
     status = CPXnewcols (cp_env, cp_lp, nVars, cost.direct_access(), var_lb.direct_access(), 
-			 var_ub.direct_access(), NULL, NULL);
+       var_ub.direct_access(), NULL, NULL);
 
     std::cerr << "copying" << std::endl;
 
@@ -1384,8 +1384,8 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     std::cerr << "adding rows" << std::endl;
 
     CPXaddrows(cp_env, cp_lp, 0, nConstraints, lp_descr.nEntries(), rhs_lower.direct_access(), row_sense, 
-	       (int*) row_start.direct_access(), (int*) lp_descr.col_indices(), lp_descr.value(),
-	       NULL, NULL);
+         (int*) row_start.direct_access(), (int*) lp_descr.col_indices(), lp_descr.value(),
+         NULL, NULL);
 
     uint count = 0;
     Math1D::Vector<int> idx(nConstraints);
@@ -1394,9 +1394,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       if (row_sense[c] == 'R') {
 
-	idx[count] = c;
-	range[count] = rhs_upper[c] - rhs_lower[c];
-	count++;
+  idx[count] = c;
+  range[count] = rhs_upper[c] - rhs_lower[c];
+  count++;
       }
     }
     CPXchgrngval (cp_env, cp_lp, count, idx.direct_access(), range.direct_access());
@@ -1472,9 +1472,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     }
 
     nReturn = XPRSloadlp(xp_prob, "curv-ilp", nVars, nConstraints, row_sense,
-			 rhs_upper.direct_access(), row_range, cost.direct_access(), 
-			 (int*) col_start.direct_access(), NULL, (int*) lp_descr.row_indices(), lp_descr.value(),
-			 var_lb.direct_access(), var_ub.direct_access());
+       rhs_upper.direct_access(), row_range, cost.direct_access(), 
+       (int*) col_start.direct_access(), NULL, (int*) lp_descr.row_indices(), lp_descr.value(),
+       var_lb.direct_access(), var_ub.direct_access());
 
     delete[] row_sense;
     delete[] row_range;
@@ -1500,10 +1500,10 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
 #ifndef USE_PM_ONE_MATRIX
     CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
-				lp_descr.value(),lp_descr.nEntries());
+        lp_descr.value(),lp_descr.nEntries());
 
     lpSolver.loadProblem (coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
-			  cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
+        cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
 
     coinMatrix.cleanMatrix();
 #else
@@ -1567,7 +1567,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     std::cerr << "matrix created" << std::endl;
 
     lpSolver.loadProblem (pmone_matrix, var_lb.direct_access(), var_ub.direct_access(),   
-			  cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
+        cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
 #endif
 
     //outcomment this when you are debugging
@@ -1590,9 +1590,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       OsiClpSolverInterface solver1;
       CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
-				  lp_descr.value(),lp_descr.nEntries());
+          lp_descr.value(),lp_descr.nEntries());
       solver1.loadProblem(coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
-			    cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
+          cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
       for (int i=0;i<nVars;++i) {
         solver1.setInteger(i);
       }
@@ -1832,7 +1832,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
                 CPXaddrows(cp_env, cp_lp, 0, 1, 2*pairs.size(), new_rhs, "L", new_start, cols, coeffs,  NULL, NULL);
               }
-#endif		
+#endif    
               nConstraintsAdded++;
 
               delete cols;
@@ -1943,7 +1943,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   std::cerr << "integral energy according to independent routine: " << integral_energy << std::endl;
 
   double icm_energy = curv_icm(labeling.direct_access(), cost.direct_access(), mesh,
-			                         lambda, gamma, bruckstein, energy_offset, !prevent_crossings) 
+                               lambda, gamma, bruckstein, energy_offset, !prevent_crossings) 
                       + energy_offset;
 
   std::cerr << "energy after ICM: " << icm_energy << std::endl;
@@ -2038,7 +2038,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       }
     }
 #ifdef HAS_GUROBI
-    if (solver == "gurobi") {	
+    if (solver == "gurobi") {  
       for (uint v=0; v < mesh.nFaces(); v++) {
         GRBsetdblattrelement(grb_model,"LB",v,var_lb[v]);
         GRBsetdblattrelement(grb_model,"UB",v,var_ub[v]);
@@ -2279,7 +2279,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
                   CPXaddrows(cp_env, cp_lp, 0, 1, 2*pairs.size(), new_rhs, "L", new_start, cols, coeffs,  NULL, NULL);
                 }
-#endif		
+#endif    
                 nConstraintsAdded++;
 
                 delete cols;
@@ -2465,7 +2465,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
           << mesh.nFaces()   << ' '     // 6
           << edge_pairs.size()  << ' '  // 7
           << lp_energy       << ' '     // 8
-		  ;
+      ;
 
 
   //Close logfile
