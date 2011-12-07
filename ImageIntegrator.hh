@@ -61,7 +61,7 @@ private:
   bool step_cd();
   bool step_grad();
 
-  const ImageIntegrator& integrator;
+  const ImageIntegrator* integrator;
 
   std::vector<Mesh2DPoint> coord;
   std::vector<Mesh2DPoint> original_coord;
