@@ -98,26 +98,9 @@ to the command line. There are some more modes here:
 -mode standard : will use an lp-solver.
 -mode icm      : use iterated conditional modes (evolution of integral solutions)
 -mode msd      : use min-sum diffusion as in [Schoenemann, Kuang, Kahl EMMCVPR 2011]
--mode qpbo     : 
-
-
-
-Selecting
-
--method factor-lp 
-
-will address a model in the style [El Zehiry & Grady CVPR 2010, Strandmark & Kahl EMMCVPR 2011]  
-and solve it via linear programming. You can also select the option
-
--diffusion
-
-to solve it via min-sum diffusion.
-
-Finally, selecting
-
--method qpbo 
-
-will activate the QPBO-solver of Vladimir Kolmogorov. The underlying model is the same as for clique-lp .
+-mode qpbo     : method of [El Zehiry & Grady CVPR 10] and [Strandmark & Kahl EMMCVPR 2011].
+                 This is based on max-flow with probing. (You need the QPBO-solver of 
+		 Vladimir Kolmogorov).
 
 ***** Selecting the mesh ******
 
