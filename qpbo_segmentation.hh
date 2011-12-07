@@ -6,7 +6,7 @@
 #include "matrix.hh"
 #include "lp_segmentation.hh"
 
-//solves a segmentation problem with length and curvature regularity via an LP
+//solves a segmentation problem with length and curvature regularity via QPBO
 //@param lambda: the weight for the length term
 //@param beta  : the weight for the curvature term  
 void err_function(char * err);
