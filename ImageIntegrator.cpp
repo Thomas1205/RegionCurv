@@ -174,7 +174,7 @@ SegmentationCurve::SegmentationCurve(const std::vector<Mesh2DPoint>& newcoord,
                                      bool bruckstein) :
   coord(newcoord),
   original_coord(newcoord),
-  integrator(integrator_in)
+  integrator(&integrator_in)
 {
   this->lambda = lambda;
   this->gamma = gamma;
@@ -390,7 +390,7 @@ void SegmentationCurve::refine(bool verbose)
 
 double SegmentationCurve::fg_energy() 
 {
-  return integrator.integral(coord);
+  return integrator->integral(coord);
 }
 
 double SegmentationCurve::smooth_energy() 
@@ -474,8 +474,8 @@ double SegmentationCurve::energy_single(int i, double x, double y)
   en += /*0.33333333333333333333 **/ gamma * curv_weight(x,y,         p2.x_,p2.y_, p3.x_,p3.y_, 2.0, bruckstein);
 
   //en = 0;
-  en += /*0.5 **/ integrator.fg_energy_line(p1.x_,p1.y_, x,y);
-  en += /*0.5 **/ integrator.fg_energy_line(x,y, p2.x_,p2.y_);
+  en += /*0.5 **/ integrator->fg_energy_line(p1.x_,p1.y_, x,y);
+  en += /*0.5 **/ integrator->fg_energy_line(x,y, p2.x_,p2.y_);
 
   return en;
 }
