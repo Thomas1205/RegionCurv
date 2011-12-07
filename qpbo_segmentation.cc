@@ -4,7 +4,7 @@
 
 #include <stdexcept>
 
-#include "qpbo_segmentation.h"
+#include "qpbo_segmentation.hh"
 
 #include "lp_segmentation.hh"
 #include "segmentation_common.hh"
@@ -25,8 +25,6 @@ void err_function(char * err)
 
 
 //solves a segmentation problem with length and curvature regularity via QPBO
-//@param lambda: the weight for the length term
-//@param beta  : the weight for the curvature term  
 double qpbo_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, Math2D::Matrix<uint>& segmentation)
 {
   using namespace std;

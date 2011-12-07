@@ -15,7 +15,7 @@
 
 #ifdef HAS_QPBO
 //by Petter Strandmark
-#include "qpbo_segmentation.h"
+#include "qpbo_segmentation.hh"
 #endif
 
 void check_filename(std::string name)
