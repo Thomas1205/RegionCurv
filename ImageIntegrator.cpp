@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <cmath>
+#include <map>
 using namespace std;
 
 #include "ImageIntegrator.hh"
@@ -16,6 +17,8 @@ using namespace std;
 
 #define ASSERT(cond) if (!(cond)) { cout << endl << "Error (line " << __LINE__ << " in " << __FILE__ << "): " << #cond << endl; \
                                     exit(128); }
+
+#define PRINT(var) cerr << #var << " = " << (var) << endl;
 
 ImageIntegrator::ImageIntegrator(const Math2D::Matrix<float>& data_term) :
 	data_term_integrated_x(data_term.xDim(), data_term.yDim()),
@@ -128,13 +131,13 @@ double ImageIntegrator::fg_energy_line(double x1, double y1, double x2, double y
 			double yb = (1-ts[i+1])*y1 + ts[i+1]*y2;
 			//Project points to image domain
 			if (xa<0) xa = 0;
-			if (xa>xDim) xa=xDim;
+			if (xa>xDim) xa=double(xDim);
 			if (ya<0) ya = 0;
-			if (ya>yDim) ya=yDim;
+			if (ya>yDim) ya=double(yDim);
 			if (xb<0) xb = 0;
-			if (xb>xDim) xb=xDim;
+			if (xb>xDim) xb=double(xDim);
 			if (yb<0) yb = 0;
-			if (yb>yDim) yb=yDim;
+			if (yb>yDim) yb=double(yDim);
 			if ( (xa-xb)*(xa-xb) + (ya-yb)*(ya-yb) > 0 ) {
 				en += fg_energy_line_pixel(xa,ya,xb,yb);
 			}
@@ -164,6 +167,7 @@ double ImageIntegrator::integral(const std::vector<Mesh2DPoint>& coord) const
 
 SegmentationCurve::SegmentationCurve(const std::vector<Mesh2DPoint>& newcoord, 
                                      const ImageIntegrator& integrator_in, 
+                                     double sign,
                                      double lambda, 
                                      double gamma, 
                                      double curv_power, 
@@ -176,6 +180,9 @@ SegmentationCurve::SegmentationCurve(const std::vector<Mesh2DPoint>& newcoord,
 	this->gamma = gamma;
 	this->curv_power = curv_power;
 	this->bruckstein = bruckstein;
+  if (sign<0) {
+    reverse();
+  }
 }
 
 void SegmentationCurve::reverse()
@@ -189,18 +196,12 @@ bool SegmentationCurve::step_cd()
 	bool any_changed = false;
 
 	for (int i=0; i < coord.size(); i++) {
-		//cerr << "i=" << setw(4) << i << " " << endl;
 
 		double x = coord.at(i).x_;
 		double y = coord.at(i).y_;
 		double E1 = energy_single(i,x,y);
 		double dx = dEdx(i);
 		double dy = dEdy(i);
-		//double dx2 = dEdx_ad(i);
-		//double dy2 = dEdy_ad(i);
-
-		//cerr << "dx=" << setw(20) << dx << " dy=" << setw(20) << dy << " " << endl;
-		//cerr << "dx=" << setw(20) << dx2 << " dy=" << setw(20) << dy2 << " " << endl;
 
 		double nrm = sqrt(dx*dx + dy*dy);
 
@@ -230,26 +231,30 @@ bool SegmentationCurve::step_cd()
 			}
 		} 
 
-		//cerr << setw(20) << E1 << " --> " << setw(20) << E2;
+		if ( E2 < E1) 
+    {
+      //double Ecomplete1 = energy();
+      //double Esingle1   = energy_single(i,coord.at(i).x_,coord.at(i).y_);
+      //double Etot1 = energy2();
 
-		if (E2 < E1) {
+      coord.at(i).x_ = x - tau*dx;
+      coord.at(i).y_ = y - tau*dy;	
 
-			double Ecomplete1 = energy();
-			double Esingle1   = energy_single(i,x,y);
+      //double Ecomplete2 = energy();
+      //double Esingle2   = energy_single(i,coord.at(i).x_,coord.at(i).y_);
+      //double Etot2 = energy2();
 
-			coord.at(i).x_ = x - tau*dx;
-			coord.at(i).y_ = y - tau*dy;	
+      //if (! ((Ecomplete1 - Ecomplete2)/abs(Ecomplete1) > -1e-5) ) {
+      //  PRINT(Esingle1);
+      //  PRINT(Esingle2);
+      //  PRINT(Etot1);
+      //  PRINT(Etot2);
+      //}
 
-			double Ecomplete2 = energy();
-			double Esingle2   = energy_single(i,x - tau*dx,y - tau*dy);
+      //ASSERT( (Ecomplete1 - Ecomplete2)/abs(Ecomplete1) > -1e-5 );
 
-			ASSERT( (Ecomplete1 - Ecomplete2)/abs(Ecomplete1) > -1e-5 );
-			ASSERT( (Esingle1 - Esingle2)/abs(Esingle1) > 0 );
-
-			//cerr << " changed";
 			any_changed = true;
 		}
-		//cerr << endl;
 	}
 
 	return any_changed;
@@ -308,9 +313,26 @@ bool SegmentationCurve::step_grad()
 }
 
 
-void SegmentationCurve::refine()
+bool SegmentationCurve::self_intersect() const
 {
-	lambda = 0;
+  using namespace std;
+  map<pair<double, double>, bool > point_used;
+  for (int i=0; i<coord.size(); ++i) {
+    pair<double, double> p(coord[i].x_, coord[i].y_);
+    if (point_used[p]) {
+      return true;
+    }
+    point_used[p] = true;
+  }
+  return false;
+}
+
+
+void SegmentationCurve::refine(bool verbose)
+{
+  if (self_intersect()) {
+    return;
+  }
 
 	for (int iter=1; iter <= 200; ++iter) {
 
@@ -323,35 +345,45 @@ void SegmentationCurve::refine()
 
 		double Eend = energy();
 
-		//cerr << "--------------------" << endl;
-		cerr << "iter=" << setw(3) << iter << " E = " << Eend << " ";
-		if (Estart == Eend) {
-			cerr << "(no change) ";
-		}
-		else if (Estart < Eend)  {
-			cerr << "(increase) ";
-		}
-		else if (Estart > Eend) {
-			cerr << "(decrease) ";
-		}
+    if (verbose) {
+		  cerr << "  iter=" << setw(3) << iter << " E = " << Eend << " ";
+		  if (Estart == Eend) {
+			  cerr << "(no change) ";
+		  }
+		  else if (Estart < Eend)  {
+			  cerr << "(increase) ";
+		  }
+		  else if (Estart > Eend) {
+			  cerr << "(decrease) ";
+		  }
+      cerr << endl;
+    }
 
-		// Check that the two ways of computing the energy give
-		// the same result
-		double E2=0;
-		for (int i=0; i < coord.size(); i++) {
-			double x = coord.at(i).x_;
-			double y = coord.at(i).y_;
-			E2 += energy_single(i,x,y);
-		}
-		cerr << "deltaE = " << abs((E2-Eend)/E2) << " ";
-		cerr << endl;
-		//cerr << "--------------------" << endl;
-
-		if (!any_changed || Estart < Eend) {
+		if (!any_changed) {
 			break;
 			coord = oldcoord;
 		}
+
+    if (Estart < Eend) {
+      break;
+			coord = oldcoord;
+    }
+ 
 	}
+
+  // Sanity check, no pixel can move too much
+  for (int i=0; i<coord.size(); ++i) {
+    double dx = coord[i].x_ - original_coord.at(i).x_;
+    double dy = coord[i].y_ - original_coord.at(i).y_;
+    if (dx*dx + dy*dy >= 5*5) {
+      coord = original_coord;
+      if (verbose) {
+        cerr << "  restoring original coordinates" << endl;
+      }
+      return;
+    }
+  }
+
 }
 
 
@@ -390,6 +422,14 @@ double SegmentationCurve::energy()
 	return fg_energy() + smooth_energy();
 }
 
+double SegmentationCurve::energy2() 
+{
+  double en = 0;
+	for (int i=0; i < coord.size(); i++) {
+    en += energy_single(i, coord[i].x_, coord[i].y_);
+	}
+	return en;
+}
 
 double SegmentationCurve::dEdx(int i, double h)
 {
@@ -424,32 +464,31 @@ double SegmentationCurve::energy_single(int i, double x, double y)
 
 	double dx = x-p1.x_;
 	double dy = y-p1.y_;
-	en += 0.5 * lambda * sqrt( dx*dx + dy*dy );
+	en += /*0.5 **/ lambda * sqrt( dx*dx + dy*dy );
 	dx = x-p2.x_;
 	dy = y-p2.y_;
-	en += 0.5 * lambda * sqrt( dx*dx + dy*dy );
+	en += /*0.5 **/ lambda * sqrt( dx*dx + dy*dy );
 
-	en += 0.33333333333333333333 * gamma * curv_weight(p0.x_,p0.y_, p1.x_,p1.y_, x,y,         2.0, bruckstein);
-	en += 0.33333333333333333333 * gamma * curv_weight(p1.x_,p1.y_, x,y,         p2.x_,p2.y_, 2.0, bruckstein);
-	en += 0.33333333333333333333 * gamma * curv_weight(x,y,         p2.x_,p2.y_, p3.x_,p3.y_, 2.0, bruckstein);
+	en += /*0.33333333333333333333 **/ gamma * curv_weight(p0.x_,p0.y_, p1.x_,p1.y_, x,y,         2.0, bruckstein);
+	en += /*0.33333333333333333333 **/ gamma * curv_weight(p1.x_,p1.y_, x,y,         p2.x_,p2.y_, 2.0, bruckstein);
+	en += /*0.33333333333333333333 **/ gamma * curv_weight(x,y,         p2.x_,p2.y_, p3.x_,p3.y_, 2.0, bruckstein);
 
 	//en = 0;
-	en += 0.5 * integrator.fg_energy_line(p1.x_,p1.y_, x,y);
-	en += 0.5 * integrator.fg_energy_line(x,y, p2.x_,p2.y_);
+	en += /*0.5 **/ integrator.fg_energy_line(p1.x_,p1.y_, x,y);
+	en += /*0.5 **/ integrator.fg_energy_line(x,y, p2.x_,p2.y_);
 
 	return en;
 }
 
-void SegmentationCurve::draw(std::string svgfile, const Math2D::Matrix<float>& data_term)
+void SegmentationCurve::start_svg(std::ofstream& of, const Math2D::Matrix<float>& image)
 {
-	size_t xDim = data_term.xDim();
-	size_t yDim = data_term.yDim();
+  size_t xDim = image.xDim();
+	size_t yDim = image.yDim();
 
-	ofstream of(svgfile.c_str());
-    init_svg_file(of,uint(xDim),uint(yDim));
+  init_svg_file(of,uint(xDim),uint(yDim));
 
-	float max_data = data_term.max();
-	float min_data = data_term.min();
+	float max_data = image.max();
+	float min_data = image.min();
 
 	//Draw data term background
 	for (size_t i=0;i<xDim;++i) {
@@ -460,14 +499,21 @@ void SegmentationCurve::draw(std::string svgfile, const Math2D::Matrix<float>& d
 		points.push_back( make_pair(i+1,j+1) );
 		points.push_back( make_pair(i,j+1) );
 		stringstream sout;
-		int c = 255.0*(data_term(i,j)-min_data) / (max_data - min_data);
+		int c = 255.0*(image(i,j)-min_data) / (max_data - min_data);
 		sout << "fill:#" << hex << setw(2) << c << c << c
 		     << ";stroke:none;";
 		svg_draw_polygon(of,sout.str(),points);
 	}}
+}
 
+void SegmentationCurve::end_svg(std::ofstream& of)
+{
+  finish_svg_file(of);
+}
 
-	string line_style = "stroke-width:0.2;stroke:red;";
+void SegmentationCurve::draw(std::ofstream& of)
+{
+	string line_style = "stroke-width:0.25;stroke:red;";
 
 	//Draw curve
 	for (uint i=0; i < original_coord.size(); i++) {
@@ -492,7 +538,7 @@ void SegmentationCurve::draw(std::string svgfile, const Math2D::Matrix<float>& d
 				<< "\" x2=\"" << p2.x_ << "\" y2=\"" << p2.y_ << "\" />" << std::endl;
 		}
 	}
-	finish_svg_file(of);
+	
 }
 
 

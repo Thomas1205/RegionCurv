@@ -765,19 +765,19 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
 
     // Get polygon coordinates
-    std::vector<Mesh2DPoint> coord;
-    mesh.get_polygon_points(i, coord);
-    // Integrate the data term
-    double cost2 = integrator.integral(coord);
-    if (area.integral(coord) < 0) {
-      cost2 = -cost2;
-    }
-    // TEST: compare the two values
-    double avgabs = ( abs(cost[i]) + abs(cost2) ) / 2.0;
-    double absdiff = abs(cost[i] - cost2);
-    if ( absdiff / avgabs > 1e-4 && avgabs > 1e-4) {
-      std::cerr << "Difference in data term : " << cost[i] << " <--> " << cost2 << std::endl;
-    }
+    //std::vector<Mesh2DPoint> coord;
+    //mesh.get_polygon_points(i, coord);
+    //// Integrate the data term
+    //double cost2 = integrator.integral(coord);
+    //if (area.integral(coord) < 0) {
+    //  cost2 = -cost2;
+    //}
+    //// TEST: compare the two values
+    //double avgabs = ( abs(cost[i]) + abs(cost2) ) / 2.0;
+    //double absdiff = abs(cost[i] - cost2);
+    //if ( absdiff / avgabs > 1e-4 && avgabs > 1e-4) {
+    //  std::cerr << "Difference in data term : " << cost[i] << " <--> " << cost2 << std::endl;
+    //}
 
 
     if (options.fix_regions_) {
@@ -2476,11 +2476,13 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   // Refine
   //
   if (options.refine_) {
+    //
+    // Extract curves until no more are found
+    //
     Petter::statusTry("Extracting curves...");
     std::vector<SegmentationCurve> curves;
     std::vector<bool> pair_used(edge_pairs.size(), false);
 
-    // Extract curves until no more are found
     bool succeeded;
     do {
       succeeded = true;
@@ -2507,11 +2509,66 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       int prev = -1;
       int curr = start;
+      double curve_sign = 0;
       //Walk through the boundary
+      //std::cerr << '\n';
       while (true) {
 
         uint ip = edge_pairs[curr].common_point_idx_;
         coord.push_back( mesh.point(ip) );
+
+        // Determine the orientation along the curve
+        if (curr != start /*&& curve_sign==0*/) {
+          
+          // Get the edge from the previous point to the current
+          uint ip_prev = edge_pairs[prev].common_point_idx_;
+          std::pair<uint,bool> result = mesh.find_edge(ip,ip_prev);
+          uint edge = result.first;
+          // Get the two adjacent faces
+          std::vector<uint> faces = mesh.adjacent_faces(edge);
+          if (faces.size() >= 1) {
+            // Get the edge vector
+            double from_x = mesh.point(mesh.edge(edge).from_idx_).x_;
+            double from_y = mesh.point(mesh.edge(edge).from_idx_).y_;
+            double to_x = mesh.point(mesh.edge(edge).to_idx_).x_;
+            double to_y = mesh.point(mesh.edge(edge).to_idx_).y_;
+            if (result.second) {
+              // Edge was flipped
+              std::swap(from_x,to_x);
+              std::swap(from_y,to_y);
+            }
+            double ux = to_x - from_x;
+            double uy = to_y - from_y;
+            //Is the face on the left or right side of the edge?
+            Mesh2DPoint p = mesh.face_center(faces[0]);
+            double vx = p.x_  - from_x;
+            double vy = p.y_  - from_y;
+            double z = ux*vy - vx*uy;
+            if (z > 0) {
+              //This region is on the right side
+              if (lp_solution[faces[0]] > 0.9) {
+                //std::cerr << '-';
+                curve_sign = -1;
+              }
+              else {
+                //std::cerr << '+';
+                curve_sign = 1;
+              }
+            }
+            else {
+              //This region is on the left side
+              if (lp_solution[faces[0]] > 0.9) {
+                //std::cerr << '+';
+                curve_sign = 1;
+              }
+              else {
+                //std::cerr << '-';
+                curve_sign = -1;
+              }
+            }
+
+          }
+        }
 
         // Find the next edge pair along the curve
         int next;
@@ -2549,7 +2606,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       if (succeeded) {
         // Add these points as a new curve
-        curves.push_back(SegmentationCurve(coord,integrator,lambda,gamma,2.0,bruckstein));
+        curves.push_back(SegmentationCurve(coord,integrator,curve_sign,lambda,gamma,2.0,bruckstein));
       }
 
 
@@ -2563,13 +2620,42 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       return energy;
     }
 
+    //std::cerr << "LP energy    : " << lp_energy << '\n';
+
+    double curve_energy = 0;
+    for (int i=0;i<curves.size();++i) {
+      curve_energy += curves[i].energy();
+    }
+    std::cerr << "Curve energy (before) : " << curve_energy << '\n';
+
+    //
+    // Refine the curve solutions
+    //
+    for (int i=0;i<curves.size();++i) {
+      //std::cerr << "Curve #" << i+1 << '\n';
+      curves[i].refine(false);
+    }
+
+    curve_energy = 0;
+    for (int i=0;i<curves.size();++i) {
+      curve_energy += curves[i].energy();
+    }
+    std::cerr << "Curve energy (after)  : " << curve_energy << '\n';
+
+
     if (mesh.nFaces() <= 20000) {
-      Petter::statusTry("Saving SVGs...");
+      Petter::statusTry("Saving SVG...");
+      
+      std::stringstream sout;
+      sout << options.base_filename_ << "-refinement.svg";
+
+      std::ofstream of(sout.str().c_str());
+      SegmentationCurve::start_svg(of, data_term);
       for (int i=0;i<curves.size();++i) {
-        std::stringstream sout;
-        sout << options.base_filename_ << "-refinement-" << (i+1) << ".svg";
-        curves[i].draw(sout.str(), data_term);
+        curves[i].draw(of);
       }
+      SegmentationCurve::end_svg(of);
+
       Petter::statusOK();
     }
   }

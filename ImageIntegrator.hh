@@ -26,8 +26,8 @@ private:
 	double fg_energy_line_pixel(double x1, double y1, double x2, double y2) const;
 	double fg_energy_line(double x1, double y1, double x2, double y2) const;
 
-	Math2D::Matrix<float> data_term_integrated_x;
-  Math2D::Matrix<float> data_term_integrated_y;
+	Math2D::Matrix<double> data_term_integrated_x;
+  Math2D::Matrix<double> data_term_integrated_y;
 };
 
 
@@ -36,21 +36,25 @@ class SegmentationCurve
 {
 public:
   SegmentationCurve(const std::vector<Mesh2DPoint>& newcoord, const ImageIntegrator& integrator_in, 
-                    double lambda, double gamma, double curv_power, bool bruckstein);
+                    double sign, double lambda, double gamma, double curv_power, bool bruckstein);
 	void reverse();
 
-	void refine();
+  bool self_intersect() const;
+	void refine(bool verbose=false);
 
 	double fg_energy();
 	double smooth_energy();
 	double energy();
+  double energy2();
 
 	double dEdx(int i, double h=1e-4);
 	double dEdy(int i, double h=1e-4);
 
 	double energy_single(int i, double x, double y);
 
-	void draw(std::string svgfile, const Math2D::Matrix<float>& image);
+  static void start_svg(std::ofstream& of, const Math2D::Matrix<float>& image);
+  static void end_svg(std::ofstream& of);
+	void draw(std::ofstream& of);
 
 private:
 
