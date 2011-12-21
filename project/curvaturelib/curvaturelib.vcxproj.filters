@@ -96,7 +96,7 @@
     <ClCompile Include="..\..\extended_lp_segmentation.cc">
       <Filter>curvature</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\ImageIntegrator.cpp">
+    <ClCompile Include="..\..\ImageIntegrator.cc">
       <Filter>curvature</Filter>
     </ClCompile>
   </ItemGroup>

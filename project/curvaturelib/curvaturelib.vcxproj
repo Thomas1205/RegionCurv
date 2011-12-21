@@ -26,7 +26,7 @@
     <ClCompile Include="..\..\draw_segmentation.cc" />
     <ClCompile Include="..\..\extended_lp_segmentation.cc" />
     <ClCompile Include="..\..\gpcpetter.cc" />
-    <ClCompile Include="..\..\ImageIntegrator.cpp" />
+    <ClCompile Include="..\..\ImageIntegrator.cc" />
     <ClCompile Include="..\..\label_components.cc" />
     <ClCompile Include="..\..\lp_inpainting.cc" />
     <ClCompile Include="..\..\lp_segmentation.cc">
