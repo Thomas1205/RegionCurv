@@ -10,6 +10,7 @@ CHANGE history for RegionCurv
 - factor-based routines are now available for multi-region problems
 - integrated stand-alone routines to compute the energy of an integral solution
   (i.e. no longer solving a large-scale linear program there)
+- added curve evolution as a postprocessing stage
 - integrated ICM postprocessing stage
 - new implementation of min-sum diffusion, much faster in practice
 - added option to ignore some of the possible line pairs (does not give much speed-up)
