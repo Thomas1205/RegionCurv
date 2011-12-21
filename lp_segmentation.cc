@@ -2465,6 +2465,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
           << mesh.nFaces()   << ' '     // 6
           << edge_pairs.size()  << ' '  // 7
           << lp_energy       << ' '     // 8
+          << energy          << ' '     // 9
       ;
 
 

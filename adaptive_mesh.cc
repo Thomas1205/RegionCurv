@@ -17,36 +17,60 @@
 //
 struct Rect
 {
-  size_t x1,x2,y1,y2;
+  double x1,x2,y1,y2;
 
-  Rect(size_t x1,size_t x2,size_t y1, size_t y2) 
+  Rect(double x1,double x2,double y1, double y2) 
   {
     this->x1 = x1;
     this->x2 = x2;
     this->y1 = y1;
     this->y2 = y2;
   }
-  size_t size()
+  double size() const
   {
     return (x2-x1)*(y2-y1);
   }
 
-  float compute_score(const Math2D::Matrix<float>& data_term)
+  float compute_score(const Math2D::Matrix<float>& data_term) const
   {
-    float mean = 0;
-    for (size_t x=x1; x<x2; ++x) {
-      for (size_t y=y1; y<y2; ++y) {
-        mean += data_term(x,y);
+    const int minscore = -1000000;
+    if (size()<=1) {
+      return minscore;
+    }
+
+  //  float mean = 0;
+  //  for (size_t x=floor(x1); x<ceil(x2); ++x) {
+  //    for (size_t y=floor(y1); y<ceil(y2); ++y) {
+  //      mean += data_term(x,y);
+  //    }
+  //  }
+  //  mean /= size();
+
+  //  float score = 0;
+  //  for (size_t x=floor(x1); x<ceil(x2); ++x) {
+  //    for (size_t y=floor(y1); y<ceil(y2); ++y) {
+  //      float term = (data_term(x,y) - mean);
+  //      score += term*term;
+  //    }
+  //  }
+
+  //  return score;
+    int ones=0;
+    int zeros=0;
+    for (size_t x=floor(x1); x<ceil(x2); ++x) {
+      for (size_t y=floor(y1); y<ceil(y2); ++y) {
+        if (data_term(x,y)<0) {
+          zeros++;
+        }
+        else {
+          ones++;
+        }
       }
     }
-    mean /= size();
 
-    float score = 0;
-    for (size_t x=x1; x<x2; ++x) {
-      for (size_t y=y1; y<y2; ++y) {
-        float term = (data_term(x,y) - mean);
-        score += term*term;
-      }
+    int score = std::min(zeros,ones);
+    if (score == 0) {
+      return minscore + size();
     }
 
     return score;
@@ -185,14 +209,18 @@ void generate_adaptive_mesh(const Math2D::Matrix<float>& data_term, Mesh2D& mesh
   Rect rect(0,xDim,0,yDim);
   queue.push( rectpair(rect,0.0f) );
 
-  while (queue.size() < limit) {
+  while (queue.size() < limit && queue.size() > 0) {
     //Get the rectangle that needs to be divided the most
     const rectpair& rpair = queue.top();
     const Rect& rect = rpair.first;
 
+	  if (rect.size()<=1) {
+      break;
+	  }
+
     //Split into 4
-    size_t xs = (rect.x2 + rect.x1)/2;
-    size_t ys = (rect.y2 + rect.y1)/2;
+    double xs = (rect.x2 + rect.x1)/2;
+    double ys = (rect.y2 + rect.y1)/2;
     Rect rect1(rect.x1,xs,rect.y1,ys);
     Rect rect2(xs,rect.x2,rect.y1,ys);
     Rect rect3(rect.x1,xs,ys,rect.y2);
@@ -200,20 +228,11 @@ void generate_adaptive_mesh(const Math2D::Matrix<float>& data_term, Mesh2D& mesh
 
     queue.pop();
 
-
     //Add to queue
-    if (rect1.size() > 0) {
-      queue.push( rectpair(rect1, rect1.compute_score(data_term)) );
-    }
-    if (rect2.size() > 0) {
-      queue.push( rectpair(rect2, rect2.compute_score(data_term)) );
-    }
-    if (rect3.size() > 0) {
-      queue.push( rectpair(rect3, rect3.compute_score(data_term)) );
-    }
-    if (rect4.size() > 0) {
-      queue.push( rectpair(rect4, rect4.compute_score(data_term)) );
-    }
+    queue.push( rectpair(rect1, rect1.compute_score(data_term)) );
+    queue.push( rectpair(rect2, rect2.compute_score(data_term)) );
+    queue.push( rectpair(rect3, rect3.compute_score(data_term)) );
+    queue.push( rectpair(rect4, rect4.compute_score(data_term)) );
   }
 
   //Draw as SVG
@@ -288,12 +307,12 @@ void add_rect_to_mesh(const Rect& rect, uint neighborhood, Mesh2D& mesh)
     exit(1);
   }
 
-  double x1 = (double) rect.x1;
-  double x2 = (double) rect.x2;
-  double y1 = (double) rect.y1;
-  double y2 = (double)rect.y2;
-  double dx = double (x2-x1);
-  double dy = double(y2-y1);
+  double x1 = rect.x1;
+  double x2 = rect.x2;
+  double y1 = rect.y1;
+  double y2 = rect.y2;
+  double dx = x2-x1;
+  double dy = y2-y1;
 
   Mesh2D smallmesh;
   generate_mesh(1,1, neighborhood, smallmesh, true);
@@ -323,9 +342,9 @@ void add_rect_to_mesh(const Rect& rect, uint neighborhood, Mesh2D& mesh)
       face.push_back( es2l[f.edge_idx_[j]] );
     }
     mesh.add_face(face);
-  }
+  } 
 }
-
+  
 
 void add_triangle_to_mesh(const Triangle& tri, Mesh2D& mesh)
 {

@@ -643,7 +643,9 @@ void Mesh2D::draw_labels_with_pairs(std::string filename, const double* labels, 
     stringstream style;
     style << "fill:#" << graylevels[color] << graylevels[color] << graylevels[color] <<
       ";stroke-width:0.0;stroke:#7f7f7f7";
-    svg_draw_polygon(of,style.str(),points);
+    if (color!=255) {
+      svg_draw_polygon(of,style.str(),points);
+    }
     //}
   }
 
