@@ -13,6 +13,7 @@
 #include "stl_out.hh"
 
 #include <coin/ClpSimplex.hpp>
+#include <coin/ClpPresolve.hpp>
 #include <coin/ClpPlusMinusOneMatrix.hpp>
 #include <coin/CbcModel.hpp>
 #include <coin/OsiClpSolverInterface.hpp>
@@ -33,6 +34,10 @@
 
 #ifdef HAS_XPRESS
 #include "xprs.h" 
+#endif
+
+#if ALLOW_CONVEX_PRIORS
+#undef USE_PM_ONE_MATRIX
 #endif
 
 //solves a segmentation problem with length regularity via an LP
@@ -751,6 +756,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   if (enforce_regionedge) {
     nConstraints += 2*light_factor*mesh.nEdges();
   }
+  if (options.convex_prior_) {
+    nConstraints++;
+  }
 
   Math1D::NamedVector<double> var_lb(nVars,0.0,MAKENAME(var_lb));
   Math1D::NamedVector<double> var_ub(nVars,1.0,MAKENAME(var_ub));
@@ -902,6 +910,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   if (enforce_regionedge) {
     nEntries += uint( 8*light_factor*edge_pairs.size() //Note: not exact number
                      + 2*light_factor*mesh.nEdges() ); //we also allocate space for the slack variables used with the convex solver
+  }
+  if (options.convex_prior_) {
+    nEntries += uint( 2*edge_pairs.size() );
   }
 
   SparseMatrixDescription<double> lp_descr(nEntries, nConstraints, nVars);
@@ -1219,6 +1230,24 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       }
     }*/
 
+
+    //
+    // Final equality constraint
+    //
+    // This constrains the number of foreground regions to be 1.
+    //
+    for (uint j=0; j < edge_pairs.size(); j++) {
+      // Angle of pair
+      double diff_angle = pair_diff_angle(mesh, edge_pairs[j]);
+
+      lp_descr.add_entry(nConstraints-1, edge_pair_var_offs + 2*j, diff_angle);
+      lp_descr.add_entry(nConstraints-1, edge_pair_var_offs + 2*j+1, diff_angle);
+    }
+
+    rhs_lower[nConstraints-1] = 2*M_PI-0.0005;
+    rhs_upper[nConstraints-1] = 2*M_PI+0.0005;
+    
+
     Petter::statusOK();
   }
 
@@ -1508,6 +1537,11 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     coinMatrix.cleanMatrix();
 #else
 
+    if (options.convex_prior_) {
+        INTERNAL_ERROR << "Cannot use a +1/-1 matrix with a convex prior. Undefine USE_PM_ONE_MATRIX. exiting..." << std::endl;
+        exit(1);
+    }
+
     uint nPos = 0;
     uint nNeg = 0;
 
@@ -1570,10 +1604,6 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
         cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
 #endif
 
-    //outcomment this when you are debugging
-    lp_descr.reset(0);
-
-
     //lpSolver.writeMps("curv.mps");
 
     tStartCLP = std::clock();
@@ -1581,46 +1611,33 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
     if (options.convex_prior_) {
 
-#ifdef ALLOW_CONVEX_PRIORS
-      //
-      // We need an integer solver for this task.
-      // The LP solution will essentially be worthless. Unfortunately, this
-      // means that the convex constraints are of limited usefulness in practice.
-      //
+      // -3178780.2
+      //  0.405 seconds without.
 
-      OsiClpSolverInterface solver1;
-      CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
-          lp_descr.value(),lp_descr.nEntries());
-      solver1.loadProblem(coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
-          cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
-      for (int i=0;i<nVars;++i) {
-        solver1.setInteger(i);
-      }
-      solver1.setObjSense(1.0);
+      ClpPresolve presolveInfo; 
+      ClpSimplex * presolvedModel = presolveInfo.presolvedModel(lpSolver); 
+      presolvedModel->dual();
+      lp_solution = lpSolver.primalColumnSolution();
+      presolveInfo.postsolve(true);
+      lpSolver.checkSolution(); 
 
-      // Save the MPS file for other solvers to attack
-      //solver1.writeMps("convex","mps",1.0);
+      error = lpSolver.isProvenOptimal() ? 0 : 1;
 
-      CbcModel model(solver1);
-      model.branchAndBound();
-      bool is_optimal = model.isProvenOptimal();
-      
-      if (is_optimal) {
-        std::cerr << "Optimal solution found!" << std::endl;
-      }
+      if (error != 0)
+        std::cerr << "!!!!!!!!!!!!!!LP-solver failed!!!!!!!!!!!!!!!!!!!" << std::endl;
 
-      convex_sol.resize(nVars);
-      for (int i=0; i < nVars; ++i) {
-        convex_sol[i] = model.getColSolution()[i];
-      }
-      lp_solution = &convex_sol[0];
-#else
-      std::cerr << "Define ALLOW_CONVEX_PRIORS in order to compile with an integer solver." << std::endl;
-      std::exit(1);
-#endif
     }
     else {
+      //outcomment this when you are debugging
+      lp_descr.reset(0);
+
+      //ClpPresolve presolveInfo; 
+      //ClpSimplex * presolvedModel = presolveInfo.presolvedModel(lpSolver); 
+      //presolvedModel->dual();
+      //presolveInfo.postsolve(true);
+
       lpSolver.dual();
+
       lp_solution = lpSolver.primalColumnSolution();
 
       error = 1 - lpSolver.isProvenOptimal();
@@ -1648,6 +1665,19 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       Petter::statusOK();
     }
   }
+
+  if (options.convex_prior_) {
+    double angle_sum = 0;
+    for (uint j=0; j < edge_pairs.size(); j++) {
+      // Angle of pair
+      double diff_angle = pair_diff_angle(mesh, edge_pairs[j]);
+
+      angle_sum += diff_angle * lp_solution[edge_pair_var_offs + 2*j];
+      angle_sum += diff_angle * lp_solution[edge_pair_var_offs + 2*j+1];
+    }
+    std::cerr << "Number of turns : " << (angle_sum/(2*M_PI)) << std::endl;
+  }
+
   
   //list of edge pairs that have the respective point as the common point
   Storage1D<std::vector<uint> > point_pairs(mesh.nPoints());
@@ -1942,11 +1972,13 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   std::cerr << "integral energy according to independent routine: " << integral_energy << std::endl;
 
-  double icm_energy = curv_icm(labeling.direct_access(), cost.direct_access(), mesh,
-                               lambda, gamma, bruckstein, energy_offset, !prevent_crossings) 
-                      + energy_offset;
+  if (!options.convex_prior_) {
+    double icm_energy = curv_icm(labeling.direct_access(), cost.direct_access(), mesh,
+                                 lambda, gamma, bruckstein, energy_offset, !prevent_crossings) 
+                        + energy_offset;
 
-  std::cerr << "energy after ICM: " << icm_energy << std::endl;
+    std::cerr << "energy after ICM: " << icm_energy << std::endl;
+  }
 
 
   uint nOpposingLinePairs = 0;
@@ -2482,6 +2514,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     //
     Petter::statusTry("Extracting curves...");
     std::vector<SegmentationCurve> curves;
+    std::vector<int> curve_signs;
     std::vector<bool> pair_used(edge_pairs.size(), false);
 
     bool succeeded;
@@ -2608,6 +2641,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       if (succeeded) {
         // Add these points as a new curve
         curves.push_back(SegmentationCurve(coord,integrator,curve_sign,lambda,gamma,2.0,bruckstein));
+        curve_signs.push_back(curve_sign);
       }
 
 
@@ -2659,6 +2693,29 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       Petter::statusOK();
     }
+
+
+    // Generate segmentation
+    // (really inefficient code)
+    Petter::statusTry("Building segmentation...");
+    for (uint y=0; y < yDim*out_factor; y++) {
+      for (uint x=0; x < xDim*out_factor; x++) {
+        int inside_sum = 0;
+        for (int i=0;i<curves.size();++i) {
+          if (curves[i].inside(x,y)) {
+            inside_sum += curve_signs[i];
+          }
+        }
+        if (inside_sum == 0) {
+          segmentation(x,y) = 0;
+        }
+        else {
+          segmentation(x,y) = 255;
+        }
+      }
+    }
+    Petter::statusOK();
+
   }
 
   return energy;

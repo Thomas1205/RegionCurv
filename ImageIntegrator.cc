@@ -21,17 +21,17 @@ using namespace std;
 #define PRINT(var) cerr << #var << " = " << (var) << endl;
 
 ImageIntegrator::ImageIntegrator(const Math2D::Matrix<float>& data_term) :
-  data_term_integrated_x(data_term.xDim(), data_term.yDim()),
-  data_term_integrated_y(data_term.xDim(), data_term.yDim())
+  data_term_integrated_x(data_term.xDim(), data_term.yDim())
+  //,data_term_integrated_y(data_term.xDim(), data_term.yDim())
 {
   
   size_t xDim = data_term_integrated_x.xDim();
-  size_t yDim = data_term_integrated_y.yDim();
+  size_t yDim = data_term_integrated_x.yDim();
 
   for (size_t y=0;y<yDim;++y) {
   for (size_t x=0;x<xDim;++x) {
     data_term_integrated_x(x,y) = data_term(x,y);
-    data_term_integrated_y(x,y) = data_term(x,y);
+    //data_term_integrated_y(x,y) = data_term(x,y);
   }}
   
   // Integrate data term
@@ -41,11 +41,11 @@ ImageIntegrator::ImageIntegrator(const Math2D::Matrix<float>& data_term) :
     }
   }
 
-  for (size_t x=0;x<xDim;++x) {
-    for (size_t y=1;y<yDim;++y) {
-      data_term_integrated_y(x,y) += data_term_integrated_y(x,y-1);
-    }
-  }
+  //for (size_t x=0;x<xDim;++x) {
+  //  for (size_t y=1;y<yDim;++y) {
+  //    data_term_integrated_y(x,y) += data_term_integrated_y(x,y-1);
+  //  }
+  //}
 }
 
 
@@ -120,7 +120,7 @@ double ImageIntegrator::fg_energy_line(double x1, double y1, double x2, double y
   double en = 0;
   
   size_t xDim = data_term_integrated_x.xDim();
-  size_t yDim = data_term_integrated_y.yDim();
+  size_t yDim = data_term_integrated_x.yDim();
 
   
   for (size_t i=0; i < ts.size()-1; ++i) {
@@ -444,6 +444,36 @@ double SegmentationCurve::dEdy(int i, double h)
   double y = coord.at(i).y_;
   return ( energy_single(i, x, y + h) - energy_single(i, x, y - h) ) / (2*h);
 }
+
+
+bool SegmentationCurve::inside(size_t x, size_t y)
+{
+  size_t xDim = integrator->data_term_integrated_x.xDim();
+  size_t yDim = integrator->data_term_integrated_x.yDim();
+  if (x>=xDim || y>=yDim) {
+    return false;
+  }
+
+  double before = energy();
+
+  for (size_t xx=x;xx<xDim;++xx) {
+    integrator->data_term_integrated_x(xx,y) += 1;
+  }
+
+  double after = energy();
+
+  for (size_t xx=x;xx<xDim;++xx) {
+    integrator->data_term_integrated_x(xx,y) -= 1;
+  }
+
+  if (abs(before-after) > 0.5) {
+    return true;
+  }
+  else {
+    return false;
+  }
+}
+
 
 
 double SegmentationCurve::energy_single(int i, double x, double y)

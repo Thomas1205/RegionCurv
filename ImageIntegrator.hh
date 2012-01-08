@@ -27,7 +27,7 @@ private:
   double fg_energy_line(double x1, double y1, double x2, double y2) const;
 
   Math2D::Matrix<double> data_term_integrated_x;
-  Math2D::Matrix<double> data_term_integrated_y;
+  //Math2D::Matrix<double> data_term_integrated_y;
 };
 
 
@@ -51,6 +51,8 @@ public:
   double dEdy(int i, double h=1e-4);
 
   double energy_single(int i, double x, double y);
+
+  bool inside(size_t x, size_t y);
 
   static void start_svg(std::ofstream& of, const Math2D::Matrix<float>& image);
   static void end_svg(std::ofstream& of);
