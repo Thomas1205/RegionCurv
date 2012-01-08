@@ -111,11 +111,90 @@ int main(int argc, char** argv) {
   float energy_offset = 0.0;
   float mu0 = convert<float>(app.getParam("-mu0"));
   float mu1 = convert<float>(app.getParam("-mu1"));
-  if (mu0 < 0) {
+
+  // If mu0 and mu1 are unspecified
+  if (mu0 < 0 || mu1 < 0) {
+
+    // Starting guess
     mu0 = gray_image.min();
-  }
-  if (mu1 < 0) {
     mu1 = gray_image.max();
+
+    //std::cerr << "mu0 = " << mu0 << "  mu1 = " << mu1 << std::endl;
+
+    // Iteratively compute good values of mu0 and mu1 if 
+    // not specified by user
+    for (int iter=1;iter<=25;++iter) {
+      // Compute average over the two regions
+      int n0 = 0;
+      int n1 = 0;
+      double sum0 = 0;
+      double sum1 = 0;
+      for (uint y=0; y < yDim; y++) {
+        for (uint x=0; x < xDim; x++) {
+          double pix = gray_image(x,y);
+          double d0 = (pix-mu0)*(pix-mu0);
+          double d1 = (pix-mu1)*(pix-mu1);
+          if (d0 < d1) {
+            sum0 += pix;
+            n0++;
+          }
+          else {
+            sum1 += pix;
+            n1++;
+          }
+
+        }
+      }
+      mu0 = sum0 / n0;
+      mu1 = sum1 / n1;
+    
+      if (convert<float>(app.getParam("-mu0")) >= 0) {
+        mu0 = convert<float>(app.getParam("-mu0"));
+      }
+      if (convert<float>(app.getParam("-mu1")) >= 0) {
+        mu1 = convert<float>(app.getParam("-mu1"));
+      }
+
+      //std::cerr << "mu0 = " << mu0 << "  mu1 = " << mu1 << std::endl;
+    }
+
+    // Try to figure out which one is the background by
+    // looking at the image border
+    int b0 = 0;
+    int b1 = 0;
+    for (uint y=0; y < yDim; y++) {
+      double pix = gray_image(0,y);
+      double d0 = (pix-mu0)*(pix-mu0);
+      double d1 = (pix-mu1)*(pix-mu1);
+      if (d0 < d1) b0++;
+      else  b1++;
+      pix = gray_image(xDim-1,y);
+      d0 = (pix-mu0)*(pix-mu0);
+      d1 = (pix-mu1)*(pix-mu1);
+      if (d0 < d1) b0++;
+      else  b1++;
+    }
+    for (uint x=0; x < xDim; x++) {
+      double pix = gray_image(x,0);
+      double d0 = (pix-mu0)*(pix-mu0);
+      double d1 = (pix-mu1)*(pix-mu1);
+      if (d0 < d1) b0++;
+      else  b1++;
+      pix = gray_image(x,yDim);
+      d0 = (pix-mu0)*(pix-mu0);
+      d1 = (pix-mu1)*(pix-mu1);
+      if (d0 < d1) b0++;
+      else  b1++;
+    }
+
+    // If more foreground than background appears 
+    // along the image borders
+    if (b1 > b0) {
+      std::swap(mu1,mu0);
+    }
+
+    std::cerr << "mu0 = " << mu0 << "  mu1 = " << mu1 << std::endl;
+
   }
 
   for (uint y=0; y < yDim; y++) {
@@ -313,7 +392,7 @@ int main(int argc, char** argv) {
 
   Math2D::Matrix<uint> scaled_seg(xDim,yDim);
   for (uint i=0; i < scaled_seg.size(); i++) {
-    scaled_seg.direct_access(i) = uint (fscaled_seg.direct_access(i) + 0.5);
+    scaled_seg.direct_access(i) = uint (fscaled_seg.direct_access(i));
   }
 
   draw_segmentation(scaled_seg, out_image, 250.0, 250.0, 150.0);
