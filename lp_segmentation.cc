@@ -1611,9 +1611,6 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
     if (options.convex_prior_) {
 
-      // -3178780.2
-      //  0.405 seconds without.
-
       ClpPresolve presolveInfo; 
       ClpSimplex * presolvedModel = presolveInfo.presolvedModel(lpSolver); 
       presolvedModel->dual();
