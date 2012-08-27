@@ -40,6 +40,7 @@ public:
   void reverse();
 
   bool self_intersect() const;
+  void fix_self_intersect() ;
   void refine(bool verbose=false);
 
   double fg_energy();

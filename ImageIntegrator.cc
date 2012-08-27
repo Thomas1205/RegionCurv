@@ -327,14 +327,41 @@ bool SegmentationCurve::self_intersect() const
   return false;
 }
 
+void SegmentationCurve::fix_self_intersect() 
+{
+  using namespace std;
+  map<pair<double, double>, bool > point_used;
+  map<pair<double, double>, int > point_ind;
+  for (int i=0; i<coord.size(); ++i) {
+    pair<double, double> p(coord[i].x_, coord[i].y_);
+    if (point_used[p]) {
+        int j = point_ind[p];
+        int i1 = i-1 % coord.size();
+        int i2 = i+1 % coord.size();
+        int j1 = j-1 % coord.size();
+        int j2 = j+1 % coord.size();
+
+        coord[i].x_ = (coord[i1].x_ + coord[i2].x_) / 2.0;
+        coord[i].y_ = (coord[i1].y_ + coord[i2].y_) / 2.0;
+        coord[j].x_ = (coord[j1].x_ + coord[j2].x_) / 2.0;
+        coord[j].y_ = (coord[j1].y_ + coord[j2].y_) / 2.0;
+    }
+    else {
+        point_used[p] = true;
+        point_ind[p] = i;
+    }
+  }
+}
+
 
 void SegmentationCurve::refine(bool verbose)
 {
   if (self_intersect()) {
-    return;
+    cerr << "Self-intersection" << endl;
+    fix_self_intersect();
   }
-
-  for (int iter=1; iter <= 200; ++iter) {
+  int iter;
+  for (iter=1; iter <= 200; ++iter) {
 
     double Estart = energy();
     std::vector<Mesh2DPoint> oldcoord = coord;
@@ -360,29 +387,38 @@ void SegmentationCurve::refine(bool verbose)
     }
 
     if (!any_changed) {
-      break;
-      coord = oldcoord;
+        coord = oldcoord;
+        break;
     }
 
     if (Estart < Eend) {
-      break;
       coord = oldcoord;
+      if (verbose) {
+        cerr << "Energy increased. ";
+      }
+      break;
+    }
+
+    // Sanity check, no pixel can move too much
+    bool stop = false;
+    for (int i=0; i<coord.size(); ++i) {
+      double dx = coord[i].x_ - original_coord.at(i).x_;
+      double dy = coord[i].y_ - original_coord.at(i).y_;
+      if (dx*dx + dy*dy >= 5*5) {
+        coord[i] = oldcoord[i];
+        if (verbose && !stop) {
+          cerr << "  moved too far" << endl;
+          stop = true;
+        }
+      }
     }
  
   }
 
-  // Sanity check, no pixel can move too much
-  for (int i=0; i<coord.size(); ++i) {
-    double dx = coord[i].x_ - original_coord.at(i).x_;
-    double dy = coord[i].y_ - original_coord.at(i).y_;
-    if (dx*dx + dy*dy >= 5*5) {
-      coord = original_coord;
-      if (verbose) {
-        cerr << "  restoring original coordinates" << endl;
-      }
-      return;
-    }
+  if (verbose) {
+    cerr << "Ran for " << iter << " iterations." << endl;
   }
+
 
 }
 
@@ -410,7 +446,7 @@ double SegmentationCurve::smooth_energy()
     dy = p1.y_-p2.y_;
     en += 0.5 * lambda * sqrt( dx*dx + dy*dy );
 
-    en += gamma * curv_weight(p0.x_,p0.y_, p1.x_,p1.y_, p2.x_,p2.y_, 2.0, bruckstein);
+    en += gamma * curv_weight(p0.x_,p0.y_, p1.x_,p1.y_, p2.x_,p2.y_,  curv_power, bruckstein);
     //cerr << p0 << " " << p1 << " " << p2 << "  en=" << en << endl;
   }
 
@@ -499,9 +535,9 @@ double SegmentationCurve::energy_single(int i, double x, double y)
   dy = y-p2.y_;
   en += /*0.5 **/ lambda * sqrt( dx*dx + dy*dy );
 
-  en += /*0.33333333333333333333 **/ gamma * curv_weight(p0.x_,p0.y_, p1.x_,p1.y_, x,y,         2.0, bruckstein);
-  en += /*0.33333333333333333333 **/ gamma * curv_weight(p1.x_,p1.y_, x,y,         p2.x_,p2.y_, 2.0, bruckstein);
-  en += /*0.33333333333333333333 **/ gamma * curv_weight(x,y,         p2.x_,p2.y_, p3.x_,p3.y_, 2.0, bruckstein);
+  en += /*0.33333333333333333333 **/ gamma * curv_weight(p0.x_,p0.y_, p1.x_,p1.y_, x,y,         curv_power, bruckstein);
+  en += /*0.33333333333333333333 **/ gamma * curv_weight(p1.x_,p1.y_, x,y,         p2.x_,p2.y_, curv_power, bruckstein);
+  en += /*0.33333333333333333333 **/ gamma * curv_weight(x,y,         p2.x_,p2.y_, p3.x_,p3.y_, curv_power, bruckstein);
 
   //en = 0;
   en += /*0.5 **/ integrator->fg_energy_line(p1.x_,p1.y_, x,y);
@@ -521,19 +557,21 @@ void SegmentationCurve::start_svg(std::ofstream& of, const Math2D::Matrix<float>
   float min_data = image.min();
 
   //Draw data term background
-  for (size_t i=0;i<xDim;++i) {
-  for (size_t j=0;j<yDim;++j) {
-    vector<pair<double, double> > points;
-    points.push_back( make_pair(i,j) );
-    points.push_back( make_pair(i+1,j) );
-    points.push_back( make_pair(i+1,j+1) );
-    points.push_back( make_pair(i,j+1) );
-    stringstream sout;
-    int c = 255.0*(image(i,j)-min_data) / (max_data - min_data);
-    sout << "fill:#" << hex << setw(2) << c << c << c
-         << ";stroke:none;";
-    svg_draw_polygon(of,sout.str(),points);
-  }}
+  //for (size_t i=0;i<xDim;++i) {
+  //for (size_t j=0;j<yDim;++j) {
+  //  vector<pair<double, double> > points;
+  //  points.push_back( make_pair(i,j) );
+  //  points.push_back( make_pair(i+1,j) );
+  //  points.push_back( make_pair(i+1,j+1) );
+  //  points.push_back( make_pair(i,j+1) );
+  //  stringstream sout;
+  //  int c = 255.0*(image(i,j)-min_data) / (max_data - min_data);
+  //  if (c!=255) {
+  //      sout << "fill:#" << hex << setw(2) << c << c << c
+  //           << ";stroke:none;";
+  //      svg_draw_polygon(of,sout.str(),points);
+  //  }
+  //}}
 }
 
 void SegmentationCurve::end_svg(std::ofstream& of)
@@ -543,32 +581,42 @@ void SegmentationCurve::end_svg(std::ofstream& of)
 
 void SegmentationCurve::draw(std::ofstream& of)
 {
-  string line_style = "stroke-width:0.25;stroke:red;";
+    of << "<path style=\"fill:none;stroke-width:0.55;stroke:red;stroke-linecap:round;";
+    of << "opacity:0.75;stroke-linejoin:round;stroke-opacity:1;stroke-miterlimit:4;";
+    of << "stroke-dasharray:none;\" d = \"";
+    bool first=true;
+    for (uint i=0; i < original_coord.size(); i++) {
+        Mesh2DPoint& p1 = original_coord[i];
+        if (first) {
+            of << "M ";
+            first = false;
+        }
+        else {
+            of << "L ";
+        }
 
-  //Draw curve
-  for (uint i=0; i < original_coord.size(); i++) {
-    Mesh2DPoint& p1 = original_coord[i];
-    Mesh2DPoint& p2 = original_coord[ (i+1) % original_coord.size() ];
-    if (!(p1 == p2)) {
-      //Edge still used
-      of << "<line style=\"" << line_style << "\"  x1=\"" << p1.x_ << "\" y1=\"" << p1.y_ 
-        << "\" x2=\"" << p2.x_ << "\" y2=\"" << p2.y_ << "\" />" << std::endl;
+        of << p1.x_ << "," << p1.y_ << " ";
     }
-  }
-
-  line_style = "stroke-width:0.2;stroke:blue;";
-
-  //Draw curve
-  for (uint i=0; i < coord.size(); i++) {
-    Mesh2DPoint& p1 = coord[i];
-    Mesh2DPoint& p2 = coord[ (i+1) % coord.size() ];
-    if (!(p1 == p2)) {
-      //Edge still used
-      of << "<line style=\"" << line_style << "\"  x1=\"" << p1.x_ << "\" y1=\"" << p1.y_ 
-        << "\" x2=\"" << p2.x_ << "\" y2=\"" << p2.y_ << "\" />" << std::endl;
-    }
-  }
+    of << "Z\" /> " << endl;
   
+
+    of << "<path style=\"fill:none;stroke-width:0.55;stroke:#48b300;stroke-linecap:round;";
+    of << "opacity:0.75;stroke-linejoin:round;stroke-opacity:1;stroke-miterlimit:4;";
+    of << "stroke-dasharray:none;\" d = \"";
+    first=true;
+    for (uint i=0; i < coord.size(); i++) {
+        Mesh2DPoint& p1 = coord[i];
+        if (first) {
+            of << "M ";
+            first = false;
+        }
+        else {
+            of << "L ";
+        }
+
+        of << p1.x_ << "," << p1.y_ << " ";
+    }
+    of << "Z\" /> " << endl;
 }
 
 
