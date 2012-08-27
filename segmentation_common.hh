@@ -49,6 +49,10 @@ struct LPSegOptions
   bool refine_;
 
   bool convex_prior_;
+  int min_objects_;
+  int max_objects_;
+
+  double curv_power_;
 };
 
 //Generates a mesh with a given neighborhood structure

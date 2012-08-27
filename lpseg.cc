@@ -67,7 +67,8 @@ int main(int argc, char** argv) {
   {"-griddimy",optWithValue,1,"-1"},{"-solver",optWithValue,1,"clp"},
   {"-ignore-crossings",flag,0,""},{"-no-touching-regions",flag,0,""},{"-convex",flag,0,""},
   {"-reduce-pairs",flag,0,""},{"-mode",optWithValue,1,"standard"},
-  {"-refine",flag,0,""}};
+  {"-refine",flag,0,""},{"-min-objects",optWithValue,1,"0"}, {"-max-objects",optWithValue,1,"1000000"}, 
+  {"-curv-power",optWithValue,1,"2.0"}};
 
   const int nParams = sizeof(params)/sizeof(ParamDescr);
 
@@ -259,8 +260,10 @@ int main(int argc, char** argv) {
   seg_opts.base_filename_ = base_filename;
   seg_opts.convex_prior_ =  app.is_set("-convex");
   seg_opts.refine_ =  app.is_set("-refine");
-
+  seg_opts.min_objects_ = convert<int>( app.getParam("-min-objects") );
+  seg_opts.max_objects_ = convert<int>( app.getParam("-max-objects") );
   seg_opts.debug_svg_ = app.is_set("-debug-svg");
+  seg_opts.curv_power_ = convert<double>(app.getParam("-curv-power"));
 
   if (app.is_set("-reduce-pairs"))
     seg_opts.reduce_edge_pairs_ = true;
@@ -302,7 +305,12 @@ int main(int argc, char** argv) {
     seg_opts.output_factor_ = 1; // Usually no need to enlarge output now
   }
 
-  if (gamma == 0.0 && !seg_opts.convex_prior_) {
+  bool need_curvature = false;
+  if (gamma != 0.0 || seg_opts.min_objects_ > 0 || seg_opts.max_objects_ < 1000000 || seg_opts.convex_prior_) {
+    need_curvature = true;
+  }
+
+  if ( ! need_curvature ) {
 
     if (nRegions == 2)
       lp_segment_lenreg(data_term, seg_opts, energy_offset, segmentation);

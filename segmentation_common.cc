@@ -37,6 +37,9 @@ LPSegOptions::LPSegOptions() {
   debug_svg_ = false;
   refine_ = false;
   convex_prior_ = false;
+  min_objects_ = 0;
+  max_objects_ = 1000000;
+  curv_power_ = 2.0;
 }
 
 void add_grid_output(uint region_index, double label, const Mesh2D& mesh, const Math2D::Matrix<double>& output)
