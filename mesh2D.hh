@@ -29,13 +29,13 @@ struct Mesh2DPoint {
 std::ostream& operator<<(std::ostream& os, const Mesh2DPoint& point);
 
 bool lines_cross(Mesh2DPoint p1, Mesh2DPoint p2, Mesh2DPoint q1, Mesh2DPoint q2, 
-		 std::pair<double,double>& crossing_point);
-
-bool line_pairs_with_meeting_point_cross(const Mesh2D& mesh, const Mesh2DEdgePair& pair1, const Mesh2DEdgePair& pair2);
+                 std::pair<double,double>& crossing_point);
 
 bool line_pairs_with_meeting_point_cross(const Mesh2DPoint& p1, const Mesh2DPoint& p2, 
-					 const Mesh2DPoint& q1, const Mesh2DPoint& q2,
-					 const Mesh2DPoint& meeting_point);
+                                         const Mesh2DPoint& q1, const Mesh2DPoint& q2,
+                                         const Mesh2DPoint& meeting_point);
+
+bool line_pairs_with_meeting_point_cross(const Mesh2D& mesh, const Mesh2DEdgePair& pair1, const Mesh2DEdgePair& pair2);
 
 double triangle_area(const Mesh2DPoint& p1, const Mesh2DPoint& p2, const Mesh2DPoint& p3);
 
@@ -121,6 +121,8 @@ public:
 
   Mesh2DEdge edge(uint edge_idx) const;
 
+  Mesh2DFace face(uint face_idx) const;
+
   uint nPoints() const;
 
   uint nEdges() const;
@@ -150,6 +152,14 @@ public:
   void enlarge(double x_factor, double y_factor);
 
   Mesh2DPoint face_center(uint idx);
+
+  double min_x() const;
+
+  double min_y() const;
+
+  double max_x() const;
+
+  double max_y() const;
 
 protected:
   std::vector<Mesh2DPoint> point_;

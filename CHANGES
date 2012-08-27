@@ -1,7 +1,7 @@
 CHANGE history for RegionCurv
 
 
-**** upcoming release (1.0?)
+**** version 1.0 ******
 
 - released curvature denoising
 - can optionally use a convex prior now

@@ -22,83 +22,83 @@ bool operator==(std::pair<double, double> q, Mesh2DPoint p) {
 }
 
 bool lines_cross(Mesh2DPoint p1, Mesh2DPoint p2, Mesh2DPoint q1, Mesh2DPoint q2, 
-		 std::pair<double,double>& crossing_point) {
+                 std::pair<double,double>& crossing_point) {
 
-    crossing_point.first =  -100000;
-    crossing_point.second = -100000;
+  crossing_point.first =  -100000;
+  crossing_point.second = -100000;
 
-//     if ( ((p1.first-p2.first) * (q1.first-q2.first) + (p1.second-p2.second) * (q1.second - q2.second)) == 0.0)
-// 	//the lines are collinnear
-// 	return false;
+  //     if ( ((p1.first-p2.first) * (q1.first-q2.first) + (p1.second-p2.second) * (q1.second - q2.second)) == 0.0)
+  // 	//the lines are collinnear
+  // 	return false;
 
 
-    Math1D::Vector<double> pn(3);
-    pn[0] = p1.y_ - p2.y_;
-    pn[1] = p2.x_ - p1.x_;
+  Math1D::Vector<double> pn(3);
+  pn[0] = p1.y_ - p2.y_;
+  pn[1] = p2.x_ - p1.x_;
 
-    double pnorm = sqrt(pn[0]*pn[0] + pn[1]*pn[1]);
-    if (pnorm == 0.0) //if any of the two lines reduces to a point, we define that the lines do not cross;
-	return false;
+  double pnorm = sqrt(pn[0]*pn[0] + pn[1]*pn[1]);
+  if (pnorm == 0.0) //if any of the two lines reduces to a point, we define that the lines do not cross;
+    return false;
 
-    pn[0] /= pnorm;
-    pn[1] /= pnorm;
-    pn[2] = -p1.x_*pn[0] - p1.y_ * pn[1];
+  pn[0] /= pnorm;
+  pn[1] /= pnorm;
+  pn[2] = -p1.x_*pn[0] - p1.y_ * pn[1];
 
-    Math1D::Vector<double> qn(3);
-    qn[0] = q1.y_ - q2.y_;
-    qn[1] = q2.x_ - q1.x_;
+  Math1D::Vector<double> qn(3);
+  qn[0] = q1.y_ - q2.y_;
+  qn[1] = q2.x_ - q1.x_;
 
-    double qnorm = sqrt(qn[0]*qn[0] + qn[1]*qn[1]);
-    if (qnorm == 0)
-	return false;
+  double qnorm = sqrt(qn[0]*qn[0] + qn[1]*qn[1]);
+  if (qnorm == 0)
+    return false;
 
-    qn[0] /= qnorm;
-    qn[1] /= qnorm;
-    qn[2] = -q1.x_*qn[0] - q1.y_*qn[1];
+  qn[0] /= qnorm;
+  qn[1] /= qnorm;
+  qn[2] = -q1.x_*qn[0] - q1.y_*qn[1];
 
-    Math1D::Vector<double> cross_vec = Math1D::cross(pn, qn); //pn / qn;
+  Math1D::Vector<double> cross_vec = Math1D::cross(pn, qn); //pn / qn;
     
-//     std::cerr << "pn: " << pn << std::endl;
-//     std::cerr << "qn: " << qn << std::endl; 
-//     std::cerr << "cross product: " << cross << std::endl;
+  //     std::cerr << "pn: " << pn << std::endl;
+  //     std::cerr << "qn: " << qn << std::endl; 
+  //     std::cerr << "cross product: " << cross << std::endl;
 
-    if (cross_vec[2] == 0.0) {
-	//std::cerr << "parallel" << std::endl;
-	return false;
-    }
+  if (cross_vec[2] == 0.0) {
+    //std::cerr << "parallel" << std::endl;
+    return false;
+  }
     
-    cross_vec[0] /= cross_vec[2];
-    cross_vec[1] /= cross_vec[2];
-    cross_vec[2] = 1.0;
+  cross_vec[0] /= cross_vec[2];
+  cross_vec[1] /= cross_vec[2];
+  cross_vec[2] = 1.0;
 
-    //std::cerr << "crossing point: " << cross << std::endl;
+  //std::cerr << "crossing point: " << cross << std::endl;
 
-    //if (cross[0] == p1.first || cross[0] == p2.first || cross[0] == q1.first || cross[0] == q2.first) {
-    std::pair<double,double> cp = std::make_pair(cross_vec[0],cross_vec[1]);
-    if (cp == p1 || cp == p2 || cp == q1 || cp ==q2) {
-	//std::cerr << "touch" << std::endl;
-	//the lines are allowed to touch (but not cross) at a single point
-	return false;
-    }
+  //if (cross[0] == p1.first || cross[0] == p2.first || cross[0] == q1.first || cross[0] == q2.first) {
+  std::pair<double,double> cp = std::make_pair(cross_vec[0],cross_vec[1]);
+  if (cp == p1 || cp == p2 || cp == q1 || cp ==q2) {
+    //std::cerr << "touch" << std::endl;
+    //the lines are allowed to touch (but not cross) at a single point
+    return false;
+  }
 
-    double px = (p1.x_ - cross_vec[0]) * (cross_vec[0] - p2.x_);
-    double py = (p1.y_ - cross_vec[1]) * (cross_vec[1] - p2.y_);
+  double px = (p1.x_ - cross_vec[0]) * (cross_vec[0] - p2.x_);
+  double py = (p1.y_ - cross_vec[1]) * (cross_vec[1] - p2.y_);
     
-    //std::cerr << "px: " << px << std::endl;
-    //std::cerr << "py: " << py << std::endl;
+  //std::cerr << "px: " << px << std::endl;
+  //std::cerr << "py: " << py << std::endl;
 
-    if (px <= 0.001 && py <= 0.001)
-	return false; //either the crossing point is outside the segment or coincides with one of the endpoints
+  if (px <= 0.001 && py <= 0.001)
+    return false; //either the crossing point is outside the segment or coincides with one of the endpoints
 
-    double qx = (q1.x_ - cross_vec[0]) * (cross_vec[0] - q2.x_);
-    double qy = (q1.y_ - cross_vec[1]) * (cross_vec[1] - q2.y_);
+  double qx = (q1.x_ - cross_vec[0]) * (cross_vec[0] - q2.x_);
+  double qy = (q1.y_ - cross_vec[1]) * (cross_vec[1] - q2.y_);
 
-    if (qx <= 0.001 && qy <= 0.001)
-	return false; //either the crossing point is outside the segment or coincides with one of the endpoints
+  if (qx <= 0.001 && qy <= 0.001)
+    return false; //either the crossing point is outside the segment or coincides with one of the endpoints
     
-    crossing_point.first = cross_vec[0];
-    crossing_point.second = cross_vec[1];
-    return true;
+  crossing_point.first = cross_vec[0];
+  crossing_point.second = cross_vec[1];
+  return true;
 }
 
 bool line_pairs_with_meeting_point_cross(const Mesh2D& mesh, const Mesh2DEdgePair& pair1, const Mesh2DEdgePair& pair2) {
@@ -130,13 +130,13 @@ bool line_pairs_with_meeting_point_cross(const Mesh2D& mesh, const Mesh2DEdgePai
   
   
   return ( line_pairs_with_meeting_point_cross(mesh.point(p1_idx), mesh.point(p2_idx), mesh.point(p3_idx), 
-					       mesh.point(p4_idx), mesh.point(point)) );
+                                               mesh.point(p4_idx), mesh.point(point)) );
 }
 
 
 bool line_pairs_with_meeting_point_cross(const Mesh2DPoint& p1, const Mesh2DPoint& p2, 
-					 const Mesh2DPoint& q1, const Mesh2DPoint& q2,
-					 const Mesh2DPoint& meeting_point) {
+                                         const Mesh2DPoint& q1, const Mesh2DPoint& q2,
+                                         const Mesh2DPoint& meeting_point) {
 
   Math1D::Vector<double> diff_p1(2);
   diff_p1[0] = meeting_point.x_ - p1.x_;
@@ -179,7 +179,7 @@ bool line_pairs_with_meeting_point_cross(const Mesh2DPoint& p1, const Mesh2DPoin
     aux2.y_ += 100.0 * diff_q2[1];
 
     return (lines_cross(aux1,meeting_point,p1,p2,crossing_point)
-	    || lines_cross(aux2,meeting_point,p1,p2,crossing_point) );
+            || lines_cross(aux2,meeting_point,p1,p2,crossing_point) );
   }
   else {
 
@@ -195,7 +195,7 @@ bool line_pairs_with_meeting_point_cross(const Mesh2DPoint& p1, const Mesh2DPoin
     aux2.y_ += 100.0 * diff_p2[1];
 
     return (lines_cross(aux1,meeting_point,q1,q2,crossing_point)
-	    || lines_cross(aux2,meeting_point,q1,q2,crossing_point) );
+            || lines_cross(aux2,meeting_point,q1,q2,crossing_point) );
   }
 
 }
@@ -256,7 +256,7 @@ std::ostream& operator<<(std::ostream& os, const Mesh2DEdge& edge) {
 }
 
 Mesh2DEdgePair::Mesh2DEdgePair(uint first_edge, uint second_edge, uint common_point) 
-: first_edge_idx_(first_edge), second_edge_idx_(second_edge), common_point_idx_(common_point) 
+  : first_edge_idx_(first_edge), second_edge_idx_(second_edge), common_point_idx_(common_point) 
 {}
 
 std::ostream& Mesh2DEdgePair::operator<<(std::ostream& os) const {
@@ -456,7 +456,6 @@ void Mesh2D::draw(std::string filename, bool drawfaces) const {
 
         assert(point_count.size() == 3);
         uint end_point = MAX_UINT;
-        uint start_point = MAX_UINT;
 
         for (std::map<uint,uint>::iterator it = point_count.begin(); it != point_count.end(); it++) {
           if (it->second == 2) {
@@ -464,9 +463,6 @@ void Mesh2D::draw(std::string filename, bool drawfaces) const {
             break;
           }
         }
-
-        start_point = (edge_[edge_idx].to_idx_ == end_point) ? 
-          edge_[edge_idx].from_idx_ : edge_[edge_idx].to_idx_;
 
         points.push_back(std::make_pair(point_[end_point].x_,point_[end_point].y_));
       }
@@ -481,7 +477,7 @@ void Mesh2D::draw(std::string filename, bool drawfaces) const {
     if (!(p1 == p2)) {
       //Edge still used
       of << "<line style=\"" << line_style << "\"  x1=\"" << p1.x_ << "\" y1=\"" << p1.y_ 
-        << "\" x2=\"" << p2.x_ << "\" y2=\"" << p2.y_ << "\" />" << std::endl;
+         << "\" x2=\"" << p2.x_ << "\" y2=\"" << p2.y_ << "\" />" << std::endl;
     }
   }
   finish_svg_file(of);
@@ -531,7 +527,6 @@ void Mesh2D::draw_labels(std::string filename, const int* labels) const {
 
       assert(point_count.size() == 3);
       uint end_point = MAX_UINT;
-      uint start_point = MAX_UINT;
 
       for (std::map<uint,uint>::iterator it = point_count.begin(); it != point_count.end(); it++) {
         if (it->second == 2) {
@@ -539,9 +534,6 @@ void Mesh2D::draw_labels(std::string filename, const int* labels) const {
           break;
         }
       }
-
-      start_point = (edge_[edge_idx].to_idx_ == end_point) ? 
-        edge_[edge_idx].from_idx_ : edge_[edge_idx].to_idx_;
 
       points.push_back(std::make_pair(point_[end_point].x_,point_[end_point].y_));
     }
@@ -620,7 +612,6 @@ void Mesh2D::draw_labels_with_pairs(std::string filename, const double* labels, 
 
       assert(point_count.size() == 3);
       uint end_point = MAX_UINT;
-      uint start_point = MAX_UINT;
 
       for (std::map<uint,uint>::iterator it = point_count.begin(); it != point_count.end(); it++) {
         if (it->second == 2) {
@@ -628,9 +619,6 @@ void Mesh2D::draw_labels_with_pairs(std::string filename, const double* labels, 
           break;
         }
       }
-
-      start_point = (edge_[edge_idx].to_idx_ == end_point) ? 
-        edge_[edge_idx].from_idx_ : edge_[edge_idx].to_idx_;
 
       points.push_back(std::make_pair(point_[end_point].x_,point_[end_point].y_));
     }
@@ -643,9 +631,7 @@ void Mesh2D::draw_labels_with_pairs(std::string filename, const double* labels, 
     stringstream style;
     style << "fill:#" << graylevels[color] << graylevels[color] << graylevels[color] <<
       ";stroke-width:0.0;stroke:#7f7f7f7";
-    if (color!=255) {
-      svg_draw_polygon(of,style.str(),points);
-    }
+    svg_draw_polygon(of,style.str(),points);
     //}
   }
 
@@ -655,7 +641,7 @@ void Mesh2D::draw_labels_with_pairs(std::string filename, const double* labels, 
     if (!(p1 == p2)) {
       //Edge still used
       of << "<line style=\"" << line_style << "\"  x1=\"" << p1.x_ << "\" y1=\"" << p1.y_ 
-        << "\" x2=\"" << p2.x_ << "\" y2=\"" << p2.y_ << "\" />" << std::endl;
+         << "\" x2=\"" << p2.x_ << "\" y2=\"" << p2.y_ << "\" />" << std::endl;
     }
   }
 
@@ -958,7 +944,7 @@ void Mesh2D::merge_parallel_edges()
         }
       }
 
-endpoint: 
+    endpoint: 
       ;
     }
 
@@ -1009,6 +995,26 @@ Mesh2DPoint Mesh2D::point(uint point_idx) const {
 
 Mesh2DEdge Mesh2D::edge(uint edge_idx) const {
   return edge_[edge_idx];
+}
+
+Mesh2DFace Mesh2D::face(uint face_idx) const {
+  return face_[face_idx];
+}
+
+double Mesh2D::min_x() const {
+  return min_x_;
+}
+
+double Mesh2D::min_y() const {
+  return min_y_;
+}
+
+double Mesh2D::max_x() const {
+  return max_x_;
+}
+
+double Mesh2D::max_y() const {
+  return max_y_;
 }
 
 
