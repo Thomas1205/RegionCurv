@@ -1374,8 +1374,8 @@ double LpSegmenter::segment(uint nIter) {
 
 		  nConstraintsAdded++;
 
-		  delete cols;
-		  delete coeffs;
+		  delete[] cols;
+		  delete[] coeffs;
 		}
 	      }
 	    }

@@ -1902,8 +1902,8 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 #endif    
               nConstraintsAdded++;
 
-              delete cols;
-              delete coeffs;
+              delete[] cols;
+              delete[] coeffs;
             }
           }
         }
@@ -2351,8 +2351,8 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 #endif    
                 nConstraintsAdded++;
 
-                delete cols;
-                delete coeffs;
+                delete[] cols;
+                delete[] coeffs;
               }
             }
           }
