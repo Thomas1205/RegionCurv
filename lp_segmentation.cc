@@ -259,7 +259,7 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
         const std::vector<Mesh2DEdgePair>& edge_pairs, 
         const NamedStorage1D<std::vector<uint> >& point_pair,
         const NamedStorage1D<std::vector<uint> >& point_edge, 
-        double lambda, double gamma, bool bruckstein, bool crossings_allowed = false) {
+        double lambda, double gamma, double curv_power, bool bruckstein, bool crossings_allowed = false) {
 
   //NOTE: if crossings are ALLOWED, this routine only APPROXIMATES the energy
 
@@ -323,7 +323,7 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
             weight += 0.5*lambda*mesh.edge_length(second);
           //do not penalize the image corners for their curvature
           if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
-            weight += gamma * curv_weight(mesh,cur_edge_pair,2.0,bruckstein);
+            weight += gamma * curv_weight(mesh,cur_edge_pair,curv_power,bruckstein);
 
           //since the cost are identical for both orientations, we don't care about orientation here
           energy += weight;
@@ -359,7 +359,7 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
           weight += 0.5*lambda*mesh.edge_length(second);
         //do not penalize the image corners for their curvature
         if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
-          weight += gamma * curv_weight(mesh,cur_edge_pair,2.0,bruckstein);
+          weight += gamma * curv_weight(mesh,cur_edge_pair,curv_power,bruckstein);
 
         lp_cost[2*j]   = weight;
         lp_cost[2*j+1] = weight;
@@ -494,7 +494,7 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
 
 //currently assuming that crossing prevention is active
 double curv_energy(const uint* solution, const double* region_cost, const Mesh2D& mesh,
-       double lambda, double gamma, bool bruckstein, bool crossings_allowed = false) { 
+       double lambda, double gamma, double curv_power, bool bruckstein, bool crossings_allowed = false) { 
 
   double energy = 0.0;
 
@@ -526,7 +526,7 @@ double curv_energy(const uint* solution, const double* region_cost, const Mesh2D
   for (uint p=0; p < mesh.nPoints(); p++) {
 
     energy += point_energy(p, solution, mesh, edge_pairs, point_pair, point_edge, 
-         lambda, gamma, bruckstein, crossings_allowed);
+         lambda, gamma, curv_power, bruckstein, crossings_allowed);
   }
 
   //std::cerr << "final energy: " << energy << std::endl;
@@ -535,7 +535,7 @@ double curv_energy(const uint* solution, const double* region_cost, const Mesh2D
 }
 
 double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
-    double lambda, double gamma, bool bruckstein, double energy_offset, bool crossings_allowed = false) { 
+    double lambda, double gamma, double curv_power, bool bruckstein, double energy_offset, bool crossings_allowed = false) { 
 
   double energy = 0.0;
 
@@ -569,7 +569,7 @@ double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
   for (uint p=0; p < mesh.nPoints(); p++) {
 
     cur_point_energy[p] = point_energy(p, solution, mesh, edge_pairs, point_pair, point_edge, 
-               lambda, gamma, bruckstein, crossings_allowed);
+               lambda, gamma, curv_power, bruckstein, crossings_allowed);
 
     energy += cur_point_energy[p];
   }
@@ -664,7 +664,7 @@ double curv_icm(const Math2D::Matrix<float>& data_term, const LPSegOptions& opti
   }
 
   double energy = curv_icm(face_label.direct_access(), region_cost.direct_access(), mesh,
-         options.lambda_, options.gamma_, options.bruckstein_, energy_offset,
+      options.lambda_, options.gamma_, options.curv_power_, options.bruckstein_, energy_offset,
          !options.prevent_crossings_);
 
   const uint out_factor = options.output_factor_;
@@ -695,6 +695,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   //Get the options
   double lambda = options.lambda_;
   double gamma = options.gamma_;
+  double curv_power = options.curv_power_;
   int neighborhood = options.neighborhood_;
   bool enforce_consistent_boundaries = options.enforce_consistent_boundaries_;
   bool enforce_consistent_points = options.enforce_consistent_points_;
@@ -708,6 +709,13 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   bool light_constraints = options.light_constraints_;
   bool bruckstein = options.bruckstein_;
   bool reduce_edge_pairs = options.reduce_edge_pairs_;
+
+  bool constrain_number_of_objects = false;
+  int min_objects = options.min_objects_;
+  int max_objects = options.max_objects_;
+  if (min_objects > 0 || max_objects < 1000000) {
+    constrain_number_of_objects = true;
+  }
 
   std::string solver = options.solver_;
 
@@ -756,7 +764,19 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   if (enforce_regionedge) {
     nConstraints += 2*light_factor*mesh.nEdges();
   }
+
   if (options.convex_prior_) {
+    // There can only be one object. It is essential to have 
+    // this constraints in order to get an integral solution
+    constrain_number_of_objects = true;
+    if (min_objects <= 0 || max_objects > 1000) {
+      min_objects = 1;  
+      max_objects = 1; 
+    }
+  }
+
+  // Need one extra constraint for the number of objects
+  if (constrain_number_of_objects) {
     nConstraints++;
   }
 
@@ -819,7 +839,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       weight += 0.5*lambda*mesh.edge_length(second);
     //do not penalize the image corners for their curvature
     if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
-      weight += gamma * curv_weight(mesh,edge_pairs[j],2.0,bruckstein);
+      weight += gamma * curv_weight(mesh,edge_pairs[j],curv_power,bruckstein);
 
     cost[edge_pair_var_offs+2*j] = weight;
     cost[edge_pair_var_offs+2*j+1] = weight;
@@ -1123,9 +1143,17 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   }
 
 
+  std::vector<signed char> edge_pair_sign;
+  if (options.convex_prior_ || constrain_number_of_objects) {
 
-  if (options.convex_prior_) {
-    Petter::statusTry("Adding convexity constraints...");
+    if (options.convex_prior_) {
+      Petter::statusTry("Adding convexity constraints...");
+    }
+    else {
+      Petter::statusTry("Processing line pair angle signs...");
+    }
+
+    edge_pair_sign.resize(edge_pairs.size(), 0);
 
     for (uint j=0; j < edge_pairs.size(); j++) {
       uint first = edge_pairs[j].first_edge_idx_;
@@ -1205,53 +1233,64 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       if (!bothok) {
         if (ok) {
           // The other pair is non-convex and not allowed
-          var_lb[edge_pair_var_offs+2*j+1] = 0;
-          var_ub[edge_pair_var_offs+2*j+1] = 0;
+          if (options.convex_prior_) {
+            var_lb[edge_pair_var_offs+2*j+1] = 0;
+            var_ub[edge_pair_var_offs+2*j+1] = 0;
+          }
+          edge_pair_sign[j] = 1;
         }
         else {
           // The first pair is non-convex and not allowed
-          var_lb[edge_pair_var_offs+2*j] = 0;
-          var_ub[edge_pair_var_offs+2*j] = 0;
+          if (options.convex_prior_) {
+            var_lb[edge_pair_var_offs+2*j] = 0;
+            var_ub[edge_pair_var_offs+2*j] = 0;
+          }
+          edge_pair_sign[j] = -1;
         }
       }
 
 
     }
-
-
-    /*for (int i=0; i<nVars; ++i) { 
-      if (cost[i] < 0) {
-        var_lb[i] = 1;
-        var_ub[i] = 1;
-      }
-      else {
-        var_lb[i] = 0;
-        var_ub[i] = 0;
-      }
-    }*/
-
-
-    //
-    // Final equality constraint
-    //
-    // This constrains the number of foreground regions to be 1.
-    //
-    for (uint j=0; j < edge_pairs.size(); j++) {
-      // Angle of pair
-      double diff_angle = pair_diff_angle(mesh, edge_pairs[j]);
-
-      lp_descr.add_entry(nConstraints-1, edge_pair_var_offs + 2*j, diff_angle);
-      lp_descr.add_entry(nConstraints-1, edge_pair_var_offs + 2*j+1, diff_angle);
-    }
-
-    rhs_lower[nConstraints-1] = 2*M_PI-0.0005;
-    rhs_upper[nConstraints-1] = 2*M_PI+0.0005;
-    
 
     Petter::statusOK();
   }
 
 
+  if (constrain_number_of_objects) {
+    //
+    // Final equality constraint
+    //
+    // This constrains the number of foreground regions to be 1.
+    //
+    Petter::statusTry("Adding constraint on num. of objects...");
+
+    for (uint j=0; j < edge_pairs.size(); j++) {
+      // Angle of pair
+      double diff_angle = pair_diff_angle(mesh, edge_pairs[j]);
+      
+      if (edge_pair_sign[j] == 1) {
+        lp_descr.add_entry(nConstraints-1, edge_pair_var_offs + 2*j,   diff_angle);
+        lp_descr.add_entry(nConstraints-1, edge_pair_var_offs + 2*j+1, -diff_angle);
+      }
+      else if (edge_pair_sign[j] == -1) {
+        lp_descr.add_entry(nConstraints-1, edge_pair_var_offs + 2*j,   -diff_angle);
+        lp_descr.add_entry(nConstraints-1, edge_pair_var_offs + 2*j+1, diff_angle);
+      }
+    }
+
+    
+    
+    rhs_lower[nConstraints-1] = 2*M_PI*min_objects - 0.0005;
+
+    if (max_objects < 1000000) {
+      rhs_upper[nConstraints-1] = 2*M_PI*max_objects + 0.0005;
+    }
+    else {
+      rhs_upper[nConstraints-1] = std::numeric_limits<double>::infinity();
+    }
+
+    Petter::statusOK();
+  }
 
 
   Math1D::Vector<uint> row_start(nConstraints+1);
@@ -1537,8 +1576,8 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     coinMatrix.cleanMatrix();
 #else
 
-    if (options.convex_prior_) {
-        INTERNAL_ERROR << "Cannot use a +1/-1 matrix with a convex prior. Undefine USE_PM_ONE_MATRIX. exiting..." << std::endl;
+    if (options.convex_prior_ || constrain_number_of_objects) {
+        INTERNAL_ERROR << "Cannot use a +1/-1 matrix. Undefine USE_PM_ONE_MATRIX. exiting..." << std::endl;
         exit(1);
     }
 
@@ -1609,11 +1648,12 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     tStartCLP = std::clock();
     
 
-    if (options.convex_prior_) {
+    if (options.convex_prior_ || constrain_number_of_objects) {
 
       ClpPresolve presolveInfo; 
       ClpSimplex * presolvedModel = presolveInfo.presolvedModel(lpSolver); 
       presolvedModel->dual();
+      //presolvedModel->barrier();
       lp_solution = lpSolver.primalColumnSolution();
       presolveInfo.postsolve(true);
       lpSolver.checkSolution(); 
@@ -1969,7 +2009,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   std::cerr << "integral energy according to independent routine: " << integral_energy << std::endl;
 
-  if (!options.convex_prior_) {
+  if (!options.convex_prior_ && !constrain_number_of_objects) {
     double icm_energy = curv_icm(labeling.direct_access(), cost.direct_access(), mesh,
                                  lambda, gamma, bruckstein, energy_offset, !prevent_crossings) 
                         + energy_offset;
@@ -2477,6 +2517,26 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 #endif
 
 
+  if (constrain_number_of_objects) {
+    double angle_sum = 0.0;
+    for (uint j=0; j < edge_pairs.size(); j++) {
+      // Angle of pair
+      double diff_angle = pair_diff_angle(mesh, edge_pairs[j]);
+      
+      if (edge_pair_sign[j] == 1) {
+        angle_sum += lp_solution[edge_pair_var_offs + 2*j]   * diff_angle;
+        angle_sum += lp_solution[edge_pair_var_offs + 2*j+1] * (-diff_angle);
+      }
+      else if (edge_pair_sign[j] == -1) {
+        angle_sum += lp_solution[edge_pair_var_offs + 2*j]   * -(diff_angle);
+        angle_sum += lp_solution[edge_pair_var_offs + 2*j+1] *   diff_angle;
+      }
+    }
+
+    std::cerr << "Number of objects : " << angle_sum / (2*M_PI) << " (min,max) = (" << min_objects << ',' << max_objects << ")" << std::endl;
+  }
+
+
 
   //
   // Open the log file (append mode)
@@ -2625,6 +2685,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
         // Did we fail to continue along the curve?
         if (next == edge_pairs.size()) {
+          Petter::statusFailed();
           succeeded = false;
           break;
         }
@@ -2637,7 +2698,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       if (succeeded) {
         // Add these points as a new curve
-        curves.push_back(SegmentationCurve(coord,integrator,curve_sign,lambda,gamma,2.0,bruckstein));
+        curves.push_back(SegmentationCurve(coord,integrator,curve_sign,lambda,gamma,curv_power,bruckstein));
         curve_signs.push_back(curve_sign);
       }
 
@@ -2663,9 +2724,14 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     //
     // Refine the curve solutions
     //
-    for (int i=0;i<curves.size();++i) {
-      //std::cerr << "Curve #" << i+1 << '\n';
-      curves[i].refine(false);
+    if (!options.convex_prior_) {
+        for (int i=0;i<curves.size();++i) {
+          std::cerr << "Curve #" << i+1 << '\n';
+          curves[i].refine(true);
+        }
+    }
+    else {
+        std::cerr << "Skipping refinement due to convex prior." << std::endl;
     }
 
     curve_energy = 0;
@@ -2674,8 +2740,6 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     }
     std::cerr << "Curve energy (after)  : " << curve_energy << '\n';
 
-
-    if (mesh.nFaces() <= 20000) {
       Petter::statusTry("Saving SVG...");
       
       std::stringstream sout;
@@ -2689,12 +2753,12 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       SegmentationCurve::end_svg(of);
 
       Petter::statusOK();
-    }
+
 
 
     // Generate segmentation
     // (really inefficient code)
-    Petter::statusTry("Building segmentation...");
+    /*Petter::statusTry("Building segmentation...");
     for (uint y=0; y < yDim*out_factor; y++) {
       for (uint x=0; x < xDim*out_factor; x++) {
         int inside_sum = 0;
@@ -2712,6 +2776,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       }
     }
     Petter::statusOK();
+    */
 
   }
 
