@@ -585,23 +585,12 @@ void Mesh2D::draw_labels_with_pairs(std::string filename, const double* labels, 
 
     std::vector<std::pair<double, double> > points;
 
-    //Should we draw this face?
-    bool should_draw = false;
-
     for (uint j=0; j < nEdges; j++) {
 
       std::map<uint,uint> point_count;
 
       uint edge_idx = face_[i].edge_idx_[j];
       uint next_edge_idx = face_[i].edge_idx_[(j+1) % nEdges];
-
-      std::vector<uint> adj_faces = adjacent_faces(edge_idx);
-      for (uint k=0; k<adj_faces.size(); ++k) {
-        if (labels[adj_faces[k]] != labels[i]) {
-          should_draw = true;
-        }
-      }
-
 
       point_count[edge_[edge_idx].to_idx_]++;
       point_count[edge_[edge_idx].from_idx_]++;
