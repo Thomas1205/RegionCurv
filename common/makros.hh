@@ -10,9 +10,10 @@
 #include <string>
 #include <iomanip>
 #include <cstdlib> //includes the exit-function
+#include <typeinfo>
 
 #ifdef WIN32
-namespace{
+namespace {
 bool isnan(double x) {
   return (x != x);
 }
@@ -79,6 +80,12 @@ T convert(const std::string s) {
 
 template<>
 uint convert<uint>(const std::string s); 
+
+template<typename T1, typename T2>
+void operator+=(std::pair<T1,T2>& x, const std::pair<T1,T2>& y) {
+  x.first += y.first;
+  x.second += y.second;
+}
 
 
 /********************* Code Macros ****************************/
