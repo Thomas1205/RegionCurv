@@ -33,7 +33,7 @@ std::string Application::getParam(std::string name) {
   }
 
   if (param_value_.find(name) == param_value_.end()) {
-    INTERNAL_ERROR << "    no value for the parameter\"" << name 
+    INTERNAL_ERROR << "    no value for the parameter \"" << name 
 		   << "\" specified on command line. Exiting..." << std::endl;
     exit(1); 
   }
@@ -92,30 +92,44 @@ Application::Application(uint argc, char** argv, ParamDescr* param_list, uint nP
 
 	switch (param_list[p].type_) {
 	case flag : {
+          if (flags_.find(cur_arg) != flags_.end())
+            std::cerr << "WARNING: flag \"" << cur_arg << "\" was specified twice" << std::endl;
 	  flags_.insert(cur_arg);
 	  break;
 	};
 	case mandWithValue: {
+          if (param_value_.find(cur_arg) != param_value_.end())
+            std::cerr << "WARNING: parameter \"" << cur_arg << "\" was specified twice" << std::endl;
 	  param_value_[cur_arg] = argv[i+1];
 	  break;
 	}
 	case optWithValue: {
+          if (param_value_.find(cur_arg) != param_value_.end())
+            std::cerr << "WARNING: parameter \"" << cur_arg << "\" was specified twice" << std::endl;
 	  param_value_[cur_arg] = argv[i+1];
 	  break;
 	}
 	case mandInFilename: {
+          if (param_value_.find(cur_arg) != param_value_.end())
+            std::cerr << "WARNING: parameter \"" << cur_arg << "\" was specified twice" << std::endl;
 	  param_value_[cur_arg] = argv[i+1];
 	  break;
 	}
 	case optInFilename: {
+          if (param_value_.find(cur_arg) != param_value_.end())
+            std::cerr << "WARNING: parameter \"" << cur_arg << "\" was specified twice" << std::endl;
 	  param_value_[cur_arg] = argv[i+1];
 	  break;
 	}
 	case mandOutFilename: {
+          if (param_value_.find(cur_arg) != param_value_.end())
+            std::cerr << "WARNING: parameter \"" << cur_arg << "\" was specified twice" << std::endl;
 	  param_value_[cur_arg] = argv[i+1];
 	  break;
 	}
 	case optOutFilename: {
+          if (param_value_.find(cur_arg) != param_value_.end())
+            std::cerr << "WARNING: parameter \"" << cur_arg << "\" was specified twice" << std::endl;
 	  param_value_[cur_arg] = argv[i+1];
 	  break;
 	}
@@ -196,6 +210,17 @@ Application::Application(uint argc, char** argv, ParamDescr* param_list, uint nP
       }
     }
   }
+
+  /*** 4. "last_started_call" ***/
+
+  std::string filename = "last_started_call";
+
+  std::ofstream of(filename.c_str());
+  
+  for (size_t j=0; j < argv_.size(); j++)
+    of << argv_[j] << " ";
+  of << std::endl;
+  of.close();
 }
 
 
