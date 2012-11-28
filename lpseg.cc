@@ -58,17 +58,17 @@ int main(int argc, char** argv) {
   }
 
   ParamDescr  params[] = {{"-i",mandInFilename,0,""},{"-lambda",optWithValue,1,"1.0"},
-  {"-gamma",optWithValue,1,"1.0"},{"-o",mandOutFilename,0,""},{"-n",optWithValue,1,"8"},
-  {"-boundary-constraints",optWithValue,1,"tight"},
-  {"-method",optWithValue,1,"lp"},{"-bruckstein",flag,0,""},
-  {"-adaptive",optWithValue,0,""},{"-hex-mesh",flag,0,""},{"-regions",optWithValue,1,"2"},
-  {"-light-constraints",flag,0,""},{"-debug-svg",flag,0,""},{"-mu0",optWithValue,1,"-1"},
-  {"-mu1",optWithValue,1,"-1"},{"-griddim",optWithValue,1,"-1"},{"-griddimx",optWithValue,1,"-1"},
-  {"-griddimy",optWithValue,1,"-1"},{"-solver",optWithValue,1,"clp"},
-  {"-ignore-crossings",flag,0,""},{"-no-touching-regions",flag,0,""},{"-convex",flag,0,""},
-  {"-reduce-pairs",flag,0,""},{"-mode",optWithValue,1,"standard"},
-  {"-refine",flag,0,""},{"-min-objects",optWithValue,1,"0"}, {"-max-objects",optWithValue,1,"1000000"}, 
-  {"-curv-power",optWithValue,1,"2.0"}};
+			  {"-gamma",optWithValue,1,"1.0"},{"-o",mandOutFilename,0,""},{"-n",optWithValue,1,"8"},
+			  {"-boundary-constraints",optWithValue,1,"tight"},
+			  {"-method",optWithValue,1,"lp"},{"-bruckstein",flag,0,""},
+			  {"-adaptive",optWithValue,0,""},{"-hex-mesh",flag,0,""},{"-regions",optWithValue,1,"2"},
+			  {"-light-constraints",flag,0,""},{"-debug-svg",flag,0,""},{"-mu0",optWithValue,1,"-1"},
+			  {"-mu1",optWithValue,1,"-1"},{"-griddim",optWithValue,1,"-1"},{"-griddimx",optWithValue,1,"-1"},
+			  {"-griddimy",optWithValue,1,"-1"},{"-solver",optWithValue,1,"clp"},
+			  {"-ignore-crossings",flag,0,""},{"-no-touching-regions",flag,0,""},{"-convex",flag,0,""},
+			  {"-reduce-pairs",flag,0,""},{"-mode",optWithValue,1,"standard"},
+			  {"-refine",flag,0,""},{"-min-objects",optWithValue,1,"0"}, {"-max-objects",optWithValue,1,"1000000"}, 
+			  {"-curv-power",optWithValue,1,"2.0"},{"-factorize-frequency",optWithValue,0,""}};
 
   const int nParams = sizeof(params)/sizeof(ParamDescr);
 
@@ -271,6 +271,8 @@ int main(int argc, char** argv) {
     seg_opts.gridtype_ = LPSegOptions::Hex;
   if (app.is_set("-adaptive"))
     seg_opts.adaptive_mesh_n_ = convert<int>(app.getParam("-adaptive"));
+  if (app.is_set("-factorize-frequency"))
+    seg_opts.factorization_frequency_ = convert<uint>(app.getParam("-factorize-frequency"));
 
   std::string constraint_string = app.getParam("-boundary-constraints");
   if (constraint_string == "tight") {

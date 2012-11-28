@@ -53,6 +53,8 @@ struct LPSegOptions
   int max_objects_;
 
   double curv_power_;
+
+  uint factorization_frequency_;
 };
 
 //Generates a mesh with a given neighborhood structure

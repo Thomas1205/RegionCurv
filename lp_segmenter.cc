@@ -569,6 +569,9 @@ LpSegmenter::LpSegmenter(const Math2D::Matrix<float>& image, const  LPSegOptions
 
     lpSolver_.loadProblem (coinMatrix_, var_lb_.direct_access(), var_ub_.direct_access(),   
 			   cost_.direct_access(), rhs_lower_.direct_access(), rhs_upper_.direct_access());
+
+    lpSolver_.getModelPtr()->setFactorizationFrequency(options_.factorization_frequency_);
+
     //std::cerr << "setting precision" << std::endl;
     //lpSolver_.messageHandler()->setPrecision(12);
     //std::cerr << "precision set" << std::endl;
@@ -1001,6 +1004,8 @@ double LpSegmenter::point_energy(uint point, const std::vector<Mesh2DEdgePair>& 
 	OsiClpSolverInterface lpSolver;
 	lpSolver.messageHandler()->setLogLevel(5);
 	
+	
+
 	CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
 				    lp_descr.value(),lp_descr.nEntries());
 	

@@ -22,7 +22,10 @@ QPBO = QPBO-v1.3.src/QPBO.o QPBO-v1.3.src/QPBO_extra.o QPBO-v1.3.src/QPBO_maxflo
 GPC = thirdparty/gpc.o
 EXTERNALS = -lClp -lCoinUtils -lOsiClp -lOsi -lCbc -lCgl -lz -lbz2
 
-all:  bin $(DEBUGDIR) $(OPTDIR) bin/lpseg.debug.L64 bin/lpinpaint.debug.L64 bin/interactiveseg.debug.L64 bin/curvdenoise.debug.L64 common/lib/commonlib.debug common/lib/commonlib.opt
+all: .common bin $(DEBUGDIR) $(OPTDIR) bin/lpseg.debug.L64 bin/lpinpaint.debug.L64 bin/interactiveseg.debug.L64 bin/curvdenoise.debug.L64 common/lib/commonlib.debug common/lib/commonlib.opt
+
+.common: 
+	cd common; make; cd -
 
 common/lib/commonlib.opt : 
 	cd common; make; cd -

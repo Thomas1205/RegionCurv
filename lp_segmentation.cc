@@ -162,6 +162,8 @@ double lp_segment_lenreg(const Math2D::Matrix<float>& data_term, const LPSegOpti
     lpSolver.loadProblem (coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
       cost.direct_access(), rhs.direct_access(), rhs.direct_access());
 
+    lpSolver.setFactorizationFrequency(options.factorization_frequency_);
+
     coinMatrix.cleanMatrix();
 
     tStartCLP = std::clock();
@@ -1642,6 +1644,8 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     lpSolver.loadProblem (pmone_matrix, var_lb.direct_access(), var_ub.direct_access(),   
         cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
 #endif
+
+    lpSolver.setFactorizationFrequency(options.factorization_frequency_);
 
     //lpSolver.writeMps("curv.mps");
 

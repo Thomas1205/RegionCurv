@@ -40,6 +40,7 @@ LPSegOptions::LPSegOptions() {
   min_objects_ = 0;
   max_objects_ = 1000000;
   curv_power_ = 2.0;
+  factorization_frequency_ = 200;
 }
 
 void add_grid_output(uint region_index, double label, const Mesh2D& mesh, const Math2D::Matrix<double>& output)
@@ -296,15 +297,15 @@ void generate_mesh(uint xDim, uint yDim, uint neighborhood, Mesh2D& mesh, bool s
     Petter::statusTry("Generating mesh...");
   }
 
-  uint nAreasPerPixel = 1;
+  //uint nAreasPerPixel = 1;
   if (neighborhood == 4) {
-    nAreasPerPixel = 1;
+    //nAreasPerPixel = 1;
   }
   else if (neighborhood == 8) {
-    nAreasPerPixel = 4;
+    //nAreasPerPixel = 4;
   }
   else if (neighborhood == 16) {
-    nAreasPerPixel = 32;
+    //nAreasPerPixel = 32;
   }
   else {
     INTERNAL_ERROR << "invalid neighborhood \"" << neighborhood << "\". Exiting." << std::endl;
