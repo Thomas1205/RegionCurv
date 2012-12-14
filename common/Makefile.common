@@ -1,9 +1,9 @@
 LIB = lib/
 COMPILER = g++ -c
 LINKER = g++ 
-DEBUGFLAGS =  -ansi -Wall -Wextra -pedantic -malign-double -g -DSAFE_MODE -msse4 -DUSE_SSE=4 -fPIC
-DEVELFLAGS =  -ansi -Wall -Wextra -pedantic -malign-double -msse4 -DUSE_SSE=4 -fPIC
-OPTFLAGS =  -ansi -Wall -Wextra -pedantic -malign-double -O5 -DNDEBUG -msse4 -DUSE_SSE=4 -fPIC
+DEBUGFLAGS =  -ansi -Wall -Wextra -pedantic -malign-double -g -DSAFE_MODE -fPIC
+DEVELFLAGS =  -ansi -Wall -Wextra -pedantic -malign-double -fPIC
+OPTFLAGS =  -ansi -Wall -Wextra -pedantic -malign-double -O5 -DNDEBUG -fPIC
 LINKSFLAGS = -lpthread
 DEBUGDIR = debug/
 OPTDIR = opt/
