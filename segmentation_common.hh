@@ -69,15 +69,15 @@ void add_hex_to_mesh(double x, double y, double w, Mesh2D& mesh);
 //
 // Adds the contribution from a region to an output image
 //
-void add_grid_output(uint region_index, double label, const Mesh2D& mesh, const Math2D::Matrix<double>& output);
+void add_grid_output(uint region_index, double label, const Mesh2D& mesh, Math2D::Matrix<double>& output);
 
-void add_grid_output_mreg(uint face_index, const double* label, uint nRegions, const Mesh2D& mesh, const Math3D::Tensor<double>& output);
+void add_grid_output_mreg(uint face_index, const double* label, uint nRegions, const Mesh2D& mesh, Math3D::Tensor<double>& output);
 
 //
 // Calculates the data term for a region given the data term in pixels
 //
-double calculate_data_term(uint region_index, Mesh2D& mesh, const Math2D::Matrix<float>& data_term);
-double calculate_data_term(uint region_index, uint r, Mesh2D& mesh, const Math3D::Tensor<float>& data_term);
+double calculate_data_term(uint region_index, const Mesh2D& mesh, const Math2D::Matrix<float>& data_term);
+double calculate_data_term(uint region_index, uint r, const Mesh2D& mesh, const Math3D::Tensor<float>& data_term);
 
 //
 // Generates an adaptive square grid

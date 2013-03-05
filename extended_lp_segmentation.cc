@@ -348,7 +348,7 @@ double multi_curv_energy(const Mesh2D& mesh, const Storage1D<uint>& integral_sol
   return energy;
 }
 
-double multi_curv_icm(const Mesh2D& mesh, const Storage1D<uint>& integral_solution, 
+double multi_curv_icm(const Mesh2D& mesh, Storage1D<uint>& integral_solution, 
 		      const Math1D::Vector<double>& cost, const LPSegOptions& options, uint nRegions) {
 
   double energy = 0.0;

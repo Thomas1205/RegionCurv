@@ -43,7 +43,7 @@ LPSegOptions::LPSegOptions() {
   factorization_frequency_ = 200;
 }
 
-void add_grid_output(uint region_index, double label, const Mesh2D& mesh, const Math2D::Matrix<double>& output)
+void add_grid_output(uint region_index, double label, const Mesh2D& mesh, Math2D::Matrix<double>& output)
 {
 
   std::vector<Mesh2DPoint> points;
@@ -103,7 +103,7 @@ void add_grid_output(uint region_index, double label, const Mesh2D& mesh, const 
   }
 }
 
-void add_grid_output_mreg(uint face_index, const double* label, uint nRegions, const Mesh2D& mesh, const Math3D::Tensor<double>& output) {
+void add_grid_output_mreg(uint face_index, const double* label, uint nRegions, const Mesh2D& mesh, Math3D::Tensor<double>& output) {
 
   std::vector<Mesh2DPoint> points;
   mesh.get_polygon_points(face_index, points);
@@ -166,7 +166,7 @@ void add_grid_output_mreg(uint face_index, const double* label, uint nRegions, c
 }
 
 
-double calculate_data_term(uint region_index, Mesh2D& mesh, const Math2D::Matrix<float>& data_term)
+double calculate_data_term(uint region_index, const Mesh2D& mesh, const Math2D::Matrix<float>& data_term)
 {
   using namespace std;
 
@@ -229,7 +229,7 @@ double calculate_data_term(uint region_index, Mesh2D& mesh, const Math2D::Matrix
   return total;
 }
 
-double calculate_data_term(uint region_index, uint r, Mesh2D& mesh, const Math3D::Tensor<float>& data_term) {
+double calculate_data_term(uint region_index, uint r, const Mesh2D& mesh, const Math3D::Tensor<float>& data_term) {
 
   std::vector<Mesh2DPoint> points;
   mesh.get_polygon_points(region_index, points);
