@@ -8,6 +8,7 @@
 #include <set>
 #include <fstream>
 #include "makros.hh"
+#include "stl_util.hh"
 
 enum ParamType {
   flag,

@@ -43,6 +43,19 @@ std::string Application::getParam(std::string name) {
 
 Application::Application(uint argc, char** argv, ParamDescr* param_list, uint nParams) {
 
+  Makros::register_typename(typeid(float).name(),"float");
+  Makros::register_typename(typeid(double).name(),"double");
+  Makros::register_typename(typeid(long double).name(),"long double");
+  Makros::register_typename(typeid(int).name(),"int");
+  Makros::register_typename(typeid(uint).name(),"uint");
+  Makros::register_typename(typeid(short).name(),"short");
+  Makros::register_typename(typeid(ushort).name(),"ushort");
+  Makros::register_typename(typeid(char).name(),"char");
+  Makros::register_typename(typeid(uchar).name(),"uchar");
+  Makros::register_typename(typeid(bool).name(),"bool");
+  Makros::register_typename(typeid(std::string).name(),"std::string");
+
+
   app_name_ = argv[0];
   nParams_ = nParams;
   param_list_ = new ParamDescr[nParams];

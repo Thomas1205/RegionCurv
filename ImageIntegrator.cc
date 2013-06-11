@@ -63,7 +63,7 @@ double ImageIntegrator::M(double px, int y) const
   if (y < 0) {
     y = 0;
   }
-  if (y >= data_term_integrated_x.yDim()) {
+  if (y >= int(data_term_integrated_x.yDim())) {
     y = data_term_integrated_x.yDim()-1;
   }
   
@@ -161,20 +161,17 @@ double ImageIntegrator::integral(const std::vector<Mesh2DPoint>& coord) const
 
 
 
-
-
-
-
 SegmentationCurve::SegmentationCurve(const std::vector<Mesh2DPoint>& newcoord, 
-                                     const ImageIntegrator& integrator_in, 
+                                     ImageIntegrator& integrator_in, 
                                      double sign,
                                      double lambda, 
                                      double gamma, 
                                      double curv_power, 
                                      bool bruckstein) :
+  integrator(&integrator_in),
   coord(newcoord),
-  original_coord(newcoord),
-  integrator(&integrator_in)
+  original_coord(newcoord)
+
 {
   this->lambda = lambda;
   this->gamma = gamma;
@@ -195,7 +192,7 @@ bool SegmentationCurve::step_cd()
 {
   bool any_changed = false;
 
-  for (int i=0; i < coord.size(); i++) {
+  for (int i=0; i < int(coord.size()); i++) {
 
     double x = coord.at(i).x_;
     double y = coord.at(i).y_;
@@ -263,10 +260,10 @@ bool SegmentationCurve::step_cd()
 bool SegmentationCurve::step_grad()
 {
   // Compute gradient
-  vector<double> dx(coord.size(), 0);
-  vector<double> dy(coord.size(), 0);
+  std::vector<double> dx(coord.size(), 0);
+  std::vector<double> dy(coord.size(), 0);
   double max_nrm = -1;
-  for (int i=0; i < coord.size(); i++) {
+  for (int i=0; i < int(coord.size()); i++) {
     dx[i] = dEdx(i);
     dy[i] = dEdy(i);
     double nrm = sqrt(dx[i]*dx[i] + dy[i]*dy[i]);
@@ -275,7 +272,7 @@ bool SegmentationCurve::step_grad()
     }
   }
 
-  for (int i=0; i < coord.size(); i++) {
+  for (int i=0; i < int(coord.size()); i++) {
     dx[i] /= max_nrm;
     dy[i] /= max_nrm;
   }
@@ -291,7 +288,7 @@ bool SegmentationCurve::step_grad()
   vector<Mesh2DPoint> coordgood(coord);
 
   while (true) {
-    for (int i=0; i < coord.size(); i++) {
+    for (int i=0; i < int(coord.size()); i++) {
       coord[i].x_ = coordold[i].x_ - alpha*tau*dx[i];
       coord[i].y_ = coordold[i].y_ - alpha*tau*dy[i];
     }
@@ -317,7 +314,7 @@ bool SegmentationCurve::self_intersect() const
 {
   using namespace std;
   map<pair<double, double>, bool > point_used;
-  for (int i=0; i<coord.size(); ++i) {
+  for (int i=0; i < int(coord.size()); ++i) {
     pair<double, double> p(coord[i].x_, coord[i].y_);
     if (point_used[p]) {
       return true;
@@ -332,7 +329,7 @@ void SegmentationCurve::fix_self_intersect()
   using namespace std;
   map<pair<double, double>, bool > point_used;
   map<pair<double, double>, int > point_ind;
-  for (int i=0; i<coord.size(); ++i) {
+  for (int i=0; i < int(coord.size()); ++i) {
     pair<double, double> p(coord[i].x_, coord[i].y_);
     if (point_used[p]) {
         int j = point_ind[p];
@@ -401,7 +398,7 @@ void SegmentationCurve::refine(bool verbose)
 
     // Sanity check, no pixel can move too much
     bool stop = false;
-    for (int i=0; i<coord.size(); ++i) {
+    for (int i=0; i < int(coord.size()); ++i) {
       double dx = coord[i].x_ - original_coord.at(i).x_;
       double dy = coord[i].y_ - original_coord.at(i).y_;
       if (dx*dx + dy*dy >= 5*5) {
@@ -432,7 +429,7 @@ double SegmentationCurve::fg_energy()
 double SegmentationCurve::smooth_energy() 
 {
   double en = 0;
-  for (int i=0; i < coord.size(); i++) {
+  for (int i=0; i < int(coord.size()); i++) {
     int iprev = i-1;
     if (iprev<0) iprev = coord.size()-1;
     Mesh2DPoint& p0 = coord[ iprev ];
@@ -461,7 +458,7 @@ double SegmentationCurve::energy()
 double SegmentationCurve::energy2() 
 {
   double en = 0;
-  for (int i=0; i < coord.size(); i++) {
+  for (int i=0; i < int(coord.size()); i++) {
     en += energy_single(i, coord[i].x_, coord[i].y_);
   }
   return en;
@@ -492,7 +489,7 @@ bool SegmentationCurve::inside(size_t x, size_t y)
 
   double before = energy();
 
-  for (size_t xx=x;xx<xDim;++xx) {
+  for (size_t xx=x; xx < size_t(xDim); ++xx) {
     integrator->data_term_integrated_x(xx,y) += 1;
   }
 

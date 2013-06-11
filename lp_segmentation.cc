@@ -1,6 +1,7 @@
 /*** First version written by Thomas Schoenemann as a private person without employment, October 2009 ***/
 /*** continued by Thomas Schoenemann as an employee of Lund University, Sweden, January 2010 ***/
 /*** extended by Thomas Schoenemann and Petter Strandmark as employees of Lund University, Sweden, September 2010-2011 ***/
+/**** refined by Thomas Schoenemann at the University of Pisa, Italy, 2011 ****/
 
 #include "lp_segmentation.hh"
 #include "mesh2D.hh"
@@ -17,6 +18,13 @@
 #include <coin/ClpPlusMinusOneMatrix.hpp>
 #include <coin/CbcModel.hpp>
 #include <coin/OsiClpSolverInterface.hpp>
+
+#include "conv_lp_solving.hh"
+#include "factorMPBP.hh"
+#include "factorDualOpt.hh"
+#include "factorTRWS.hh"
+#include "factorChainDualDecomp.hh"
+
 
 #define USE_PM_ONE_MATRIX
 
@@ -40,239 +48,240 @@
 #undef USE_PM_ONE_MATRIX
 #endif
 
+
 //solves a segmentation problem with length regularity via an LP
 //@param lambda: the weight for the length term
 double lp_segment_lenreg(const Math2D::Matrix<float>& data_term, const LPSegOptions& options,
-  double energy_offset, Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels) {
+                         double energy_offset, Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels) {
 
-    double lambda = options.lambda_;
-    int neighborhood = options.neighborhood_;
+  double lambda = options.lambda_;
+  int neighborhood = options.neighborhood_;
+  
+  uint xDim = uint( data_term.xDim() );
+  uint yDim = uint( data_term.yDim() );
+  
+  Mesh2D mesh;
+  
+  uint nAreasPerPixel = 1;
+  if (neighborhood == 8)
+    nAreasPerPixel = 4;
+  if (neighborhood == 16)
+    nAreasPerPixel = 32;
+    
+  generate_mesh(xDim,yDim,neighborhood,mesh);
 
-    uint xDim = uint( data_term.xDim() );
-    uint yDim = uint( data_term.yDim() );
+  Storage1D<PixelFaceRelation> shares;
+  Math1D::Vector<uint> share_start;
+  compute_pixel_shares(mesh, xDim, yDim, shares, share_start);
 
-    Mesh2D mesh;
+  uint nVars = mesh.nFaces() + 2*mesh.nEdges();
+  uint nConstraints = mesh.nEdges();
 
-    uint nAreasPerPixel = 1;
-    if (neighborhood == 8)
-      nAreasPerPixel = 4;
-    if (neighborhood == 16)
-      nAreasPerPixel = 32;
+  Math1D::NamedVector<double> cost(nVars,0.0,MAKENAME(cost));
+  for (uint y=0; y < yDim; y++) {
+    for (uint x=0; x < xDim; x++) {
 
-    generate_mesh(xDim,yDim,neighborhood,mesh);
+      uint base = (y*xDim+x)*nAreasPerPixel;
+      double cur_data = data_term(x,y); 
 
-    Storage1D<PixelFaceRelation> shares;
-    Math1D::Vector<uint> share_start;
-    compute_pixel_shares(mesh, xDim, yDim, shares, share_start);
+      for (uint i=0; i < nAreasPerPixel; i++) {
+        double area = mesh.convex_area(base+i);
+        cost[base+i] = area * cur_data;
+      }
+    }
+  }
 
-    uint nVars = mesh.nFaces() + 2*mesh.nEdges();
-    uint nConstraints = mesh.nEdges();
+  uint edge_offset = mesh.nFaces();
+  for (uint i=0; i < mesh.nEdges(); i++) {
+    double length_weight = lambda * mesh.edge_length(i);
 
-    Math1D::NamedVector<double> cost(nVars,0.0,MAKENAME(cost));
+    if (mesh.adjacent_faces(i).size() >= 2) {
+      cost[edge_offset + 2*i]   = length_weight;
+      cost[edge_offset + 2*i+1] = length_weight;
+    }
+  }
+
+  Math1D::NamedVector<double> rhs(nConstraints,0.0,MAKENAME(rhs));
+
+  Math1D::NamedVector<double> var_lb(nVars,0.0,MAKENAME(var_lb));
+  Math1D::NamedVector<double> var_ub(nVars,1.0,MAKENAME(var_ub));
+
+  if (fixed_labels != 0) {
+
+    bool has_warned = false;
+
     for (uint y=0; y < yDim; y++) {
       for (uint x=0; x < xDim; x++) {
 
-        uint base = (y*xDim+x)*nAreasPerPixel;
-        double cur_data = data_term(x,y); 
-
-        for (uint i=0; i < nAreasPerPixel; i++) {
-          double area = mesh.convex_area(base+i);
-          cost[base+i] = area * cur_data;
-        }
-      }
-    }
-
-    uint edge_offset = mesh.nFaces();
-    for (uint i=0; i < mesh.nEdges(); i++) {
-      double length_weight = lambda * mesh.edge_length(i);
-
-      if (mesh.adjacent_faces(i).size() >= 2) {
-        cost[edge_offset + 2*i]   = length_weight;
-        cost[edge_offset + 2*i+1] = length_weight;
-      }
-    }
-
-    Math1D::NamedVector<double> rhs(nConstraints,0.0,MAKENAME(rhs));
-
-    Math1D::NamedVector<double> var_lb(nVars,0.0,MAKENAME(var_lb));
-    Math1D::NamedVector<double> var_ub(nVars,1.0,MAKENAME(var_ub));
-
-    if (fixed_labels != 0) {
-
-      bool has_warned = false;
-
-      for (uint y=0; y < yDim; y++) {
-        for (uint x=0; x < xDim; x++) {
-
-          int fixed = (*fixed_labels)(x,y);
-          if (fixed == 0) {
-            for (uint v=share_start[y*xDim+x]; v < share_start[y*xDim+x+1]; v++) {
-              uint f = shares[v].face_idx_;
-              float area_share = std::min(1.0f, shares[v].share_);
-              if (area_share >= 0.95)
-                var_ub[f] = 0.0;
-              else if (!has_warned) {
-                std::cerr << Petter::RED << "WARNING: ignored a partial seed region" << Petter::NORMAL << std::endl;
-                has_warned = true;
-              }
+        int fixed = (*fixed_labels)(x,y);
+        if (fixed == 0) {
+          for (uint v=share_start[y*xDim+x]; v < share_start[y*xDim+x+1]; v++) {
+            uint f = shares[v].face_idx_;
+            float area_share = std::min(1.0f, shares[v].share_);
+            if (area_share >= 0.95)
+              var_ub[f] = 0.0;
+            else if (!has_warned) {
+              std::cerr << Petter::RED << "WARNING: ignored a partial seed region" << Petter::NORMAL << std::endl;
+              has_warned = true;
             }
           }
-          else if (fixed == 1) {
-            for (uint v=share_start[y*xDim+x]; v < share_start[y*xDim+x+1]; v++) {
-              uint f = shares[v].face_idx_;
-              float area_share = std::min(1.0f, shares[v].share_);
-              if (area_share >= 0.95)
-                var_lb[f] = 1.0;
-              else if (!has_warned) {
-                std::cerr << Petter::RED << "WARNING: ignored a partial seed region" << Petter::NORMAL << std::endl;
-                has_warned = true;
-              }
+        }
+        else if (fixed == 1) {
+          for (uint v=share_start[y*xDim+x]; v < share_start[y*xDim+x+1]; v++) {
+            uint f = shares[v].face_idx_;
+            float area_share = std::min(1.0f, shares[v].share_);
+            if (area_share >= 0.95)
+              var_lb[f] = 1.0;
+            else if (!has_warned) {
+              std::cerr << Petter::RED << "WARNING: ignored a partial seed region" << Petter::NORMAL << std::endl;
+              has_warned = true;
             }
           }
         }
       }
     }
+  }
 
-    std::cerr << "coding matrix" << std::endl;
+  std::cerr << "coding matrix" << std::endl;
 
-    uint nEntries = 4*mesh.nEdges(); 
-    SparseMatrixDescription<double> lp_descr(nEntries, nConstraints, nVars);
+  uint nEntries = 4*mesh.nEdges(); 
+  SparseMatrixDescription<double> lp_descr(nEntries, nConstraints, nVars);
 
-    for (uint j=0; j < mesh.nEdges(); j++) {
-      lp_descr.add_entry(j,edge_offset+2*j,1);
-      lp_descr.add_entry(j,edge_offset+2*j+1,-1);
+  for (uint j=0; j < mesh.nEdges(); j++) {
+    lp_descr.add_entry(j,edge_offset+2*j,1);
+    lp_descr.add_entry(j,edge_offset+2*j+1,-1);
 
-      for (std::vector<uint>::const_iterator it = mesh.adjacent_faces(j).begin();
-        it != mesh.adjacent_faces(j).end(); it++) {
+    for (std::vector<uint>::const_iterator it = mesh.adjacent_faces(j).begin();
+         it != mesh.adjacent_faces(j).end(); it++) {
 
-          lp_descr.add_entry(j,*it,mesh.match(*it,j));
-      }
+      lp_descr.add_entry(j,*it,mesh.match(*it,j));
     }
+  }
 
-    std::cerr << nVars << " variables, " << nConstraints << " constraints" << std::endl;
+  std::cerr << nVars << " variables, " << nConstraints << " constraints" << std::endl;
 
-    std::cerr << "converting matrix" << std::endl;
+  std::cerr << "converting matrix" << std::endl;
 
-    std::clock_t tStartCLP, tEndCLP;  
+  std::clock_t tStartCLP, tEndCLP;  
 
-    CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
-      lp_descr.value(),lp_descr.nEntries());
+  CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
+                              lp_descr.value(),lp_descr.nEntries());
 
-    ClpSimplex lpSolver;
-    lpSolver.loadProblem (coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
-      cost.direct_access(), rhs.direct_access(), rhs.direct_access());
+  ClpSimplex lpSolver;
+  lpSolver.loadProblem (coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
+                        cost.direct_access(), rhs.direct_access(), rhs.direct_access());
 
-    lpSolver.setFactorizationFrequency(options.factorization_frequency_);
+  lpSolver.setFactorizationFrequency(options.factorization_frequency_);
 
-    coinMatrix.cleanMatrix();
+  coinMatrix.cleanMatrix();
 
-    tStartCLP = std::clock();
+  tStartCLP = std::clock();
 
-    int error = lpSolver.dual();
-    //lpSolver.initialSolve();
-    //int error = 1 - lpSolver.isProvenOptimal();
+  int error = lpSolver.dual();
+  //lpSolver.initialSolve();
+  //int error = 1 - lpSolver.isProvenOptimal();
 
-    tEndCLP = std::clock();
+  tEndCLP = std::clock();
 
-    std::cerr << "CLP-time: " << diff_seconds(tEndCLP,tStartCLP) << " seconds. " << std::endl;
+  std::cerr << "CLP-time: " << diff_seconds(tEndCLP,tStartCLP) << " seconds. " << std::endl;
 
-    if (error)
-      std::cerr << "WARNING: solving the LP-relaxation failed!!!" << std::endl;
+  if (error)
+    std::cerr << "WARNING: solving the LP-relaxation failed!!!" << std::endl;
 
-    const double* lp_solution = lpSolver.primalColumnSolution();
+  const double* lp_solution = lpSolver.primalColumnSolution();
 
 #ifdef HAS_VNK_GRAPH 
-    Graph<double,double,double> graph(mesh.nFaces(), 2*mesh.nEdges());
+  Graph<double,double,double> graph(mesh.nFaces(), 2*mesh.nEdges());
 
-    graph.add_node(mesh.nFaces());
+  graph.add_node(mesh.nFaces());
 
-    for (uint f=0; f < mesh.nFaces(); f++) {
+  for (uint f=0; f < mesh.nFaces(); f++) {
 
-      graph.add_tweights(f, cost[f], 0.0);
+    graph.add_tweights(f, cost[f], 0.0);
 
-      if (var_lb[f] == 1.0)
-        graph.add_tweights(f, 0.0, 1e50);
-      if (var_ub[f] == 0.0) 
-        graph.add_tweights(f, 1e50,0.0);
+    if (var_lb[f] == 1.0)
+      graph.add_tweights(f, 0.0, 1e50);
+    if (var_ub[f] == 0.0) 
+      graph.add_tweights(f, 1e50,0.0);
+  }
+  for (uint e=0; e < mesh.nEdges(); e++) {
+
+    const std::vector<uint>& adjacent = mesh.adjacent_faces(e);
+
+    if (adjacent.size() == 1) {
+
+      graph.add_tweights(adjacent[0],lambda*mesh.edge_length(e),0.0);
     }
-    for (uint e=0; e < mesh.nEdges(); e++) {
+    else {
+      assert(adjacent.size() == 2);
 
-      const std::vector<uint>& adjacent = mesh.adjacent_faces(e);
-
-      if (adjacent.size() == 1) {
-
-        graph.add_tweights(adjacent[0],lambda*mesh.edge_length(e),0.0);
-      }
-      else {
-        assert(adjacent.size() == 2);
-
-        graph.add_edge(adjacent[0],adjacent[1],lambda*mesh.edge_length(e),lambda*mesh.edge_length(e));
-      }
+      graph.add_edge(adjacent[0],adjacent[1],lambda*mesh.edge_length(e),lambda*mesh.edge_length(e));
     }
+  }
 
-    double gc_energy = graph.maxflow();
+  double gc_energy = graph.maxflow();
 
-    std::cerr << "graph cut energy: " << gc_energy << std::endl;
+  std::cerr << "graph cut energy: " << gc_energy << std::endl;
 
-    Math1D::Vector<double> gc_solution(nVars,0.0);
+  Math1D::Vector<double> gc_solution(nVars,0.0);
 
-    for (uint f=0; f < mesh.nFaces(); f++) {
-      int seg = graph.what_segment(f);
-      gc_solution[f] = (seg == Graph<double,double,double>::SOURCE) ? 0 : 1;
-    }
+  for (uint f=0; f < mesh.nFaces(); f++) {
+    int seg = graph.what_segment(f);
+    gc_solution[f] = (seg == Graph<double,double,double>::SOURCE) ? 0 : 1;
+  }
 
-    lp_solution = gc_solution.direct_access();
+  lp_solution = gc_solution.direct_access();
 #endif
 
 
-    double energy = energy_offset;
-    for (uint i=0; i < nVars; i++)
-      energy += cost[i] * lp_solution[i];
+  double energy = energy_offset;
+  for (uint i=0; i < nVars; i++)
+    energy += cost[i] * lp_solution[i];
 
-    std::cerr << "energy: " << energy << std::endl;
+  std::cerr << "energy: " << energy << std::endl;
 
-    uint out_factor = options.output_factor_;
+  uint out_factor = options.output_factor_;
 
-    segmentation.resize(xDim*out_factor,yDim*out_factor);
+  segmentation.resize(xDim*out_factor,yDim*out_factor);
 
-    mesh.enlarge(out_factor,out_factor);
+  mesh.enlarge(out_factor,out_factor);
 
-    //re-compute pixel shares for the now larger mesh
-    compute_pixel_shares(mesh, out_factor*xDim, out_factor*yDim, shares, share_start);
+  //re-compute pixel shares for the now larger mesh
+  compute_pixel_shares(mesh, out_factor*xDim, out_factor*yDim, shares, share_start);
 
-    for (uint y=0; y < yDim*out_factor; y++) {
-      for (uint x=0; x < xDim*out_factor; x++) {
+  for (uint y=0; y < yDim*out_factor; y++) {
+    for (uint x=0; x < xDim*out_factor; x++) {
 
-        double sum = 0.0;
-        for (uint k= share_start[y*(xDim*out_factor)+x]; k < share_start[y*(xDim*out_factor)+x+1]; k++) {
-          uint face = shares[k].face_idx_;
-          sum += mesh.convex_area(face) * shares[k].share_ * lp_solution[face];
-        }
-        segmentation(x,y) = uint(sum*255.0);
+      double sum = 0.0;
+      for (uint k= share_start[y*(xDim*out_factor)+x]; k < share_start[y*(xDim*out_factor)+x+1]; k++) {
+        uint face = shares[k].face_idx_;
+        sum += mesh.convex_area(face) * shares[k].share_ * lp_solution[face];
       }
+      segmentation(x,y) = uint(sum*255.0);
     }
+  }
 
-    return energy;
+  return energy;
 }
 
 /***********************************************************************************************************************/
 
 double point_energy(uint point, const uint* solution, const Mesh2D& mesh, 
-        const std::vector<Mesh2DEdgePair>& edge_pairs, 
-        const NamedStorage1D<std::vector<uint> >& point_pair,
-        const NamedStorage1D<std::vector<uint> >& point_edge, 
-        double lambda, double gamma, double curv_power, bool bruckstein, bool crossings_allowed = false) {
+                    const std::vector<Mesh2DEdgePair>& edge_pairs, 
+                    const NamedStorage1D<std::vector<uint> >& point_pair,
+                    const NamedStorage1D<std::vector<uint> >& point_edge, 
+                    double lambda, double gamma, double curv_power, bool bruckstein, bool crossings_allowed = false) {
 
   //NOTE: if crossings are ALLOWED, this routine only APPROXIMATES the energy
 
   double energy = 0.0;
-
+  
   Math1D::Vector<double> drop(point_edge[point].size(),0.0);
-
+  
   double abs_drop_sum = 0.0;
-
+    
   std::map<uint,uint> drop_idx;
-
+  
   for (uint e=0; e < drop.size(); e++) {
 
     uint edge = point_edge[point][e];
@@ -292,7 +301,7 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
     }
 
     drop[e] = cur_drop;
-
+      
     abs_drop_sum += fabs(cur_drop);
   }
 
@@ -317,7 +326,7 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
 
           uint nFirstAdjacent = uint( mesh.adjacent_faces(first).size() );
           uint nSecondAdjacent = uint( mesh.adjacent_faces(second).size() );
-
+	    
           double weight = 0.0;
           if (nFirstAdjacent > 1)
             weight += 0.5*lambda*mesh.edge_length(first);
@@ -326,7 +335,7 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
           //do not penalize the image corners for their curvature
           if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
             weight += gamma * curv_weight(mesh,cur_edge_pair,curv_power,bruckstein);
-
+	    
           //since the cost are identical for both orientations, we don't care about orientation here
           energy += weight;
         }
@@ -342,7 +351,7 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
       Math1D::Vector<double> var_lb(nVars,0.0);
       Math1D::Vector<double> var_ub(nVars,1.0);
       Math1D::Vector<double> lp_cost(nVars,0.0);
-
+	
       //set cost and remove pairs that cannot be active
       for (uint j=0; j < point_pair[point].size(); j++) {
 
@@ -353,7 +362,7 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
 
         uint nFirstAdjacent = uint( mesh.adjacent_faces(first).size() );
         uint nSecondAdjacent = uint( mesh.adjacent_faces(second).size() );
-
+	  
         double weight = 0.0;
         if (nFirstAdjacent > 1)
           weight += 0.5*lambda*mesh.edge_length(first);
@@ -389,7 +398,7 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
 
       if (crossings_allowed && ads != 4)
         conflicts.clear();
-
+	
       uint nConstraints = 2*point_edge[point].size() + conflicts.size();
       uint nMatrixEntries = 4*point_pair.size() + 4*conflicts.size();
 
@@ -428,7 +437,7 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
           lp_descr.add_entry(drop_idx[first_edge],2*j,-1);
           lp_descr.add_entry(drop_idx[first_edge],2*j+1,1);
         }
-
+	  
         if (mesh.edge(second_edge).to_idx_ == middle_point) {
           lp_descr.add_entry(drop_idx[second_edge],2*j,-1);
           lp_descr.add_entry(drop_idx[second_edge],2*j+1,1);
@@ -454,12 +463,12 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
       }
 
       OsiClpSolverInterface lpSolver;
-
+	
       CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
-        lp_descr.value(),lp_descr.nEntries());
+                                  lp_descr.value(),lp_descr.nEntries());
 
       lpSolver.loadProblem (coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
-        lp_cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
+                            lp_cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
 
       for (int v=0; v < lpSolver.getNumCols(); v++) {
         lpSolver.setInteger(v);
@@ -478,12 +487,12 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
         exit(1);
       }
       if (cbc_model.isProvenInfeasible()) {
-
+	  
         std::cerr << "ERROR: problem marked as infeasible. Exiting..." << std::endl;
         exit(1);
       }
       if (cbc_model.isAbandoned()) {
-
+	  
         std::cerr << "ERROR: problem was abandoned. Exiting..." << std::endl;
         exit(1);
       }
@@ -496,10 +505,10 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
 
 //currently assuming that crossing prevention is active
 double curv_energy(const uint* solution, const double* region_cost, const Mesh2D& mesh,
-       double lambda, double gamma, double curv_power, bool bruckstein, bool crossings_allowed = false) { 
+                   double lambda, double gamma, double curv_power, bool bruckstein, bool crossings_allowed = false) { 
 
   double energy = 0.0;
-
+  
   for (uint f=0; f < mesh.nFaces(); f++)
     energy += region_cost[f] * double(solution[f]);
 
@@ -528,7 +537,7 @@ double curv_energy(const uint* solution, const double* region_cost, const Mesh2D
   for (uint p=0; p < mesh.nPoints(); p++) {
 
     energy += point_energy(p, solution, mesh, edge_pairs, point_pair, point_edge, 
-         lambda, gamma, curv_power, bruckstein, crossings_allowed);
+                           lambda, gamma, curv_power, bruckstein, crossings_allowed);
   }
 
   //std::cerr << "final energy: " << energy << std::endl;
@@ -537,10 +546,10 @@ double curv_energy(const uint* solution, const double* region_cost, const Mesh2D
 }
 
 double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
-    double lambda, double gamma, double curv_power, bool bruckstein, double energy_offset, bool crossings_allowed = false) { 
+                double lambda, double gamma, double curv_power, bool bruckstein, double energy_offset, bool crossings_allowed = false) { 
 
   double energy = 0.0;
-
+  
   for (uint f=0; f < mesh.nFaces(); f++)
     energy += region_cost[f] * double(solution[f]);
 
@@ -571,7 +580,7 @@ double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
   for (uint p=0; p < mesh.nPoints(); p++) {
 
     cur_point_energy[p] = point_energy(p, solution, mesh, edge_pairs, point_pair, point_edge, 
-               lambda, gamma, curv_power, bruckstein, crossings_allowed);
+                                       lambda, gamma, curv_power, bruckstein, crossings_allowed);
 
     energy += cur_point_energy[p];
   }
@@ -583,40 +592,40 @@ double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
 
     changes = false;
     uint nChanges = 0;
-
+    
     std::cerr << "ICM iteration " << iter << std::endl;
 
     for (uint f=0; f < mesh.nFaces(); f++) {
-
+      
       uint cur_label = solution[f];
-
+      
       double cur_energy = 0.0;
       if (cur_label == 1)
         cur_energy += region_cost[f];
-
+      
       std::vector<uint> point_indices;
       mesh.get_polygon_points(f, point_indices);
-
+      
       for (uint k=0; k < point_indices.size(); k++) 
         cur_energy += cur_point_energy[point_indices[k]];
 
       uint hyp_label = 1 - cur_label;
-
+      
       //temporarily modify the solution
       solution[f] = hyp_label;
-
+      
       Math1D::Vector<double> hyp_point_cost(point_indices.size());
-
+      
       double hyp_energy = 0.0;
       if (hyp_label == 1)
         hyp_energy += region_cost[f];
-
+      
       for (uint k=0; k < point_indices.size(); k++) {
         hyp_point_cost[k] = point_energy(point_indices[k], solution, mesh, edge_pairs, point_pair, point_edge, 
-          lambda, gamma, bruckstein, crossings_allowed);
+                                         lambda, gamma, bruckstein, crossings_allowed);
         hyp_energy += hyp_point_cost[k];
       }
-
+      
       if (cur_energy <= hyp_energy) {
         solution[f] = cur_label;
       }
@@ -633,17 +642,17 @@ double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
       }
     }
 
-    std::cerr << "energy " << energy << ", (" << (energy + energy_offset) << "), " 
-      << nChanges << " changes"<< std::endl;
+    std::cerr << "energy " << energy << " (" << (energy + energy_offset) << ") ,"
+              << nChanges << " changes "<< std::endl;
   }
 
   return energy;
 }
 
-/*******************/
+/******************/
 
 double curv_icm(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset,
-    Math2D::Matrix<uint>& segmentation) { 
+                Math2D::Matrix<uint>& segmentation) { 
 
   int neighborhood = options.neighborhood_;
   
@@ -666,8 +675,8 @@ double curv_icm(const Math2D::Matrix<float>& data_term, const LPSegOptions& opti
   }
 
   double energy = curv_icm(face_label.direct_access(), region_cost.direct_access(), mesh,
-      options.lambda_, options.gamma_, options.curv_power_, options.bruckstein_, energy_offset,
-         !options.prevent_crossings_);
+                           options.lambda_, options.gamma_, options.curv_power_, options.bruckstein_, energy_offset,
+                           !options.prevent_crossings_);
 
   const uint out_factor = options.output_factor_;
 
@@ -677,7 +686,7 @@ double curv_icm(const Math2D::Matrix<float>& data_term, const LPSegOptions& opti
   
   Math2D::Matrix<double> output(xDim*out_factor,yDim*out_factor,0);
   for (uint i=0; i < mesh.nFaces(); ++i) {
-    add_grid_output(i,face_label[i],mesh,output);  
+    add_grid_output(i,face_label[i],mesh,output);	
   }
   for (uint y=0; y < yDim*out_factor; y++) {
     for (uint x=0; x < xDim*out_factor; x++) {
@@ -692,7 +701,7 @@ double curv_icm(const Math2D::Matrix<float>& data_term, const LPSegOptions& opti
 
 //solves a segmentation problem with length and curvature regularity via an LP
 double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
-        Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels) {
+                          Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels) {
 
   //Get the options
   double lambda = options.lambda_;
@@ -727,7 +736,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   std::cerr << "light constraints: " << light_constraints << std::endl;
 
-  assert(neighborhood <= 16); 
+  assert(options.neighborhood_ <= 16); 
 
   uint xDim = uint( data_term.xDim() );
   uint yDim = uint( data_term.yDim() );
@@ -793,7 +802,6 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   for (uint i=0; i<mesh.nFaces(); ++i) {
     cost[i] = calculate_data_term(i, mesh, data_term);
 
-
     // Get polygon coordinates
     //std::vector<Mesh2DPoint> coord;
     //mesh.get_polygon_points(i, coord);
@@ -808,7 +816,6 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     //if ( absdiff / avgabs > 1e-4 && avgabs > 1e-4) {
     //  std::cerr << "Difference in data term : " << cost[i] << " <--> " << cost2 << std::endl;
     //}
-
 
     if (options.fix_regions_) {
       //Fix region variables
@@ -931,7 +938,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   }
   if (enforce_regionedge) {
     nEntries += uint( 8*light_factor*edge_pairs.size() //Note: not exact number
-                     + 2*light_factor*mesh.nEdges() ); //we also allocate space for the slack variables used with the convex solver
+                      + 2*light_factor*mesh.nEdges() ); //we also allocate space for the slack variables used with the convex solver
   }
   if (options.convex_prior_) {
     nEntries += uint( 2*edge_pairs.size() );
@@ -1055,8 +1062,6 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
     Petter::statusOK();
   }
-
-
   if (enforce_consistent_points) {
     Petter::statusTry("Coding consistent points...");
 
@@ -1081,10 +1086,10 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       //Get the two adjacent faces
       if (mesh.adjacent_faces(edge).size() != 2)
-      {
-        //One of the edges is at the border of the image
-        continue;
-      }
+        {
+          //One of the edges is at the border of the image
+          continue;
+        }
 
       uint x1 = mesh.adjacent_faces(edge)[0];
       uint x2 = mesh.adjacent_faces(edge)[1];
@@ -1116,7 +1121,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
     for (uint j=0; j < edge_pairs.size(); j++) {
       uint first = edge_pairs[j].first_edge_idx_;
-      uint second = edge_pairs[j].second_edge_idx_;  
+      uint second = edge_pairs[j].second_edge_idx_;	
 
       uint y = mesh.nFaces() + 2*j;
 
@@ -1144,7 +1149,6 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     Petter::statusOK();
   }
 
-
   std::vector<signed char> edge_pair_sign;
   if (options.convex_prior_ || constrain_number_of_objects) {
 
@@ -1161,9 +1165,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       uint first = edge_pairs[j].first_edge_idx_;
       uint second = edge_pairs[j].second_edge_idx_;
 
-      uint middle_point = edge_pairs[j].common_point_idx_;
-      uint first_edge = edge_pairs[j].first_edge_idx_;
-      uint second_edge = edge_pairs[j].second_edge_idx_;
+      //uint middle_point = edge_pairs[j].common_point_idx_;
+      //uint first_edge = edge_pairs[j].first_edge_idx_;
+      //uint second_edge = edge_pairs[j].second_edge_idx_;
 
       //Vector of the first edge 
       double from1_x = mesh.point(mesh.edge(first).from_idx_).x_;
@@ -1251,12 +1255,10 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
         }
       }
 
-
     }
 
     Petter::statusOK();
   }
-
 
   if (constrain_number_of_objects) {
     //
@@ -1294,14 +1296,23 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     Petter::statusOK();
   }
 
-
   Math1D::Vector<uint> row_start(nConstraints+1);
   lp_descr.sort_by_row(row_start);
+
+  //DEBUG
+  // std::cerr << "!!WARNING: using approx-rational cost!!" << std::endl;
+  // for (uint v=0; v < nVars; v++) {
+  //   cost[v] = approx_r64(cost[v]).toDouble();
+  //   assert (approx_r64(cost[v]).toDouble() == cost[v]);
+  // }
+  //END_DEBUG
 
   bool solver_known = false;
   const double* lp_solution = 0;
 
   int error = 0;
+
+  std::clock_t tStartSolver = std::clock();
 
 #ifdef HAS_GUROBI
   Math1D::Vector<double> GUROBI_solution;
@@ -1332,7 +1343,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     Storage1D<char> vtype(nVars,GRB_CONTINUOUS);
 
     error = GRBaddvars(grb_model,nVars,0,NULL,NULL,NULL,cost.direct_access(),var_lb.direct_access(),
-           var_ub.direct_access(),vtype.direct_access(),NULL);
+                       var_ub.direct_access(),vtype.direct_access(),NULL);
     assert(!error);
 
     error = GRBupdatemodel(grb_model);
@@ -1342,10 +1353,10 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       if (rhs_lower[c] == rhs_upper[c])
         error = GRBaddconstr(grb_model, row_start[c+1]-row_start[c], ((int*) lp_descr.col_indices()) + row_start[c], 
-        lp_descr.value() + row_start[c], GRB_EQUAL, rhs_upper[c], NULL);
+                             lp_descr.value() + row_start[c], GRB_EQUAL, rhs_upper[c], NULL);
       else
         GRBaddrangeconstr(grb_model, row_start[c+1]-row_start[c], ((int*) lp_descr.col_indices()) + row_start[c], 
-        lp_descr.value() + row_start[c], rhs_lower[c], rhs_upper[c], NULL);      
+                          lp_descr.value() + row_start[c], rhs_lower[c], rhs_upper[c], NULL);      
 
       assert(!error);
     }
@@ -1368,6 +1379,126 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     lp_solution = GUROBI_solution.direct_access();
   }    
 #endif
+
+  Math1D::Vector<double> conv_solution;
+
+  if (solver == "own-conv") {
+    solver_known = true;
+
+    conv_solution = var_lb;
+#if 1
+    for (uint v=0; v < mesh.nFaces(); v++) {
+      if (var_ub[v] != var_lb[v]) {
+
+        if (cost[v] < 0.0) {
+          conv_solution[v] = 0.75 * var_ub[v] + 0.25*var_lb[v];
+        }
+        else {
+          conv_solution[v] = 0.25 * var_ub[v] + 0.75*var_lb[v];
+        }
+      }
+    }
+    for (uint p=0; p < edge_pairs.size(); p++) {
+
+      uint edge1 = edge_pairs[p].first_edge_idx_;
+      uint edge2 = edge_pairs[p].second_edge_idx_;
+
+      double drop1 = 0.0;
+      for (uint i=0; i < mesh.adjacent_faces(edge1).size(); i++) {
+        uint face = mesh.adjacent_faces(edge1)[i];
+        drop1 += conv_solution[face] * mesh.match(face,edge1);      
+      }
+
+      double drop2 = 0.0;
+      for (uint i=0; i < mesh.adjacent_faces(edge2).size(); i++) {
+        uint face = mesh.adjacent_faces(edge2)[i];
+        drop2 += conv_solution[face] * mesh.match(face,edge2);      
+      }
+
+      if (fabs(drop1) >= 0.1 && fabs(drop2) > 0.1) {
+
+        if (mesh.edge(edge1).from_idx_ == edge_pairs[p].common_point_idx_) {
+
+          drop1 *= -1.0;
+          drop2 *= -1.0;
+        }
+
+        if (drop1 < 0.0)
+          conv_solution[edge_pair_var_offs + 2*p] = fabs(drop1);
+        else
+          conv_solution[edge_pair_var_offs + 2*p+1] = fabs(drop1);
+      }
+    }
+#endif
+
+    //std::cerr << "WARNING: the inequality constraints are currently not properly handled by the convex solver" << std::endl;
+    uint nSlacks = 0;
+    //NOTE: this code assumes that all variables are non-negative
+    for (uint c=0; c < nConstraints; c++) {
+
+      if (rhs_lower[c] != rhs_upper[c]) {
+
+        //NOTE: we presently handle only the upper bound inequality
+        nSlacks++;
+      }
+    }
+
+    if (nSlacks > 0) {
+
+#if 0
+      if (!light_constraints ) {
+        std::cerr << "starting an initial pass without extra constraints to get a good initialization" << std::endl;
+
+        eq_constrained_lp_solving_auglagrange_nesterov(nVars, consistency_con_offs, cost.direct_access(), var_lb.direct_access(), var_ub.direct_access(),
+                                                       lp_descr, rhs_upper.direct_access(), conv_solution.direct_access(), 
+                                                       gamma*100.0, 0.5, 300, 15, 1.25, nStandardEntries);
+
+        std::cerr << "adding slacks to the matrix" << std::endl;
+      }
+#endif
+
+      //NOTE: lp_descr is now modified, but since the coin matrix was already created that should pose no problems
+      cost.resize(nVars+nSlacks,0.0);
+      var_lb.resize(nVars+nSlacks,0.0);
+      var_ub.resize(nVars+nSlacks);
+
+      lp_descr.increase_nColumns(nSlacks);
+      conv_solution.resize(nVars+nSlacks,0.0);
+
+      uint cur_var = nVars;
+      for (uint c=0; c < nConstraints; c++) {
+
+        if (rhs_lower[c] != rhs_upper[c]) {
+
+          //Note: we presently handle only the upper bound inequality
+          lp_descr.add_entry(c,cur_var,1.0);
+          var_ub[cur_var] = rhs_upper[c];
+
+          cur_var++;
+        }
+      }
+
+      lp_descr.sort_by_row(row_start);
+    }
+
+    double stepsize_coeff = 0.5;
+    if (enforce_consistent_boundaries)
+      stepsize_coeff = 0.2;
+    if (enforce_regionedge)
+      stepsize_coeff = 0.1;
+
+    std::cerr << "calling main routine" << std::endl;
+
+    std::clock_t tStartConv,tEndConv;
+    tStartConv = std::clock();
+
+    eq_constrained_lp_solving_auglagrange_nesterov(nVars+nSlacks, nConstraints, cost.direct_access(), var_lb.direct_access(), var_ub.direct_access(),
+                                                   lp_descr, rhs_upper.direct_access(), conv_solution.direct_access(), 
+                                                   gamma*50.0, stepsize_coeff, 3000, 8, 1.25);
+    tEndConv = std::clock();
+
+    std::cerr << "convex solver needed " << diff_seconds(tEndConv,tStartConv) << " seconds. " << std::endl;
+  }
 
 #ifdef HAS_CPLEX
   Math1D::Vector<double> CPLEX_solution;
@@ -1411,6 +1542,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       exit(1);
     }
 
+    //necessary when using own cut generator (or heuristic??) with CPLEX
+    status = CPXsetintparam (cp_env, CPX_PARAM_PREIND, CPX_OFF);
+
     //set problem data 
     cp_lp = CPXcreateprob (cp_env, &status, "curv-lp");
 
@@ -1444,18 +1578,14 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       row_count[c] = row_start[c+1] - row_start[c];
 
     status = CPXnewcols (cp_env, cp_lp, nVars, cost.direct_access(), var_lb.direct_access(), 
-       var_ub.direct_access(), NULL, NULL);
-
-    std::cerr << "copying" << std::endl;
+                         var_ub.direct_access(), NULL, NULL);
 
     if ( status )  
       exit(1);
 
-    std::cerr << "adding rows" << std::endl;
-
     CPXaddrows(cp_env, cp_lp, 0, nConstraints, lp_descr.nEntries(), rhs_lower.direct_access(), row_sense, 
-         (int*) row_start.direct_access(), (int*) lp_descr.col_indices(), lp_descr.value(),
-         NULL, NULL);
+               (int*) row_start.direct_access(), (int*) lp_descr.col_indices(), lp_descr.value(),
+               NULL, NULL);
 
     uint count = 0;
     Math1D::Vector<int> idx(nConstraints);
@@ -1464,9 +1594,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       if (row_sense[c] == 'R') {
 
-  idx[count] = c;
-  range[count] = rhs_upper[c] - rhs_lower[c];
-  count++;
+        idx[count] = c;
+        range[count] = rhs_upper[c] - rhs_lower[c];
+        count++;
       }
     }
     CPXchgrngval (cp_env, cp_lp, count, idx.direct_access(), range.direct_access());
@@ -1542,9 +1672,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     }
 
     nReturn = XPRSloadlp(xp_prob, "curv-ilp", nVars, nConstraints, row_sense,
-       rhs_upper.direct_access(), row_range, cost.direct_access(), 
-       (int*) col_start.direct_access(), NULL, (int*) lp_descr.row_indices(), lp_descr.value(),
-       var_lb.direct_access(), var_ub.direct_access());
+                         rhs_upper.direct_access(), row_range, cost.direct_access(), 
+                         (int*) col_start.direct_access(), NULL, (int*) lp_descr.row_indices(), lp_descr.value(),
+                         var_lb.direct_access(), var_ub.direct_access());
 
     delete[] row_sense;
     delete[] row_range;
@@ -1560,7 +1690,8 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 #endif
 
   ClpSimplex lpSolver;
-  double solverTime = -1;
+  //OsiClpSolverInterface lpSolver;
+  double solverTime = -1.0;
 
   if (!solver_known)
     solver = "clp";
@@ -1570,17 +1701,17 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
 #ifndef USE_PM_ONE_MATRIX
     CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
-        lp_descr.value(),lp_descr.nEntries());
+                                lp_descr.value(),lp_descr.nEntries());
 
     lpSolver.loadProblem (coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
-        cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
+                          cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
 
     coinMatrix.cleanMatrix();
 #else
 
     if (options.convex_prior_ || constrain_number_of_objects) {
-        INTERNAL_ERROR << "Cannot use a +1/-1 matrix. Undefine USE_PM_ONE_MATRIX. exiting..." << std::endl;
-        exit(1);
+      INTERNAL_ERROR << "Cannot use a +1/-1 matrix. Undefine USE_PM_ONE_MATRIX. exiting..." << std::endl;
+      exit(1);
     }
 
     uint nPos = 0;
@@ -1626,7 +1757,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
           pmone_idx[cur_pos] = lp_descr.col_indices()[k];
           cur_pos++;
         }
-      }    
+      }
     }
 
     row_pos_start[row_start.size()-1] = cur_pos;
@@ -1639,10 +1770,13 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     row_pos_start.resize(0);
     row_neg_start.resize(0);
 
-    std::cerr << "matrix created" << std::endl;
+    //TEMP
+    //lpSolver.setLogLevel(4);
+    std::cerr << nVars << " variables, " << (row_start.size()-1) << " constraints" << std::endl;
+    //END_TEMP
 
     lpSolver.loadProblem (pmone_matrix, var_lb.direct_access(), var_ub.direct_access(),   
-        cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
+                          cost.direct_access(), rhs_lower.direct_access(), rhs_upper.direct_access());
 #endif
 
     lpSolver.setFactorizationFrequency(options.factorization_frequency_);
@@ -1650,7 +1784,6 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     //lpSolver.writeMps("curv.mps");
 
     tStartCLP = std::clock();
-    
 
     if (options.convex_prior_ || constrain_number_of_objects) {
 
@@ -1663,35 +1796,41 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       lpSolver.checkSolution(); 
 
       error = lpSolver.isProvenOptimal() ? 0 : 1;
-
-      if (error != 0)
-        std::cerr << "!!!!!!!!!!!!!!LP-solver failed!!!!!!!!!!!!!!!!!!!" << std::endl;
-
     }
     else {
+
       //outcomment this when you are debugging
       lp_descr.reset(0);
 
-      //ClpPresolve presolveInfo; 
-      //ClpSimplex * presolvedModel = presolveInfo.presolvedModel(lpSolver); 
-      //presolvedModel->dual();
-      //presolveInfo.postsolve(true);
+      //ClpSolve solve_options;
+      //solve_options.setSolveType(ClpSolve::useDual);
+      //solve_options.setSolveType(ClpSolve::useBarrier);
+      //solve_options.setPresolveType(ClpSolve::presolveNumber,5);
+      //lpSolver.initialSolve(solve_options);
 
       lpSolver.dual();
-
       lp_solution = lpSolver.primalColumnSolution();
 
       error = 1 - lpSolver.isProvenOptimal();
-
-      if (error != 0)
-        std::cerr << "!!!!!!!!!!!!!!LP-solver failed!!!!!!!!!!!!!!!!!!!" << std::endl;
     }
+
+    if (error != 0)
+      std::cerr << "!!!!!!!!!!!!!!LP-solver failed!!!!!!!!!!!!!!!!!!!" << std::endl;
+
+
+    // lpSolver.dual();
+    // //lpSolver.resolve();
+
+    // //lp_solution = lpSolver.getColSolution();
+    // lp_solution = lpSolver.primalColumnSolution();
 
     //ClpSolve solve_options;
     //solve_options.setSolveType(ClpSolve::useDual);
     //solve_options.setSolveType(ClpSolve::useBarrier);
     //solve_options.setPresolveType(ClpSolve::presolveNumber,5);
     //lpSolver.initialSolve(solve_options);
+
+    //error = 1 - lpSolver.isProvenOptimal();
 
     tEndCLP = std::clock();
 
@@ -1700,6 +1839,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
     std::cerr << "CLP-time: " << diff_seconds(tEndCLP,tStartCLP) << " seconds. " << std::endl;
     solverTime = diff_seconds(tEndCLP,tStartCLP);
+
     if (mesh.nFaces() <= 20000) {
       Petter::statusTry("Saving SVG...");
       mesh.draw_labels_with_pairs(options.base_filename_ + ".lp.svg",lp_solution,edge_pairs,xDim,yDim);
@@ -1719,6 +1859,8 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     std::cerr << "Number of turns : " << (angle_sum/(2*M_PI)) << std::endl;
   }
 
+  std::clock_t tEndSolver = std::clock();
+  std::cerr << "core solver call took " << diff_seconds(tEndSolver,tStartSolver) << " seconds." << std::endl;
   
   //list of edge pairs that have the respective point as the common point
   Storage1D<std::vector<uint> > point_pairs(mesh.nPoints());
@@ -1746,14 +1888,14 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   uint nIter = 0;
   while (prevent_crossings) {
-
+    
     nIter++;
-
+    
     std::cerr << "##### constraint generation iter #" << nIter << std::endl;
-
+    
     uint nConstraintsAdded = 0;
     for (uint p=0; p < mesh.nPoints(); p++) {
-
+      
       std::set<uint> active_pair;
 
       double sum = 0.0;
@@ -1764,51 +1906,51 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
           active_pair.insert(*it);
         }
       }
-
+      
       if (sum >= 1.0025 && active_pair.size() > 1) {
         std::cerr << "point #" << p << " might be a crossing point. " 
-          << active_pair.size() << " active pairs. " << std::endl;
+                  << active_pair.size() << " active pairs. " << std::endl;
 
         // this handles all pairwise and triple-constellations exactly,
         // as well as SOME of the higher ones. Note that we don't need to add
         // low order interactions if they are subsumed in a high order one
-
+	
         uint nPrevAdded = nConstraintsAdded;
-
+	
         for (uint k1=0; k1 < point_pairs[p].size()-1; k1++) {
-
+	  
           uint pair1 = point_pairs[p][k1];
-
+	  
           if (active_pair.find(pair1) == active_pair.end())
             continue;
 
           for (uint k2=k1+1; k2 < point_pairs[p].size(); k2++) {
-
+	    
             uint pair2 = point_pairs[p][k2];
-
+	    
             if (active_pair.find(pair2) == active_pair.end())
               continue;
 
             if (!line_pairs_with_meeting_point_cross(mesh, edge_pairs[pair1], edge_pairs[pair2]))
               continue;
-
+	    
             double sum = lp_solution[edge_pair_var_offs +  2*pair1] + lp_solution[edge_pair_var_offs +  2*pair1 + 1]
-            + lp_solution[edge_pair_var_offs +  2*pair2] + lp_solution[edge_pair_var_offs +  2*pair2 + 1];
-
+              + lp_solution[edge_pair_var_offs +  2*pair2] + lp_solution[edge_pair_var_offs +  2*pair2 + 1];
+	    
             //std::cerr << "checking pair" << std::endl;
-
+	    
             std::vector<uint> base(2);
             base[0] = pair1;
             base[1] = pair2;
-
+	    
             std::vector<uint> addons;
             for (uint k3=k2+1; k3 < point_pairs[p].size(); k3++) {
-
+	      
               uint pair3 = point_pairs[p][k3];
-
+	      
               if (active_pair.find(pair3) != active_pair.end()
-                && line_pairs_with_meeting_point_cross(mesh, edge_pairs[pair1], edge_pairs[pair3])
-                && line_pairs_with_meeting_point_cross(mesh, edge_pairs[pair2], edge_pairs[pair3]))
+                  && line_pairs_with_meeting_point_cross(mesh, edge_pairs[pair1], edge_pairs[pair3])
+                  && line_pairs_with_meeting_point_cross(mesh, edge_pairs[pair2], edge_pairs[pair3]))
                 addons.push_back(point_pairs[p][k3]);
             }
 
@@ -1827,7 +1969,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
                 new_list.push_back(addons[k]);
 
                 double cur_sum = sum + lp_solution[edge_pair_var_offs +  2*addons[k]] 
-                + lp_solution[edge_pair_var_offs +  2*addons[k] + 1];
+                  + lp_solution[edge_pair_var_offs +  2*addons[k] + 1];
 
                 for (uint l=k+1; l < addons.size(); l++) {
 
@@ -1837,7 +1979,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
                   for (uint j=2; j < new_list.size(); j++) {
 
                     uint p2 = new_list[j];
-
+		    
                     if (!line_pairs_with_meeting_point_cross(mesh, edge_pairs[p1], edge_pairs[p2])) {
                       compatible = false;
                       break;
@@ -1847,7 +1989,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
                   if (compatible) {
                     new_list.push_back(addons[l]);
                     cur_sum += lp_solution[edge_pair_var_offs +  2*addons[l]] 
-                    + lp_solution[edge_pair_var_offs +  2*addons[l] + 1];
+                      + lp_solution[edge_pair_var_offs +  2*addons[l] + 1];
                   }
                 }
 
@@ -1862,9 +2004,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
                 constraint_list.push_back(base);
 #endif
             }
-
+	    
             for (uint i=0; i < constraint_list.size(); i++) {
-
+	      
               std::vector<uint> pairs = constraint_list[i];
 
               //add the constraint
@@ -1872,12 +2014,12 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
               double* coeffs = new double[2*pairs.size()];
               for (uint k=0; k < 2*pairs.size(); k++)
                 coeffs[k] = 1.0;
-
+	      
               for (uint p=0; p < pairs.size(); p++) {
                 cols[2*p] = edge_pair_var_offs +  2*pairs[p];
                 cols[2*p+1] = edge_pair_var_offs +  2*pairs[p]+1;
               }
-
+	      
               //note: adding constraints separately is VERY inefficient
               if (solver == "clp")
                 lpSolver.addRow(2*pairs.size(), cols, coeffs, 0.0, 1.0);
@@ -1888,7 +2030,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 #endif
 #ifdef HAS_XPRESS
               if (solver == "xpress") {
-
+		
                 double new_rhs[1] = {1.0};
                 double new_range[1] = {0.0};
                 int new_start[2] = {0,2*pairs.size()};
@@ -1897,13 +2039,13 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 #endif
 #ifdef HAS_CPLEX
               if (solver == "cplex") {
-
+		
                 double new_rhs[1] = {1.0};
                 int new_start[2] = {0,2*pairs.size()};
-
+		
                 CPXaddrows(cp_env, cp_lp, 0, 1, 2*pairs.size(), new_rhs, "L", new_start, cols, coeffs,  NULL, NULL);
               }
-#endif    
+#endif		
               nConstraintsAdded++;
 
               delete[] cols;
@@ -1911,7 +2053,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
             }
           }
         }
-
+	
         if (nPrevAdded != nConstraintsAdded)
           std::cerr << "added " << (nConstraintsAdded - nPrevAdded) << " constraints" << std::endl;
       }
@@ -1924,17 +2066,25 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       if (solver == "clp") {
         lpSolver.dual();
         lp_solution = lpSolver.primalColumnSolution();
+
+        //lpSolver.resolve();
+        //lpSolver.getColSolution();
       }
 #ifdef HAS_GUROBI
       if (solver == "gurobi") {
 
         int error = GRBupdatemodel(grb_model);
         error = GRBoptimize(grb_model);
-        assert(!error);
 
+        if (error) {
+          std::cerr << "WARNING: Gurobi failed to solve the problem!" << std::endl;
+        }
+
+        assert(!error);
+	
         for (uint v=0; v < nVars; v++)
           GRBgetdblattrelement(grb_model,"X",v, GUROBI_solution.direct_access()+v);
-
+	
         lp_solution = GUROBI_solution.direct_access();
       }
 #endif
@@ -1943,7 +2093,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
         XPRSlpoptimize(xp_prob,"b");      
         XPRSgetlpsol(xp_prob, XPRESS_solution.direct_access(), 0, 0, 0); 
-
+	
         lp_solution = XPRESS_solution.direct_access();
       }
 #endif
@@ -1952,29 +2102,33 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
         int cpx_status = CPXbaropt(cp_env,cp_lp);
         //int cpx_status = CPXlpopt(cp_env,cp_lp);
-
+	
         if ( cpx_status ) {
           fprintf (stderr, "Failed to optimize MIP.\n");
           exit(1);
         }
-
+	
         CPXsolution (cp_env, cp_lp, NULL, NULL, CPLEX_solution.direct_access(), NULL, NULL, NULL);
-
+	    
         lp_solution = CPLEX_solution.direct_access();
       }
 #endif
     }
     else
       break;
-  }      
+  }     
   
 
-  double lp_energy = 0;
+  double lp_energy = 0.0;
   for (uint i=0; i < nVars; i++) {
-    lp_energy += cost[i] * lp_solution[i];    
+    lp_energy += cost[i] * lp_solution[i];
+    if (isnan(lp_energy)) {
+      std::cerr << "at i=" << i << " nan after adding " << cost[i] << " * " << lp_solution[i] << std::endl;
+    }
+    assert(!isnan(lp_energy));
   }
   double energy = energy_offset + lp_energy;
-  
+
   std::cerr << "lp energy: " << lp_energy << std::endl; 
   std::cerr << "original relaxation energy: " << energy << std::endl;
 
@@ -2006,36 +2160,35 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   std::cerr << nNonInt << " region variables are fractional" << std::endl;
   std::cerr << nNonIntAuxVars << " auxiliary (non-region) variables are fractional" << std::endl;
+
   
   double integral_energy = curv_energy(labeling.direct_access(), cost.direct_access(), mesh,
-                                       lambda, gamma, bruckstein, !prevent_crossings)
-                           + energy_offset;
+                                       lambda, gamma, curv_power, bruckstein, !prevent_crossings)
+    + energy_offset;
 
   std::cerr << "integral energy according to independent routine: " << integral_energy << std::endl;
 
+
   if (!options.convex_prior_ && !constrain_number_of_objects) {
     double icm_energy = curv_icm(labeling.direct_access(), cost.direct_access(), mesh,
-                                 lambda, gamma, bruckstein, energy_offset, !prevent_crossings) 
-                        + energy_offset;
-
+				 lambda, gamma, curv_power, bruckstein, energy_offset, !prevent_crossings) 
+      + energy_offset;
+    
     std::cerr << "energy after ICM: " << icm_energy << std::endl;
   }
 
-
   uint nOpposingLinePairs = 0;
 
-  for (uint v=mesh.nFaces(); v < nVars; v+=2) {
+  for (uint v=mesh.nFaces(); v < nVars; v += 2 ) {
 
-    double pair_sum = lp_solution[v] + lp_solution[v+1]; 
+    //double pair_sum = lp_solution[v] + lp_solution[v+1]; 
 
-    //if (pair_sum > 1.02) {
     if (lp_solution[v] > 0.05 && lp_solution[v+1] > 0.05) {
       nOpposingLinePairs++;
     }
   }
 
   std::cerr << nOpposingLinePairs << " opposing line pairs" << std::endl;
-  
 
   Math1D::Vector<double> frac_solution(mesh.nFaces());
   for (uint k=0; k < mesh.nFaces(); k++) {
@@ -2102,16 +2255,17 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
     if (solver == "clp") {
       for (uint i=0; i < (uint) lpSolver.getNumCols(); i++) {
-
+	
         if (! (var_lb[i] <= var_ub[i]))
           std::cerr << i << ", lb: " << var_lb[i] << ", ub: " << var_ub[i] << std::endl;
-
+	
         assert(var_lb[i] <= var_ub[i]);
         lpSolver.setColumnBounds(i,var_lb[i],var_ub[i]);
+        //lpSolver.setColBounds(i,var_lb[i],var_ub[i]);
       }
     }
 #ifdef HAS_GUROBI
-    if (solver == "gurobi") {  
+    if (solver == "gurobi") {	
       for (uint v=0; v < mesh.nFaces(); v++) {
         GRBsetdblattrelement(grb_model,"LB",v,var_lb[v]);
         GRBsetdblattrelement(grb_model,"UB",v,var_ub[v]);
@@ -2123,9 +2277,9 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       Math1D::Vector<int> indices(mesh.nFaces());
       for (uint v=0; v < mesh.nFaces(); v++)
         indices[v] = v;
-
+      
       Storage1D<char> indicator(mesh.nFaces(),'L');
-
+      
       XPRSchgbounds(xp_prob, mesh.nFaces(), indices.direct_access(), indicator.direct_access(), var_lb.direct_access());
       indicator.set_constant('U');
       XPRSchgbounds(xp_prob, mesh.nFaces(), indices.direct_access(), indicator.direct_access(), var_ub.direct_access());
@@ -2137,7 +2291,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       Math1D::Vector<int> indices(mesh.nFaces());
       for (uint v=0; v < mesh.nFaces(); v++)
         indices[v] = v;
-
+      
       Storage1D<char> indicator(mesh.nFaces(),'L');
       CPXchgbds(cp_env, cp_lp, mesh.nFaces(), indices.direct_access(), indicator.direct_access(), var_lb.direct_access());
       indicator.set_constant('U');
@@ -2148,21 +2302,28 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     if (solver == "clp") {
       lpSolver.dual();
       lp_solution = lpSolver.primalColumnSolution();
+      //lpSolver.resolve();
+      //lpSolver.getColSolution();
+      
 
       error = 1 - lpSolver.isProvenOptimal();
       assert(!error || enforce_consistent_points);
     }
-
 #ifdef HAS_GUROBI
     if (solver == "gurobi") {
 
       int error = GRBupdatemodel(grb_model);
       error = GRBoptimize(grb_model);
-      assert(!error);
 
+      if (error) {
+        std::cerr << "WARNING: Gurobi failed to solve the problem!" << std::endl;
+      }
+      
+      assert(!error);
+      
       for (uint v=0; v < nVars; v++)
         GRBgetdblattrelement(grb_model,"X",v, GUROBI_solution.direct_access()+v);
-
+      
       lp_solution = GUROBI_solution.direct_access();
     }
 #endif
@@ -2171,7 +2332,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       XPRSlpoptimize(xp_prob,"b");      
       XPRSgetlpsol(xp_prob, XPRESS_solution.direct_access(), 0, 0, 0); 
-
+      
       lp_solution = XPRESS_solution.direct_access();
     }
 #endif
@@ -2180,31 +2341,31 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       int cpx_status = CPXbaropt(cp_env,cp_lp);
       //int cpx_status = CPXlpopt(cp_env,cp_lp);
-
+      
       if ( cpx_status ) {
         fprintf (stderr, "Failed to optimize MIP.\n");
         exit(1);
       }
-
+      
       CPXsolution (cp_env, cp_lp, NULL, NULL, CPLEX_solution.direct_access(), NULL, NULL, NULL);
-
+      
       lp_solution = CPLEX_solution.direct_access();
     }
 #endif
 
     uint nIter = 0;
-    while (prevent_crossings) {
+    while (prevent_crossings && !enforce_consistent_points) {
 
       nIter++;
 
       std::cerr << "##### constraint generation (for thresholded solution) iter #" << nIter << std::endl;
-
+      
       uint nConstraintsAdded = 0;
       for (uint p=0; p < mesh.nPoints(); p++) {
 
-
+	
         std::set<uint> active_pair;
-
+	
         double sum = 0.0;
         for (std::vector<uint>::iterator it = point_pairs[p].begin(); it != point_pairs[p].end(); it++) {
           double contrib = lp_solution[edge_pair_var_offs +  2*(*it)] + lp_solution[edge_pair_var_offs +  2*(*it) + 1];
@@ -2213,54 +2374,54 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
             active_pair.insert(*it);
           }
         }
-
+	
         if (sum >= 1.0025 && active_pair.size() > 1) {
           std::cerr << "point #" << p << " might be a crossing point. " 
-            << active_pair.size() << " active pairs. " << std::endl;
-
+                    << active_pair.size() << " active pairs. " << std::endl;
+	  
           // this handles all pairwise and triple-constellations exactly,
           // as well as SOME of the higher ones. Note that we don't need to add
           // low order interactions if they are subsumed in a high order one
-
-          uint nPrevAdded = nConstraintsAdded;
-
+	  
+          //uint nPrevAdded = nConstraintsAdded;
+	  
           for (uint k1=0; k1 < point_pairs[p].size()-1; k1++) {
-
+	    
             uint pair1 = point_pairs[p][k1];
-
+	    
             if (active_pair.find(pair1) == active_pair.end())
               continue;
-
+	    
             for (uint k2=k1+1; k2 < point_pairs[p].size(); k2++) {
-
+	    
               uint pair2 = point_pairs[p][k2];
-
+	      
               if (active_pair.find(pair2) == active_pair.end())
                 continue;
-
+	      
               if (!line_pairs_with_meeting_point_cross(mesh, edge_pairs[pair1], edge_pairs[pair2]))
                 continue;
-
+	      
               double sum = lp_solution[edge_pair_var_offs +  2*pair1] + lp_solution[edge_pair_var_offs +  2*pair1 + 1]
-              + lp_solution[edge_pair_var_offs +  2*pair2] + lp_solution[edge_pair_var_offs +  2*pair2 + 1];
-
+                + lp_solution[edge_pair_var_offs +  2*pair2] + lp_solution[edge_pair_var_offs +  2*pair2 + 1];
+	      
               //std::cerr << "checking pair" << std::endl;
-
+	      
               std::vector<uint> base(2);
               base[0] = pair1;
               base[1] = pair2;
-
+	      
               std::vector<uint> addons;
               for (uint k3=k2+1; k3 < point_pairs[p].size(); k3++) {
-
+		
                 uint pair3 = point_pairs[p][k3];
-
+		
                 if (active_pair.find(pair3) != active_pair.end()
-                  && line_pairs_with_meeting_point_cross(mesh, edge_pairs[pair1], edge_pairs[pair3])
-                  && line_pairs_with_meeting_point_cross(mesh, edge_pairs[pair2], edge_pairs[pair3]))
+                    && line_pairs_with_meeting_point_cross(mesh, edge_pairs[pair1], edge_pairs[pair3])
+                    && line_pairs_with_meeting_point_cross(mesh, edge_pairs[pair2], edge_pairs[pair3]))
                   addons.push_back(point_pairs[p][k3]);
               }
-
+	      
               std::vector<std::vector<uint> > constraint_list;
               if (addons.empty()) {
                 if (sum >= 1.005)
@@ -2271,22 +2432,22 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
                 //handle higher interactions:
                 //NOTE: currently some of the generated constraints can be redundant to others
                 for (uint k=0; k < addons.size(); k++) {
-
+		  
                   std::vector<uint> new_list = base;
                   new_list.push_back(addons[k]);
-
+		  
                   double cur_sum = sum + lp_solution[edge_pair_var_offs +  2*addons[k]] 
-                  + lp_solution[edge_pair_var_offs +  2*addons[k] + 1];
-
+                    + lp_solution[edge_pair_var_offs +  2*addons[k] + 1];
+		  
                   for (uint l=k+1; l < addons.size(); l++) {
-
+		    
                     uint p1 = addons[l];
-
+		    
                     bool compatible = true;
                     for (uint j=2; j < new_list.size(); j++) {
-
+		      
                       uint p2 = new_list[j];
-
+		      
                       if (!line_pairs_with_meeting_point_cross(mesh, edge_pairs[p1], edge_pairs[p2])) {
                         compatible = false;
                         break;
@@ -2296,10 +2457,10 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
                     if (compatible) {
                       new_list.push_back(addons[l]);
                       cur_sum += lp_solution[edge_pair_var_offs +  2*addons[l]] 
-                      + lp_solution[edge_pair_var_offs +  2*addons[l] + 1];
+                        + lp_solution[edge_pair_var_offs +  2*addons[l] + 1];
                     }
                   }
-
+		  
                   if (cur_sum >= 1.005) {
                     std::cerr << "sum: " << cur_sum << std::endl;
                     constraint_list.push_back(new_list);
@@ -2311,22 +2472,22 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
                   constraint_list.push_back(base);
 #endif
               }
-
+	    
               for (uint i=0; i < constraint_list.size(); i++) {
-
+	      
                 std::vector<uint> pairs = constraint_list[i];
-
+		
                 //add the constraint
                 int* cols = new int[2*pairs.size()];
                 double* coeffs = new double[2*pairs.size()];
                 for (uint k=0; k < 2*pairs.size(); k++)
                   coeffs[k] = 1.0;
-
+		
                 for (uint p=0; p < pairs.size(); p++) {
                   cols[2*p] = edge_pair_var_offs +  2*pairs[p];
                   cols[2*p+1] = edge_pair_var_offs +  2*pairs[p]+1;
                 }
-
+		
                 //note: adding constraints separately is VERY inefficient
                 if (solver == "clp")
                   lpSolver.addRow(2*pairs.size(), cols, coeffs, 0.0, 1.0);
@@ -2337,7 +2498,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 #endif
 #ifdef HAS_XPRESS
                 if (solver == "xpress") {
-
+		
                   double new_rhs[1] = {1.0};
                   double new_range[1] = {0.0};
                   int new_start[2] = {0,2*pairs.size()};
@@ -2346,15 +2507,15 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 #endif
 #ifdef HAS_CPLEX
                 if (solver == "cplex") {
-
+		
                   double new_rhs[1] = {1.0};
                   int new_start[2] = {0,2*pairs.size()};
-
+		  
                   CPXaddrows(cp_env, cp_lp, 0, 1, 2*pairs.size(), new_rhs, "L", new_start, cols, coeffs,  NULL, NULL);
                 }
-#endif    
+#endif		
                 nConstraintsAdded++;
-
+		
                 delete[] cols;
                 delete[] coeffs;
               }
@@ -2366,31 +2527,37 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       std::cerr << "added " << nConstraintsAdded << " constraints" << std::endl;
 
       if (nConstraintsAdded > 0) {
-
+	
         if (solver == "clp") {
           lpSolver.dual();
           lp_solution = lpSolver.primalColumnSolution();
+          //lpSolver.resolve();
+          //lpSolver.getColSolution();
         }
-
 #ifdef HAS_GUROBI
         if (solver == "gurobi") {
-
+	  
           int error = GRBupdatemodel(grb_model);
           error = GRBoptimize(grb_model);
-          assert(!error);
 
+          if (error) {
+            std::cerr << "WARNING: Gurobi failed to solve the problem!" << std::endl;
+          }
+
+          assert(!error);
+	  
           for (uint v=0; v < nVars; v++)
             GRBgetdblattrelement(grb_model,"X",v, GUROBI_solution.direct_access()+v);
-
+	  
           lp_solution = GUROBI_solution.direct_access();
         }
 #endif
 #ifdef HAS_XPRESS
         if (solver == "xpress") {
-
+	  
           XPRSlpoptimize(xp_prob,"b");      
           XPRSgetlpsol(xp_prob, XPRESS_solution.direct_access(), 0, 0, 0); 
-
+	  
           lp_solution = XPRESS_solution.direct_access();
         }
 #endif
@@ -2399,14 +2566,14 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
           int cpx_status = CPXbaropt(cp_env,cp_lp);
           //int cpx_status = CPXlpopt(cp_env,cp_lp);
-
+	  
           if ( cpx_status ) {
             fprintf (stderr, "Failed to optimize MIP.\n");
             exit(1);
           }
-
+	  
           CPXsolution (cp_env, cp_lp, NULL, NULL, CPLEX_solution.direct_access(), NULL, NULL, NULL);
-
+	  
           lp_solution = CPLEX_solution.direct_access();
         }
 #endif
@@ -2423,16 +2590,16 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
         nNonIntThresh++;
       thresh_energy += cost[i] * val;
     }
-
+    
     std::cerr << "energy of thresholded solution: " << thresh_energy 
-      << "  (" << nNonIntThresh << " non-integral variables)" << std::endl;
+              << "  (" << nNonIntThresh << " non-integral variables)" << std::endl;
   }
 
-  int nOpposingLinePairs_after = 0;
+  uint nOpposingLinePairs_after = 0;
 
   for (uint v=mesh.nFaces(); v < nVars; v+=2) {
 
-    double pair_sum = lp_solution[v] + lp_solution[v+1]; 
+    //double pair_sum = lp_solution[v] + lp_solution[v+1]; 
 
     //if (pair_sum > 1.02) {
     if (lp_solution[v] > 0.05 && lp_solution[v+1] > 0.05) {
@@ -2485,11 +2652,12 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       double frac_sum = 0.0;
       for (uint k= share_start[y*(xDim*out_factor)+x]; k < share_start[y*(xDim*out_factor)+x+1]; k++) {
         uint face = shares[k].face_idx_;
-        sum      += large_mesh.convex_area(face) * shares[k].share_ * lp_solution[face];
+        sum += large_mesh.convex_area(face) * shares[k].share_ * lp_solution[face];
         frac_sum += large_mesh.convex_area(face) * shares[k].share_ * frac_solution[face];
       }
       double seg = int(sum*255.0 + 0.5);
-      if (seg > 255) seg = 255;
+      if (seg > 255) 
+	seg = 255;
       segmentation(x,y) = seg;
       frac_seg(x,y) = frac_sum * 255.0;
     }
@@ -2498,8 +2666,6 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   frac_seg.savePGM(options.base_filename_ + ".frac.pgm",255);
 
   Petter::statusOK();
-
-  
 
 #ifdef HAS_GUROBI
   if (grb_model != NULL)
@@ -2520,7 +2686,6 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   }
 #endif
 
-
   if (constrain_number_of_objects) {
     double angle_sum = 0.0;
     for (uint j=0; j < edge_pairs.size(); j++) {
@@ -2540,8 +2705,6 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     std::cerr << "Number of objects : " << angle_sum / (2*M_PI) << " (min,max) = (" << min_objects << ',' << max_objects << ")" << std::endl;
   }
 
-
-
   //
   // Open the log file (append mode)
   //
@@ -2559,12 +2722,11 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
           << edge_pairs.size()  << ' '  // 7
           << lp_energy       << ' '     // 8
           << energy          << ' '     // 9
-      ;
+    ;
 
 
   //Close logfile
   logfile << std::endl;
-
 
   //
   // Refine
@@ -2585,7 +2747,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       //Find a starting pair of the boundary
       int start;
-      for (start=0;start<edge_pairs.size();++start) {
+      for (start=0; start < int(edge_pairs.size()); ++start) {
         if ( !pair_used[start] && 
             (lp_solution[ mesh.nFaces() + 2*start ] > 0.9 ||
              lp_solution[ mesh.nFaces() + 2*start + 1 ] > 0.9 )
@@ -2596,7 +2758,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       }
 
       // We found no more pair to use
-      if (start == edge_pairs.size()) {
+      if (start == int(edge_pairs.size())) {
         succeeded = false;
         break;
       }
@@ -2667,7 +2829,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
         // Find the next edge pair along the curve
         int next;
-        for ( next=0;next<edge_pairs.size();++next) {
+        for ( next=0; next < int(edge_pairs.size()); ++next) {
           if (  !pair_used[next] && 
                 (  lp_solution[ mesh.nFaces() + 2*next ] > 0.9 ||
                    lp_solution[ mesh.nFaces() + 2*next + 1 ] > 0.9) &&
@@ -2688,7 +2850,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
         }
 
         // Did we fail to continue along the curve?
-        if (next == edge_pairs.size()) {
+        if (next == int(edge_pairs.size())) {
           Petter::statusFailed();
           succeeded = false;
           break;
@@ -2720,7 +2882,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     //std::cerr << "LP energy    : " << lp_energy << '\n';
 
     double curve_energy = 0;
-    for (int i=0;i<curves.size();++i) {
+    for (int i=0; i < int(curves.size()); ++i) {
       curve_energy += curves[i].energy();
     }
     std::cerr << "Curve energy (before) : " << curve_energy << '\n';
@@ -2729,7 +2891,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     // Refine the curve solutions
     //
     if (!options.convex_prior_) {
-        for (int i=0;i<curves.size();++i) {
+      for (int i=0; i < int(curves.size()); ++i) {
           std::cerr << "Curve #" << i+1 << '\n';
           curves[i].refine(true);
         }
@@ -2739,7 +2901,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     }
 
     curve_energy = 0;
-    for (int i=0;i<curves.size();++i) {
+    for (int i=0; i < int(curves.size()); ++i) {
       curve_energy += curves[i].energy();
     }
     std::cerr << "Curve energy (after)  : " << curve_energy << '\n';
@@ -2751,7 +2913,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
       std::ofstream of(sout.str().c_str());
       SegmentationCurve::start_svg(of, data_term);
-      for (int i=0;i<curves.size();++i) {
+      for (int i=0; i < int(curves.size()); ++i) {
         curves[i].draw(of);
       }
       SegmentationCurve::end_svg(of);
@@ -2785,4 +2947,604 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   }
 
   return energy;
+}
+
+
+
+double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
+                                          Math2D::Matrix<uint>& segmentation, std::string method, const Math2D::Matrix<int>* fixed_labels) {
+
+
+
+  //Get the options
+  double lambda = options.lambda_;
+  double gamma = options.gamma_;
+  bool enforce_consistent_boundaries = options.enforce_consistent_boundaries_;
+  bool enforce_consistent_points = options.enforce_consistent_points_;
+  bool enforce_regionedge = options.enforce_regionedge_;
+  //bool prevent_crossings = options.prevent_crossings_; //not handled so far
+  bool light_constraints = options.light_constraints_;
+  bool bruckstein = options.bruckstein_;
+  bool reduce_edge_pairs = options.reduce_edge_pairs_;
+
+  std::string solver = options.solver_;
+
+  std::cerr.precision(10);
+
+  uint light_factor = (light_constraints) ? 1 : 2;
+
+  std::cerr << "light constraints: " << light_constraints << std::endl;
+
+  assert(options.neighborhood_ <= 16); 
+
+  uint xDim = uint( data_term.xDim() );
+  uint yDim = uint( data_term.yDim() );
+
+  Mesh2D mesh;  
+  create_mesh(options, data_term, fixed_labels, mesh);
+
+  std::vector<Mesh2DEdgePair> edge_pairs;
+  Petter::statusTry("Generating edge pairs...");
+  mesh.generate_edge_pair_list(edge_pairs);
+
+  size_t nRemoved = 0;
+  if (reduce_edge_pairs) {
+    nRemoved = filter_edge_pairs(mesh, edge_pairs); 
+  }
+
+  Petter::statusOK();
+
+  if (reduce_edge_pairs) {
+    std::cerr << "removed " << nRemoved << " edge pairs." << std::endl;
+  }
+
+  std::cerr << edge_pairs.size() << " edge pairs." << std::endl;
+
+  uint nVars = uint( mesh.nFaces() + 2*edge_pairs.size() );
+  uint nConstraints = 3*mesh.nEdges();
+
+  const uint consistency_con_offs = nConstraints;
+  if (enforce_consistent_boundaries) {
+    nConstraints += light_factor*mesh.nEdges();
+  }
+  const uint point_consistency_con_offs = nConstraints;
+  if (enforce_consistent_points) {
+    nConstraints += mesh.nPoints();
+  }
+  const uint regionedge_constraints_offs = nConstraints;
+  if (enforce_regionedge) {
+    nConstraints += 2*light_factor*mesh.nEdges();
+  }
+
+  Math1D::NamedVector<double> var_lb(nVars,0.0,MAKENAME(var_lb));
+  Math1D::NamedVector<double> var_ub(nVars,1.0,MAKENAME(var_ub));
+
+  Math1D::Vector<double> region_cost(mesh.nFaces());
+
+  Petter::statusTry("Creating data terms...");
+  Petter::statusOK();
+
+  uint edge_pair_var_offs = mesh.nFaces();
+
+  Petter::statusTry("Line pair costs...");
+  for (uint j=0; j < edge_pairs.size(); j++) {
+
+    uint first = edge_pairs[j].first_edge_idx_;
+    uint nFirstAdjacent = uint( mesh.adjacent_faces(first).size() );
+
+    uint second = edge_pairs[j].second_edge_idx_;
+    uint nSecondAdjacent = uint( mesh.adjacent_faces(second).size() );
+
+    double weight = 0.0;
+    if (nFirstAdjacent > 1)
+      weight += 0.5*lambda*mesh.edge_length(first);
+    if (nSecondAdjacent > 1)
+      weight += 0.5*lambda*mesh.edge_length(second);
+    //do not penalize the image corners for their curvature
+    if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
+      weight += gamma * curv_weight(mesh,edge_pairs[j],2.0,bruckstein);
+
+    /*** check if (at the image border) one of the edge pairs is impossible. if so, set its upper bound to 0 ***/
+    uint edge = first;
+    if (mesh.adjacent_faces(edge).size() == 1) {
+      int match = mesh.match(mesh.adjacent_faces(edge)[0],edge);
+
+      uint y = edge_pair_var_offs+2*j;
+
+      if (edge_pairs[j].common_point_idx_ == mesh.edge(edge).from_idx_)
+        match *= -1;
+
+      if (match == -1)
+        var_ub[y+1] = 0.0;
+      else if (match == 1)
+        var_ub[y] = 0.0;
+    }
+
+    edge = second;
+    if (mesh.adjacent_faces(edge).size() == 1) {
+      int match = mesh.match(mesh.adjacent_faces(edge)[0],edge);
+
+      uint y = edge_pair_var_offs+2*j;
+
+      if (edge_pairs[j].common_point_idx_ == mesh.edge(edge).from_idx_)
+        match *= -1;
+
+      if (match == -1)
+        var_ub[y] = 0.0;
+      else if (match == 1)
+        var_ub[y+1] = 0.0;
+    }
+  }
+  Petter::statusOK();
+
+  Math1D::NamedVector<double> rhs_lower(nConstraints,0.0,MAKENAME(rhs_lower));
+  Math1D::NamedVector<double> rhs_upper(nConstraints,0.0,MAKENAME(rhs_upper));
+
+  if (fixed_labels != 0) {
+    Storage1D<PixelFaceRelation> shares;
+    Math1D::Vector<uint> share_start;
+    compute_pixel_shares(mesh, xDim, yDim, shares, share_start);
+
+    bool has_warned = false;
+
+    for (uint y=0; y < yDim; y++) {
+      for (uint x=0; x < xDim; x++) {
+
+        int fixed = (*fixed_labels)(x,y);
+        if (fixed == 0) {
+          for (uint v=share_start[y*xDim+x]; v < share_start[y*xDim+x+1]; v++) {
+            uint f = shares[v].face_idx_;
+            float area_share = std::min(1.0f, shares[v].share_);
+            if (area_share >= 0.95)
+              var_ub[f] = 0.0;
+            else if (!has_warned) {
+              std::cerr << Petter::RED << "WARNING: ignored a partial seed region" << Petter::NORMAL << std::endl;
+              has_warned = true;
+            }
+          }
+        }
+        else if (fixed == 1) {
+          for (uint v=share_start[y*xDim+x]; v < share_start[y*xDim+x+1]; v++) {
+            uint f = shares[v].face_idx_;
+            float area_share = std::min(1.0f, shares[v].share_);
+            if (area_share >= 0.95)
+              var_lb[f] = 1.0;
+            else if (!has_warned) {
+              std::cerr << Petter::RED << "WARNING: ignored a partial seed region" << Petter::NORMAL << std::endl;
+              has_warned = true;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  uint nEntries = uint( 2*mesh.nEdges() + 6*edge_pairs.size() );  
+  if (enforce_consistent_boundaries) {
+    //we also allocate space for the slack variables used with the convex solver
+    nEntries += uint( light_factor*2*edge_pairs.size() + light_factor*mesh.nEdges()); 
+  }
+  if (enforce_consistent_points) {
+    nEntries += uint( 2*edge_pairs.size() );
+  }
+  if (enforce_regionedge) {
+    nEntries += uint( 8*light_factor*edge_pairs.size() //Note: not exact number
+                      + 2*light_factor*mesh.nEdges() ); //we also allocate space for the slack variables used with the convex solver
+  }
+
+  SparseMatrixDescription<float> lp_descr(nEntries, nConstraints, nVars);
+
+  /**** a) code surface continuation constraints *****/
+
+  Petter::statusTry("Coding surface cont. constr....");
+  for (uint j=0; j < mesh.nEdges(); j++) {
+
+    const std::vector<uint>& adjacent_faces = mesh.adjacent_faces(j);
+    assert(adjacent_faces.size() >= 1);
+
+    for (std::vector<uint>::const_iterator it = adjacent_faces.begin();
+         it != adjacent_faces.end(); it++) {
+
+      assert(*it < mesh.nFaces());
+
+      lp_descr.add_entry(j,*it,mesh.match(*it,j));
+    }
+  }
+
+  for (uint j=0; j < edge_pairs.size(); j++) {
+
+    uint first_edge = edge_pairs[j].first_edge_idx_;
+    uint second_edge = edge_pairs[j].second_edge_idx_;
+
+    uint middle_point = edge_pairs[j].common_point_idx_;
+
+    if (mesh.edge(first_edge).to_idx_ == middle_point) {
+      lp_descr.add_entry(first_edge,edge_pair_var_offs+2*j,1);
+    }
+    else {
+      lp_descr.add_entry(first_edge,edge_pair_var_offs+2*j,-1);
+    }
+
+    if (mesh.edge(second_edge).to_idx_ == middle_point) {
+      lp_descr.add_entry(second_edge,edge_pair_var_offs+2*j+1,1);
+    }
+    else {
+      lp_descr.add_entry(second_edge,edge_pair_var_offs+2*j+1,-1);
+    }
+  }
+  Petter::statusOK();
+
+  /**** b) code boundary continuation constraints *****/
+  Petter::statusTry("Coding boundary cont. constr....");
+  uint boundary_con_offset = mesh.nEdges();
+
+  for (uint j=0; j < edge_pairs.size(); j++) {
+
+    uint first_edge = edge_pairs[j].first_edge_idx_;
+    uint second_edge = edge_pairs[j].second_edge_idx_;
+
+    uint middle_point = edge_pairs[j].common_point_idx_;
+
+    if (mesh.edge(first_edge).to_idx_ == middle_point) {      
+      lp_descr.add_entry(boundary_con_offset + 2*first_edge, edge_pair_var_offs+2*j, 1);
+      lp_descr.add_entry(boundary_con_offset + 2*first_edge+1, edge_pair_var_offs+2*j+1, -1);
+    }
+    else {
+      lp_descr.add_entry(boundary_con_offset + 2*first_edge+1, edge_pair_var_offs+2*j, 1);
+      lp_descr.add_entry(boundary_con_offset + 2*first_edge, edge_pair_var_offs+2*j+1, -1);
+    }
+
+    if (mesh.edge(second_edge).from_idx_ == middle_point) {
+      lp_descr.add_entry(boundary_con_offset + 2*second_edge, edge_pair_var_offs+2*j, -1);
+      lp_descr.add_entry(boundary_con_offset + 2*second_edge+1, edge_pair_var_offs+2*j+1, 1);
+    }
+    else {
+      lp_descr.add_entry(boundary_con_offset + 2*second_edge+1, edge_pair_var_offs+2*j, -1);
+      lp_descr.add_entry(boundary_con_offset + 2*second_edge, edge_pair_var_offs+2*j+1, 1);
+    }
+  }
+  Petter::statusOK();
+
+  if (enforce_consistent_boundaries) {
+
+    Petter::statusTry("Coding consistent boundaries...");
+
+    //constraints in words: for each oriented edge, the pairs that start with this oriented edge 
+    // and the pairs that end in the oppositely oriented edge may not sum to more than 1.0
+    // (i.e. they are mutually exclusive)
+
+    for (uint c=consistency_con_offs; c < consistency_con_offs + light_factor*mesh.nEdges(); c += light_factor) {
+
+      rhs_upper[c] = 1.0;
+      if (!light_constraints)
+        rhs_upper[c+1] = 1.0;
+    }
+
+    for (uint j=0; j < edge_pairs.size(); j++) {
+
+      uint middle_point = edge_pairs[j].common_point_idx_;
+
+      uint first_edge = edge_pairs[j].first_edge_idx_;
+      uint second_edge = edge_pairs[j].second_edge_idx_;
+
+
+      if (mesh.edge(first_edge).to_idx_ == middle_point) { 
+        lp_descr.add_entry(consistency_con_offs + light_factor*first_edge, edge_pair_var_offs+2*j, 1);
+        lp_descr.add_entry(consistency_con_offs + light_factor*first_edge, edge_pair_var_offs+2*j+1, 1);
+      }
+      else {
+        if (!light_constraints) {
+          lp_descr.add_entry(consistency_con_offs + light_factor*first_edge+1, edge_pair_var_offs+2*j, 1);
+          lp_descr.add_entry(consistency_con_offs + light_factor*first_edge+1, edge_pair_var_offs+2*j+1, 1);
+        }
+      }
+
+      if (mesh.edge(second_edge).to_idx_ == middle_point) {
+        lp_descr.add_entry(consistency_con_offs + light_factor*second_edge, edge_pair_var_offs+2*j, 1);
+        lp_descr.add_entry(consistency_con_offs + light_factor*second_edge, edge_pair_var_offs+2*j+1, 1);
+      }
+      else {
+        if (!light_constraints) {
+          lp_descr.add_entry(consistency_con_offs + light_factor*second_edge+1, edge_pair_var_offs+2*j, 1);
+          lp_descr.add_entry(consistency_con_offs + light_factor*second_edge+1, edge_pair_var_offs+2*j+1, 1);
+        }
+      }
+    }
+
+    Petter::statusOK();
+  }
+  if (enforce_consistent_points) {
+    Petter::statusTry("Coding consistent points...");
+
+    for (uint c=point_consistency_con_offs; c < nConstraints; c++) {
+      rhs_upper[c] = 1.0;
+    }
+
+    for (uint j=0; j < edge_pairs.size(); j++) {
+      uint middle_point = edge_pairs[j].common_point_idx_;
+
+      lp_descr.add_entry(point_consistency_con_offs + middle_point, edge_pair_var_offs+2*j, 1);
+      lp_descr.add_entry(point_consistency_con_offs + middle_point, edge_pair_var_offs+2*j+1, 1);
+    }
+    Petter::statusOK();
+  }
+
+  if (enforce_regionedge) {
+    Petter::statusTry("Coding boundary/edge pair constr....");
+    uint rowoff = regionedge_constraints_offs;
+
+    for (uint edge=0; edge < mesh.nEdges(); edge++) {
+
+      //Get the two adjacent faces
+      if (mesh.adjacent_faces(edge).size() != 2)
+        {
+          //One of the edges is at the border of the image
+          continue;
+        }
+
+      uint x1 = mesh.adjacent_faces(edge)[0];
+      uint x2 = mesh.adjacent_faces(edge)[1];
+
+      lp_descr.add_entry(rowoff+2*light_factor*edge  , x1, 1);
+      lp_descr.add_entry(rowoff+2*light_factor*edge  , x2, 1);
+      lp_descr.add_entry(rowoff+2*light_factor*edge+1, x1, -1);
+      lp_descr.add_entry(rowoff+2*light_factor*edge+1, x2, -1);
+      if (!light_constraints) {
+        lp_descr.add_entry(rowoff+2*light_factor*edge+2, x1, 1);
+        lp_descr.add_entry(rowoff+2*light_factor*edge+2, x2, 1);
+        lp_descr.add_entry(rowoff+2*light_factor*edge+3, x1, -1);
+        lp_descr.add_entry(rowoff+2*light_factor*edge+3, x2, -1);
+      }
+
+      //NOTE (important for the construction with slacks: the binding constraints are in both cases the upper bounds)
+      rhs_lower[rowoff+2*light_factor*edge]   = 0;
+      rhs_upper[rowoff+2*light_factor*edge]   = 2;
+      rhs_lower[rowoff+2*light_factor*edge+1] = -2;
+      rhs_upper[rowoff+2*light_factor*edge+1] = 0;
+
+      if (!light_constraints) {
+        rhs_lower[rowoff+2*light_factor*edge+2] = 0;
+        rhs_upper[rowoff+2*light_factor*edge+2] = 2;
+        rhs_lower[rowoff+2*light_factor*edge+3] = -2;
+        rhs_upper[rowoff+2*light_factor*edge+3] = 0;
+      }
+    }
+
+    for (uint j=0; j < edge_pairs.size(); j++) {
+      uint first = edge_pairs[j].first_edge_idx_;
+      uint second = edge_pairs[j].second_edge_idx_;	
+
+      uint y = mesh.nFaces() + 2*j;
+
+      uint edge = first;
+      if (mesh.adjacent_faces(edge).size() == 2) {
+        lp_descr.add_entry(rowoff+2*light_factor*edge   ,y  , 1);
+        lp_descr.add_entry(rowoff+2*light_factor*edge+1 ,y  , 1);
+        if (!light_constraints) {
+          lp_descr.add_entry(rowoff+2*light_factor*edge+2 ,y+1, 1);
+          lp_descr.add_entry(rowoff+2*light_factor*edge+3 ,y+1, 1);
+        }
+      }
+
+      edge = second;
+      if (mesh.adjacent_faces(edge).size() == 2) {
+        lp_descr.add_entry(rowoff+2*light_factor*edge   ,y+1, 1);
+        lp_descr.add_entry(rowoff+2*light_factor*edge+1 ,y+1, 1);
+        if (!light_constraints) {
+          lp_descr.add_entry(rowoff+2*light_factor*edge+2 ,y  , 1);
+          lp_descr.add_entry(rowoff+2*light_factor*edge+3 ,y  , 1);
+        }
+      }
+    }
+
+    Petter::statusOK();
+  }
+
+  Math1D::Vector<uint> row_start(nConstraints+1);
+  lp_descr.sort_by_row(row_start,true);
+
+  /***** now construct the MPBP/DO/TRWS-object ******/
+
+  double lower_bound = -1e300;
+
+  uint nFactors = row_start.size()-1;
+
+  uint bp_fac = (method == "bp") ? 1 : 0;
+  uint do_fac = (method == "mplp" || method == "msd" || method == "factor-dd") ? 1 : 0;
+  uint trws_fac = (method == "trws") ? 1 : 0;
+  uint dd_fac = (method == "chain-dd") ? 1 : 0;
+
+  FactorMPBP facMPBP(bp_fac*nVars,bp_fac*nFactors);
+  FactorDualOpt facDO(do_fac*nVars,do_fac*nFactors);
+  CumFactorTRWS facTRWS(trws_fac*nVars,trws_fac*nFactors);
+  FactorChainDualDecomposition dual_decomp(dd_fac*nVars,dd_fac*nFactors);
+
+  for (uint i=0; i < mesh.nFaces(); ++i) {
+    
+    Math1D::Vector<float> bin_cost(2,0.0);
+    Math1D::Vector<double> dbin_cost(2,0.0);
+
+    double cost = calculate_data_term(i, mesh, data_term);
+    
+    region_cost[i] = cost;
+    bin_cost[1] = cost;
+    
+    if (var_ub[i] == 0.0)
+      bin_cost[1] = 1e30;
+    else if (var_lb[i] == 1.0)
+      bin_cost[0] = 1e30;
+  
+    if (bp_fac == 1) 
+      facMPBP.add_var(bin_cost);
+    else if (trws_fac == 1) {
+      facTRWS.add_var(bin_cost);
+    }
+    else if (dd_fac == 1) {
+      dual_decomp.add_var(bin_cost);
+    }
+    else
+      facDO.add_var(bin_cost);
+  }
+
+  for (uint j=0; j < edge_pairs.size(); j++) {
+
+    uint first = edge_pairs[j].first_edge_idx_;
+    uint nFirstAdjacent = uint( mesh.adjacent_faces(first).size() );
+    
+    uint second = edge_pairs[j].second_edge_idx_;
+    uint nSecondAdjacent = uint( mesh.adjacent_faces(second).size() );
+    
+    double weight = 0.0;
+    if (nFirstAdjacent > 1)
+      weight += 0.5*lambda*mesh.edge_length(first);
+    if (nSecondAdjacent > 1)
+      weight += 0.5*lambda*mesh.edge_length(second);
+    //do not penalize the image corners for their curvature
+    if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
+      weight += gamma * curv_weight(mesh,edge_pairs[j],2.0,bruckstein);
+    
+    for (uint i=0; i < 2; i++) {
+
+      Math1D::Vector<float> bin_cost(2,0.0);
+      Math1D::Vector<double> dbin_cost(2,0.0);
+      bin_cost[1] = weight;
+      dbin_cost[1] = weight;
+      
+      if (var_ub[edge_pair_var_offs + 2*j+i] == 0.0) {
+        bin_cost[1] = 1e30;
+        dbin_cost[1] = 1e30;
+      }
+  
+      if (bp_fac == 1)
+        facMPBP.add_var(bin_cost);
+      else if (trws_fac == 1) {
+        facTRWS.add_var(bin_cost);
+      }
+      else if (dd_fac == 1)
+        dual_decomp.add_var(bin_cost);
+      else
+        facDO.add_var(bin_cost);
+    }
+  }
+    
+  /**** set up constraints ****/
+
+  uint nPos = 0;
+
+  //DEBUG
+  std::map<uint,uint> frequency;
+  //END_DEBUG
+
+  for (uint c = 0; c < row_start.size()-1; c++) {
+
+    //std::cerr << "c: " << c << std::endl;
+      
+    uint nCurVars = row_start[c+1] - row_start[c];
+
+    if (nCurVars == 0)
+      continue;
+
+    Math1D::Vector<uint> var(nCurVars);
+    Storage1D<bool> positive(nCurVars,true);
+
+    //DEBUG
+    frequency[nCurVars]++;
+    //END_DEBUG
+    
+
+    bool allPos = true;
+    
+    for (uint k=0; k < nCurVars; k++) {
+      
+      double val = lp_descr.value()[row_start[c]+k];
+      var[k] = lp_descr.col_indices()[row_start[c]+k];
+      
+      if (val != 1.0 && val != -1.0) {
+        INTERNAL_ERROR << " trying to set up a 1/-1 constraint from a non-1/-1 value" << std::endl;
+        exit(1);
+      }
+      
+      if (val == -1.0) {
+        positive[k] = false;
+        allPos = false;
+      }
+    }
+
+    if (allPos)
+      nPos++;
+  
+    if (bp_fac == 1)
+      facMPBP.add_binary_ilp_factor(var,positive,rhs_lower[c],rhs_upper[c]);
+    else if (trws_fac == 1)
+      facTRWS.add_binary_ilp_factor(var,positive,rhs_lower[c],rhs_upper[c],false/*true*//*(nCurVars >= 7)*/);
+    else if (dd_fac == 1)
+      dual_decomp.add_binary_ilp_factor(var,positive,rhs_lower[c],rhs_upper[c]);
+    else
+      facDO.add_binary_ilp_factor(var,positive,rhs_lower[c],rhs_upper[c]);
+  }
+
+  //DEBUG
+  std::cerr << "counts of BILP factors: " << frequency << std::endl;
+  //END_DEBUG
+
+  std::cerr << nPos << " of " << (row_start.size()-1) << " constraints are purely positive" << std::endl;
+
+  var_lb.resize(0);
+  var_ub.resize(0);
+  rhs_lower.resize(0);
+  rhs_upper.resize(0);
+  lp_descr.reset(0);
+  
+  if (bp_fac == 1) 
+    facMPBP.mpbp(500);
+  else if (trws_fac == 1)
+    lower_bound = facTRWS.optimize(/*250*/ 7);
+  else if (dd_fac == 1) 
+    lower_bound = dual_decomp.optimize(50,7500.0);
+  else {
+    if (method == "mplp")
+      lower_bound = facDO.dual_bca(50,DUAL_BCA_MODE_MPLP,true,false);
+    else if (method == "msd")
+      lower_bound = facDO.dual_bca(50,DUAL_BCA_MODE_MSD,true,false);
+    else
+      lower_bound = facDO.subgradient_opt(500,0.001);
+  }
+
+  std::cerr << "lower bound: " << lower_bound << "(" << (lower_bound + energy_offset) << ")" << std::endl;
+
+  const Math1D::Vector<uint>& labels = (bp_fac == 1) ? facMPBP.labeling() 
+    : (trws_fac == 1) ? facTRWS.labeling() :  (dd_fac == 1) ? dual_decomp.labeling() : facDO.labeling();
+
+  //produce segmentation
+
+  double energy = curv_energy(labels.direct_access(), region_cost.direct_access(), mesh,
+                              lambda, gamma, bruckstein, true);
+
+  std::cerr << "primal energy: " << energy << std::endl;
+
+  uint out_factor = options.output_factor_;
+
+  segmentation.resize(xDim*out_factor,yDim*out_factor);
+
+  mesh.enlarge(out_factor,out_factor);
+
+  Storage1D<PixelFaceRelation> shares;
+  Math1D::Vector<uint> share_start;
+
+  //re-compute pixel shares for the now larger mesh
+  compute_pixel_shares(mesh, out_factor*xDim, out_factor*yDim, shares, share_start);
+
+  for (uint y=0; y < yDim*out_factor; y++) {
+    for (uint x=0; x < xDim*out_factor; x++) {
+
+      double sum = 0.0;
+      for (uint k= share_start[y*(xDim*out_factor)+x]; k < share_start[y*(xDim*out_factor)+x+1]; k++) {
+        uint face = shares[k].face_idx_;
+        sum += mesh.convex_area(face) * shares[k].share_ * labels[face];
+      }
+      segmentation(x,y) = uint(sum*255.0);
+    }
+  }
+
+  return lower_bound + energy_offset; 
 }

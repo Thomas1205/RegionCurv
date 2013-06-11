@@ -35,7 +35,7 @@ private:
 class SegmentationCurve
 {
 public:
-  SegmentationCurve(const std::vector<Mesh2DPoint>& newcoord, const ImageIntegrator& integrator_in, 
+  SegmentationCurve(const std::vector<Mesh2DPoint>& newcoord, ImageIntegrator& integrator_in, 
                     double sign, double lambda, double gamma, double curv_power, bool bruckstein);
   void reverse();
 
@@ -64,7 +64,7 @@ private:
   bool step_cd();
   bool step_grad();
 
-  const ImageIntegrator* integrator;
+  ImageIntegrator* integrator;
 
   std::vector<Mesh2DPoint> coord;
   std::vector<Mesh2DPoint> original_coord;

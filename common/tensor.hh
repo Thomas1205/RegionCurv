@@ -15,23 +15,23 @@ namespace Math3D {
 
   
   /*** Tensor class, i.e. mathematical operations need to be defined on T ****/
-  template<typename T>
-  class Tensor : public Storage3D<T> {
+  template<typename T, typename ST=size_t>
+  class Tensor : public Storage3D<T,ST> {
   public:
     
     Tensor();
     
-    Tensor(size_t xDim, size_t yDim, size_t zDim);
+    Tensor(ST xDim, ST yDim, ST zDim);
 
-    Tensor(size_t xDim, size_t yDim, size_t zDim, T default_value);
+    Tensor(ST xDim, ST yDim, ST zDim, T default_value);
     
     ~Tensor();
 
     virtual const std::string& name() const;
 
-    void operator+=(const Tensor<T>& toAdd);
+    void operator+=(const Tensor<T,ST>& toAdd);
 
-    void operator-=(const Tensor<T>& toSub);
+    void operator-=(const Tensor<T,ST>& toSub);
     
     void operator*=(const T scalar); 
     
@@ -39,13 +39,13 @@ namespace Math3D {
 
     double sqr_norm() const;
 
-    inline double norm(size_t x, size_t y) const;
+    inline double norm(ST x, ST y) const;
 
-    inline double sqr_norm(size_t x, size_t y) const;
+    inline double sqr_norm(ST x, ST y) const;
 
-    inline T sum(size_t x, size_t y) const;
+    inline T sum(ST x, ST y) const;
 
-    inline T min(size_t x, size_t y) const;
+    inline T min(ST x, ST y) const;
     
     T sum() const;
 
@@ -55,11 +55,11 @@ namespace Math3D {
 
     T max_abs() const;
     
-    T max(size_t z) const;
+    T max(ST z) const;
 
-    T min(size_t z) const;
+    T min(ST z) const;
 
-    T max_abs(size_t z) const;
+    T max_abs(ST z) const;
 
     double max_vector_norm() const;
 
@@ -73,17 +73,17 @@ namespace Math3D {
   };
 
   /**** named Tensor class ****/
-  template <typename T>
-  class NamedTensor : public Tensor<T> {
+  template <typename T, typename ST=size_t>
+  class NamedTensor : public Tensor<T,ST> {
   public:
 
     NamedTensor();
     
     NamedTensor(std::string name);
 
-    NamedTensor(size_t xDim, size_t yDim, size_t zDim, std::string name);
+    NamedTensor(ST xDim, ST yDim, ST zDim, std::string name);
 
-    NamedTensor(size_t xDim, size_t yDim, size_t zDim, T default_value, std::string name);
+    NamedTensor(ST xDim, ST yDim, ST zDim, T default_value, std::string name);
     
     ~NamedTensor();
 
@@ -91,10 +91,10 @@ namespace Math3D {
 
     void set_name(std::string name);
 
-    inline void operator=(const Tensor<T>& toCopy);
+    inline void operator=(const Tensor<T,ST>& toCopy);
     
     //NOTE: the name is NOT copied
-    inline void operator=(const NamedTensor<T>& toCopy);
+    inline void operator=(const NamedTensor<T,ST>& toCopy);
 
   protected:
     std::string name_;
@@ -102,84 +102,131 @@ namespace Math3D {
 
 
   /**** stand-alone operators ****/
-  template<typename T>
-  Tensor<T> operator+(const Tensor<T>& v1, const Tensor<T>& v2);
+  template<typename T, typename ST>
+  Tensor<T,ST> operator+(const Tensor<T,ST>& v1, const Tensor<T,ST>& v2);
+
+  template<typename T, typename ST>
+  Tensor<T,ST> operator-(const Tensor<T,ST>& v1, const Tensor<T,ST>& v2);
+}
+
+namespace Makros {
+
+  template<typename T, typename ST>
+  class Typename<Math3D::Tensor<T,ST> > {
+  public:
+
+    std::string name() const {
+
+      return "Math3D::Tensor<" + Makros::Typename<T>() + "," + Makros::Typename<ST>() + "> ";
+    }
+  };
 
   template<typename T>
-  Tensor<T> operator-(const Tensor<T>& v1, const Tensor<T>& v2);
+  class Typename<Math3D::Tensor<T> > {
+  public:
+
+    std::string name() const {
+
+      return "Math3D::Tensor<" + Makros::Typename<T>() + "> ";
+    }
+  };
+
+  template<typename T, typename ST>
+  class Typename<Math3D::NamedTensor<T,ST> > {
+  public:
+
+    std::string name() const {
+
+      return "Math3D::NamedTensor<" + Makros::Typename<T>() + "," + Makros::Typename<ST>() + "> ";
+    }
+  };  
+
+  template<typename T>
+  class Typename<Math3D::NamedTensor<T> > {
+  public:
+
+    std::string name() const {
+
+      return "Math3D::NamedTensor<" + Makros::Typename<T>() + "> ";
+    }
+  };  
+}
+
+
+namespace Math3D {
 
 /********************************** implementation **********************************/
 
   /*** implementation of (unnamed) Tensor ***/
-  template<typename T>
-  /*static*/ const std::string Tensor<T>::tensor_name_ = "unnamed tensor";
+  template<typename T, typename ST>
+  /*static*/ const std::string Tensor<T,ST>::tensor_name_ = "unnamed tensor";
 
-  template<typename T>
-  Tensor<T>::Tensor() : Storage3D<T>() {}
+  template<typename T, typename ST>
+  Tensor<T,ST>::Tensor() : Storage3D<T,ST>() {}
   
-  template<typename T>
-  Tensor<T>::Tensor(size_t xDim, size_t yDim, size_t zDim) : Storage3D<T>(xDim,yDim,zDim) {}
+  template<typename T, typename ST>
+  Tensor<T,ST>::Tensor(ST xDim, ST yDim, ST zDim) : Storage3D<T,ST>(xDim,yDim,zDim) {}
   
-  template<typename T>
-  Tensor<T>::Tensor(size_t xDim, size_t yDim, size_t zDim, T default_value) :
-    Storage3D<T>(xDim,yDim,zDim,default_value) {}
+  template<typename T, typename ST>
+  Tensor<T,ST>::Tensor(ST xDim, ST yDim, ST zDim, T default_value) :
+    Storage3D<T,ST>(xDim,yDim,zDim,default_value) {}
   
-  template<typename T>
-  Tensor<T>::~Tensor() {}
+  template<typename T, typename ST>
+  Tensor<T,ST>::~Tensor() {}
 
-  template<typename T>
-  /*virtual*/ const std::string& Tensor<T>::name() const {
+  template<typename T, typename ST>
+  /*virtual*/ const std::string& Tensor<T,ST>::name() const {
     return tensor_name_;
   }
 
-  template<typename T>
-  void Tensor<T>::operator+=(const Tensor<T>& toAdd) {
-    if (toAdd.xDim() != Storage3D<T>::xDim_ 
-	|| toAdd.yDim() != Storage3D<T>::yDim_ 
-	|| toAdd.zDim() != Storage3D<T>::zDim_) {
+  template<typename T, typename ST>
+  void Tensor<T,ST>::operator+=(const Tensor<T,ST>& toAdd) {
+    if (toAdd.xDim() != Storage3D<T,ST>::xDim_ 
+	|| toAdd.yDim() != Storage3D<T,ST>::yDim_ 
+	|| toAdd.zDim() != Storage3D<T,ST>::zDim_) {
       INTERNAL_ERROR << "    illegal addition of tensor \"" << toAdd.name() << "\" to tensor \"" 
 		     << this->name() << "\":" << std::endl
 		     << "    sizes " << toAdd.xDim() << "x" << toAdd.yDim() << "x" << toAdd.zDim()
-		     << " and " << Storage3D<T>::xDim_ << "x" << Storage3D<T>::yDim_ << "x" 
-		     << Storage3D<T>::zDim_ << " are incompatible. Exiting..."
+		     << " and " << Storage3D<T,ST>::xDim_ << "x" << Storage3D<T,ST>::yDim_ << "x" 
+		     << Storage3D<T,ST>::zDim_ << " are incompatible. Exiting..."
 		     << std::endl;
       exit(1);
     }
 
-    const size_t size = Storage3D<T>::size_;
+    const ST size = Storage3D<T,ST>::size_;
 
-    size_t i;
+    ST i;
     for (i=0; i < size; i++)
-      Storage3D<T>::data_[i] += toAdd.direct_access(i);
+      Storage3D<T,ST>::data_[i] += toAdd.direct_access(i);
   }
   
-  template<typename T>
-  void Tensor<T>::operator-=(const Tensor<T>& toSub) {
-    if (toSub.xDim() != Storage3D<T>::xDim_ 
-	|| toSub.yDim() != Storage3D<T>::yDim_ 
-	|| toSub.zDim() != Storage3D<T>::zDim_) {
+  template<typename T, typename ST>
+  void Tensor<T,ST>::operator-=(const Tensor<T,ST>& toSub) {
+    if (toSub.xDim() != Storage3D<T,ST>::xDim_ 
+	|| toSub.yDim() != Storage3D<T,ST>::yDim_ 
+	|| toSub.zDim() != Storage3D<T,ST>::zDim_) {
       INTERNAL_ERROR << "    illegal subtraction of tensor \"" << toSub.name() << "\" from tensor \"" 
 		     << this->name() << "\":" << std::endl
 		     << "    sizes " << toSub.xDim() << "x" << toSub.yDim() << "x" << toSub.zDim()
-		     << " and " << Storage3D<T>::xDim_ << "x" << Storage3D<T>::yDim_ << "x" 
-		     << Storage3D<T>::zDim_ << " are incompatible. Exiting..."
+		     << " and " << Storage3D<T,ST>::xDim_ << "x" << Storage3D<T,ST>::yDim_ << "x" 
+		     << Storage3D<T,ST>::zDim_ << " are incompatible. Exiting..."
 		     << std::endl;
       exit(1);
     }
 
-    const size_t size = Storage3D<T>::size_;
+    const ST size = Storage3D<T,ST>::size_;
 
-    size_t i;
+    ST i;
     for (i=0; i < size; i++)
-      Storage3D<T>::data_[i] -= toSub.direct_access(i);
+      Storage3D<T,ST>::data_[i] -= toSub.direct_access(i);
   }
 
-  template<typename T>
-  void Tensor<T>::operator*=(const T scalar) {
+  template<typename T, typename ST>
+  void Tensor<T,ST>::operator*=(const T scalar) {
     
-    const size_t size = Storage3D<T>::size_;
+    const ST size = Storage3D<T>::size_;
 
-    size_t i;
+    ST i;
     for (i=0; i < size; i++)
       Storage3D<T>::data_[i] *= scalar;
   }
@@ -190,97 +237,97 @@ namespace Math3D {
   template<>
   void Tensor<double>::operator*=(const double scalar);
 
-  template<typename T>
-  double Tensor<T>::norm() const {
+  template<typename T, typename ST>
+  double Tensor<T,ST>::norm() const {
 
     double result = 0.0;
     T temp;
-    for (size_t i=0; i < Storage3D<T>::size_; i++) {
-      temp = Storage3D<T>::data_[i];
+    for (ST i=0; i < Storage3D<T,ST>::size_; i++) {
+      temp = Storage3D<T,ST>::data_[i];
       result += temp*temp;
     }
     return sqrt(result);
   }
 
-  template<typename T>
-  double Tensor<T>::sqr_norm() const {
+  template<typename T, typename ST>
+  double Tensor<T,ST>::sqr_norm() const {
 
     double result = 0.0;
     T temp;
-    for (size_t i=0; i < Storage3D<T>::size_; i++) {
-      temp = Storage3D<T>::data_[i];
+    for (ST i=0; i < Storage3D<T,ST>::size_; i++) {
+      temp = Storage3D<T,ST>::data_[i];
       result += temp*temp;
     }
     return result;
   }
 
-  template<typename T>
-  inline T Tensor<T>::sum(size_t x, size_t y) const {
+  template<typename T, typename ST>
+  inline T Tensor<T,ST>::sum(ST x, ST y) const {
 
     T result = (T) 0;
-    size_t offs = (y*Storage3D<T>::xDim_+x)*Storage3D<T>::zDim_;
+    ST offs = (y*Storage3D<T,ST>::xDim_+x)*Storage3D<T,ST>::zDim_;
 
-    for (size_t z=0; z < Storage3D<T>::zDim_; z++) {
-      result += Storage3D<T>::data_[offs+z];
+    for (ST z=0; z < Storage3D<T,ST>::zDim_; z++) {
+      result += Storage3D<T,ST>::data_[offs+z];
     }
       
     return result;
   }
 
-  template<typename T>
-  inline T Tensor<T>::min(size_t x, size_t y) const {
+  template<typename T, typename ST>
+  inline T Tensor<T,ST>::min(ST x, ST y) const {
 
-    return *std::min_element(Storage3D<T>::data_+(y*Storage3D<T>::xDim_+x)*Storage3D<T>::zDim_,
-			     Storage3D<T>::data_+(y*Storage3D<T>::xDim_+x+1)*Storage3D<T>::zDim_);
+    return *std::min_element(Storage3D<T,ST>::data_+(y*Storage3D<T,ST>::xDim_+x)*Storage3D<T,ST>::zDim_,
+			     Storage3D<T,ST>::data_+(y*Storage3D<T,ST>::xDim_+x+1)*Storage3D<T,ST>::zDim_);
   }
 
   
-  template<typename T>
-  double Tensor<T>::norm(size_t x, size_t y) const {
+  template<typename T, typename ST>
+  double Tensor<T,ST>::norm(ST x, ST y) const {
 
     double result = 0.0;
     T temp;
-    size_t offs = (y*Storage3D<T>::xDim_+x)*Storage3D<T>::zDim_;
+    ST offs = (y*Storage3D<T,ST>::xDim_+x)*Storage3D<T,ST>::zDim_;
 
-    for (size_t z=0; z < Storage3D<T>::zDim_; z++) {
-      temp = Storage3D<T>::data_[offs+z];
+    for (ST z=0; z < Storage3D<T,ST>::zDim_; z++) {
+      temp = Storage3D<T,ST>::data_[offs+z];
       result += temp*temp;
     }
       
     return sqrt(result);
   }
 
-  template<typename T>
-  double Tensor<T>::sqr_norm(size_t x, size_t y) const {
+  template<typename T, typename ST>
+  double Tensor<T,ST>::sqr_norm(ST x, ST y) const {
 
     double result = 0.0;
     T temp;
-    size_t offs = (y*Storage3D<T>::xDim_+x)*Storage3D<T>::zDim_;
+    ST offs = (y*Storage3D<T,ST>::xDim_+x)*Storage3D<T,ST>::zDim_;
 
-    for (size_t z=0; z < Storage3D<T>::zDim_; z++) {
-      temp = Storage3D<T>::data_[offs+z];
+    for (ST z=0; z < Storage3D<T,ST>::zDim_; z++) {
+      temp = Storage3D<T,ST>::data_[offs+z];
       result += temp*temp;
     }
       
     return result;
   }
 
-  template<typename T>
-  T Tensor<T>::sum() const {
+  template<typename T, typename ST>
+  T Tensor<T,ST>::sum() const {
 
     T result = 0.0;
-    for (size_t i=0; i < Storage3D<T>::size(); i++) {
-      result += Storage3D<T>::data_[i];
+    for (ST i=0; i < Storage3D<T,ST>::size(); i++) {
+      result += Storage3D<T,ST>::data_[i];
     }
 
     return result;
   }
 
-  template<typename T>
-  T Tensor<T>::max() const {
+  template<typename T, typename ST>
+  T Tensor<T,ST>::max() const {
     
 //     T max_el = std::numeric_limits<T>::min();
-//     for (size_t i=0; i < Storage3D<T>::size_; i++)
+//     for (ST i=0; i < Storage3D<T>::size_; i++)
 //       max_el = std::max(Storage3D<T>::data_[i],max_el);
 //     return max_el;
     
@@ -290,11 +337,11 @@ namespace Math3D {
   template<>
   float Tensor<float>::max() const;
     
-  template<typename T>
-  T Tensor<T>::min() const {
+  template<typename T, typename ST>
+  T Tensor<T,ST>::min() const {
     
 //     T min_el = std::numeric_limits<T>::max();
-//     for (size_t i=0; i < Storage3D<T>::size_; i++)
+//     for (ST i=0; i < Storage3D<T>::size_; i++)
 //       min_el = std::min(Storage3D<T>::data_[i],min_el);
 //     return min_el;
     
@@ -304,12 +351,12 @@ namespace Math3D {
   template<>
   float Tensor<float>::min() const;
 
-  template<typename T>
-  T Tensor<T>::max_abs() const {
+  template<typename T, typename ST>
+  T Tensor<T,ST>::max_abs() const {
 
     T max_el = std::numeric_limits<T>::min();
-    for (size_t i=0; i < Storage3D<T>::size_; i++) {
-      T cur = Storage3D<T>::data_[i];
+    for (ST i=0; i < Storage3D<T>::size_; i++) {
+      T cur = Storage3D<T,ST>::data_[i];
       if (cur < 0)
 	cur *= -1;
       max_el = std::max(cur,max_el);
@@ -318,32 +365,32 @@ namespace Math3D {
     return max_el;
   }
 
-  template<typename T>
-  T Tensor<T>::max(size_t z) const {
+  template<typename T, typename ST>
+  T Tensor<T,ST>::max(ST z) const {
 
     T max_el = std::numeric_limits<T>::min();
-    for (size_t i=z; i < Storage3D<T>::size_; i+=z)
-      max_el = std::max(Storage3D<T>::data_[i],max_el);
+    for (ST i=z; i < Storage3D<T,ST>::size_; i+=z)
+      max_el = std::max(Storage3D<T,ST>::data_[i],max_el);
       
     return max_el;
   }
     
-  template<typename T>
-  T Tensor<T>::min(size_t z) const {
+  template<typename T, typename ST>
+  T Tensor<T,ST>::min(ST z) const {
 
     T min_el = std::numeric_limits<T>::max();
-    for (size_t i=z; i < Storage3D<T>::size_; i+=z)
-      min_el = std::min(Storage3D<T>::data_[i],min_el);
+    for (ST i=z; i < Storage3D<T,ST>::size_; i+=z)
+      min_el = std::min(Storage3D<T,ST>::data_[i],min_el);
 
     return min_el;
   }
 
-  template<typename T>
-  T Tensor<T>::max_abs(size_t z) const {
+  template<typename T, typename ST>
+  T Tensor<T,ST>::max_abs(ST z) const {
 
     T max_el = std::numeric_limits<T>::min();
-    for (size_t i=z; i < Storage3D<T>::size_; i+=z) {
-      T cur = Storage3D<T>::data_[i];
+    for (ST i=z; i < Storage3D<T,ST>::size_; i+=z) {
+      T cur = Storage3D<T,ST>::data_[i];
       if (cur < 0)
 	cur *= (T) -1;
       max_el = std::max(cur,max_el);
@@ -352,17 +399,17 @@ namespace Math3D {
     return max_el;
   }
 
-  template<typename T>
-  inline double Tensor<T>::max_vector_norm() const {
+  template<typename T, typename ST>
+  inline double Tensor<T,ST>::max_vector_norm() const {
 
     double max_norm = 0.0;
 
-    for (uint y=0; y < Storage3D<T>::yDim_; y++) {
-      for (uint x=0; x < Storage3D<T>::xDim_; x++) {
+    for (ST y=0; y < Storage3D<T,ST>::yDim_; y++) {
+      for (ST x=0; x < Storage3D<T,ST>::xDim_; x++) {
 	double cur_norm = 0.0;
-	size_t base = (y*Storage3D<T>::xDim_+x)*Storage3D<T>::zDim_;
-	for (uint z=0; z < Storage3D<T>::zDim_; z++) {
-	  T cur_datum = Storage3D<T>::data_[base+z];
+	ST base = (y*Storage3D<T,ST>::xDim_+x)*Storage3D<T,ST>::zDim_;
+	for (ST z=0; z < Storage3D<T,ST>::zDim_; z++) {
+	  T cur_datum = Storage3D<T,ST>::data_[base+z];
 	  cur_norm += cur_datum*cur_datum;
 	}
 	cur_norm = sqrt(cur_norm);
@@ -372,20 +419,20 @@ namespace Math3D {
     return max_norm;
   }
 
-  template<typename T>
-  void Tensor<T>::set_constant(const T constant) {
+  template<typename T, typename ST>
+  void Tensor<T,ST>::set_constant(const T constant) {
 
-    const size_t size = Storage3D<T>::size_;
+    const ST size = Storage3D<T>::size_;
 
-    size_t i;
+    ST i;
     for (i=0; i < size; i++)
-      Storage3D<T>::data_[i] = constant;
+      Storage3D<T,ST>::data_[i] = constant;
   }
 
-  template<typename T>
-  bool Tensor<T>::savePPM(std::string filename, size_t max_intensity, bool fit_to_range) const {
+  template<typename T, typename ST>
+  bool Tensor<T,ST>::savePPM(std::string filename, size_t max_intensity, bool fit_to_range) const {
     
-    size_t zDim = this->zDim();
+    ST zDim = this->zDim();
     
     if (zDim != 1 && zDim != 3) {
       std::cerr << "WARNING: cannot save a tensor with " << zDim << " channels as either pgm or ppm. Operation aborted."
@@ -412,10 +459,10 @@ namespace Math3D {
     of.open(filename.c_str(), std::ios::binary | std::ios::app);
     of << '\n';
 
-    for (size_t i=0; i < Storage3D<T>::size_; i++) {
+    for (ST i=0; i < Storage3D<T,ST>::size_; i++) {
 
       if (max_intensity < 256) {
-	T cur_datum = Storage3D<T>::data_[i];
+	T cur_datum = Storage3D<T,ST>::data_[i];
 	if (fit_to_range) {
 	  cur_datum = std::max(cur_datum,(T) 0);
 	  cur_datum = std::min(cur_datum,(T) max_intensity);
@@ -434,47 +481,47 @@ namespace Math3D {
     
   /*** implementation of NamedTensor ***/
 
-  template<typename T>
-  NamedTensor<T>::NamedTensor() : Tensor<T>(), name_("yyy") {}
+  template<typename T, typename ST>
+  NamedTensor<T,ST>::NamedTensor() : Tensor<T,ST>(), name_("yyy") {}
   
-  template<typename T>
-  NamedTensor<T>::NamedTensor(std::string name) : Tensor<T>(), name_(name) {}
+  template<typename T, typename ST>
+  NamedTensor<T,ST>::NamedTensor(std::string name) : Tensor<T,ST>(), name_(name) {}
   
-  template<typename T>
-  NamedTensor<T>::NamedTensor(size_t xDim, size_t yDim, size_t zDim, std::string name) :
-    Tensor<T>(xDim,yDim,zDim), name_(name) {}
+  template<typename T, typename ST>
+  NamedTensor<T,ST>::NamedTensor(ST xDim, ST yDim, ST zDim, std::string name) :
+    Tensor<T,ST>(xDim,yDim,zDim), name_(name) {}
   
-  template<typename T>
-  NamedTensor<T>::NamedTensor(size_t xDim, size_t yDim, size_t zDim, T default_value, std::string name) :
-    Tensor<T>(xDim,yDim,zDim,default_value), name_(name) {}
+  template<typename T, typename ST>
+  NamedTensor<T,ST>::NamedTensor(ST xDim, ST yDim, ST zDim, T default_value, std::string name) :
+    Tensor<T,ST>(xDim,yDim,zDim,default_value), name_(name) {}
   
-  template<typename T>
-  NamedTensor<T>::~NamedTensor() {}
+  template<typename T, typename ST>
+  NamedTensor<T,ST>::~NamedTensor() {}
   
-  template<typename T>
-  /*virtual*/ const std::string& NamedTensor<T>::name() const {
+  template<typename T, typename ST>
+  /*virtual*/ const std::string& NamedTensor<T,ST>::name() const {
     return name_;
   }
 
-  template<typename T>
-  void NamedTensor<T>::set_name(std::string name) {
+  template<typename T, typename ST>
+  void NamedTensor<T,ST>::set_name(std::string name) {
     name_ = name;
   }
   
-  template<typename T>
-  inline void NamedTensor<T>::operator=(const Tensor<T>& toCopy) {
-    Tensor<T>::operator=(toCopy);
+  template<typename T, typename ST>
+  inline void NamedTensor<T,ST>::operator=(const Tensor<T,ST>& toCopy) {
+    Tensor<T,ST>::operator=(toCopy);
   }
   
   //NOTE: the name is NOT copied
-  template<typename T>
-  inline void NamedTensor<T>::operator=(const NamedTensor<T>& toCopy) {
-    Tensor<T>::operator=(toCopy);
+  template<typename T, typename ST>
+  inline void NamedTensor<T,ST>::operator=(const NamedTensor<T,ST>& toCopy) {
+    Tensor<T,ST>::operator=(toCopy);
   }
 
   /*** implementation of stand-alone operators and routines ****/
-  template<typename T>
-  Tensor<T> operator+(const Tensor<T>& v1, const Tensor<T>& v2) {
+  template<typename T, typename ST>
+  Tensor<T,ST> operator+(const Tensor<T,ST>& v1, const Tensor<T,ST>& v2) {
 
     if (v1.xDim() != v2.xDim() || v1.yDim() != v2.yDim() || v1.zDim() != v2.zDim() ) {
 
@@ -485,18 +532,18 @@ namespace Math3D {
       exit(1);
     }
 
-    Tensor<T> result(v1.xDim(), v1.yDim(), v1.zDim());
-    const size_t size = v1.size();
+    Tensor<T,ST> result(v1.xDim(), v1.yDim(), v1.zDim());
+    const ST size = v1.size();
 
-    size_t i;
+    ST i;
     for (i=0; i < size; i++)
       result.direct_access(i) = v1.direct_access(i)+v2.direct_access(i);
 
     return result;
   }
   
-  template<typename T>
-  Tensor<T> operator-(const Tensor<T>& v1, const Tensor<T>& v2) {
+  template<typename T, typename ST>
+  Tensor<T,ST> operator-(const Tensor<T,ST>& v1, const Tensor<T,ST>& v2) {
 
     if (v1.xDim() != v2.xDim() || v1.yDim() != v2.yDim() || v1.zDim() != v2.zDim() ) {
 
@@ -507,10 +554,10 @@ namespace Math3D {
       exit(1);
     }
 
-    Tensor<T> result(v1.xDim(), v1.yDim(), v1.zDim());
-    const size_t size = v1.size();
+    Tensor<T,ST> result(v1.xDim(), v1.yDim(), v1.zDim());
+    const ST size = v1.size();
     
-    size_t i;
+    ST i;
     for (i=0; i < size; i++)
       result.direct_access(i) = v1.direct_access(i)-v2.direct_access(i);
 

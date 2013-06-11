@@ -14,7 +14,7 @@
 
 #ifdef WIN32
 namespace {
-bool isnan(double x) {
+inline bool isnan(double x) {
   return (x != x);
 }
 }
@@ -51,7 +51,63 @@ std::string toString(T obj, uint width=1) {
   return s.str();
 }
 
+namespace Makros {
+
+  void register_typename(const std::string& id, const std::string& fullname);
+
+  std::string get_typename(const std::string& id);
+
+  template<typename T>
+  class Typename {
+  public:
+
+    std::string name() const;
+  };
+
+  template<typename T>
+  std::string Typename<T>::name() const {
+
+    return get_typename(typeid(T).name());
+  }
+
+  //specializations:
+
+  template<typename T>
+  class Typename<const T> {
+  public:
+
+    std::string name() const {
+      
+      return "const " +Typename<T>().name();
+    }
+  };
+
+
+  template<typename T>
+  class Typename<T*> {
+  public:
+    
+    std::string name() const {
+      
+      return Typename<T>().name() + "*";
+    }
+  };
+}
+
+template<typename T>
+std::ostream& operator<<(std::ostream& out, const Makros::Typename<T>& t) {
+
+  out << t.name();
+  return out;
+}
+
+template<typename T>
+std::string operator+(std::string s, const Makros::Typename<T>& t) {
+  return s + t.name();
+}
+
 /***********************/
+
 template <typename T>
 T convert(const std::string s) {
   
@@ -60,7 +116,8 @@ T convert(const std::string s) {
   
   is >> result;
   if (is.bad() || is.fail()) {
-    std::cerr << "ERROR: conversion of \"" << s << "\" failed. exiting." << std::endl; 
+    std::cerr << "ERROR: conversion of \"" << s << "\" to " << Makros::Typename<T>().name() //Makros::get_typename(typeid(T).name()) 
+	      << " failed. Exiting." << std::endl; 
     exit(1);
   }
   if (!is.eof()) {
@@ -89,7 +146,7 @@ void operator+=(std::pair<T1,T2>& x, const std::pair<T1,T2>& y) {
 
 
 /********************* Code Macros ****************************/
-#define TODO(s) { std::cerr << "TODO ERROR[" << __FILE__ << ":" << __LINE__ << "]: feature \"" << (s) << "\" is currently not implemented. exiting..." << std::endl; exit(1); } 
+#define TODO(s) { std::cerr << "TODO ERROR[" << __FILE__ << ":" << __LINE__ << "]: feature \"" << (s) << "\" is currently not implemented. Exiting..." << std::endl; exit(1); } 
 #define EXIT(s) { std::cerr << s << std::endl; exit(1); }
 #define MAKENAME(s) std::string(#s) + std::string("[") + std::string(__FILE__) + std::string(":") + toString(__LINE__) + std::string("]")
 
@@ -165,8 +222,9 @@ namespace Makros {
     asm __volatile__ ("movups %[tmp], %%xmm6" : : [tmp] "m" (tmp[0]) : "xmm6");
     for (i=0; (i+4) <= nData; i += 4) {
       fptr = data+i;
-      asm __volatile__ ("movups %[fptr], %%xmm7" : : [fptr] "m" (fptr[0]) : "xmm7");
-      asm __volatile__ ("maxps %%xmm7, %%xmm6" : : : "xmm6");
+      asm __volatile__ ("movups %[fptr], %%xmm7\n\t"
+                        "maxps %%xmm7, %%xmm6" : : [fptr] "m" (fptr[0]) : "xmm6", "xmm7");
+
     }
     asm __volatile__ ("movups %%xmm6, %[tmp]" : [tmp] "=m" (tmp[0]) : : );
     for (i=0; i < 4; i++)
@@ -202,8 +260,8 @@ namespace Makros {
     asm __volatile__ ("movups %[tmp], %%xmm6" : : [tmp] "m" (tmp[0]) : "xmm6");
     for (i=0; (i+4) <= nData; i += 4) {
       fptr = data+i;
-      asm __volatile__ ("movups %[fptr], %%xmm7" : : [fptr] "m" (fptr[0]) : "xmm7");
-      asm __volatile__ ("minps %%xmm7, %%xmm6" : : );
+      asm __volatile__ ("movups %[fptr], %%xmm7 \n\t" 
+                        "minps %%xmm7, %%xmm6 \n\t" : : [fptr] "m" (fptr[0]) : "xmm6","xmm7");
     }
     asm __volatile__ ("movups %%xmm6, %[tmp]" : [tmp] "=m" (tmp[0]) :  : "xmm6");
     for (i=0; i < 4; i++)
@@ -246,21 +304,27 @@ namespace Makros {
     
     wchar_t itemp[4] = {1,1,1,1}; 
 
-    asm __volatile__ ("movups %[tmp], %%xmm6" : : [tmp] "m" (tmp[0]) : "xmm6" );
-    asm __volatile__ ("xorps %%xmm5, %%xmm5" : : : "xmm5"); //sets xmm5 (= argmax) to zero
-    asm __volatile__ ("movups %[itemp], %%xmm4" : : [itemp] "m" (itemp[0]) : "xmm4"); //vector of 1s
-    asm __volatile__ ("xorps %%xmm3, %%xmm3" : : : "xmm3"); //contains candidate argmax
+    asm __volatile__ ("movups %[tmp], %%xmm6 \n\t"
+                      "xorps %%xmm5, %%xmm5 \n\t" //sets xmm5 (= argmax) to zero
+                      "movups %[itemp], %%xmm4 \n\t"
+                      "xorps %%xmm3, %%xmm3 \n\t"
+                      : : [tmp] "m" (tmp[0]), [itemp] "m" (itemp[0]) : "xmm3", "xmm4", "xmm5", "xmm6");
+
     for (i=0; (i+4) <= nData; i += 4) {
       fptr = data+i;
-      asm __volatile__ ("movups %[fptr], %%xmm7" : : [fptr] "m" (fptr[0]) : "xmm7");
-      asm __volatile__ ("movaps %%xmm7, %%xmm0" : : : "xmm0");
-      asm __volatile__ ("cmpnleps %%xmm6, %%xmm0" : : : "xmm0"); //mask is stored in xmm0
-      asm __volatile__ ("blendvps %%xmm7, %%xmm6" : : : "xmm6"); //xmm0 is implicit argument
-      asm __volatile__ ("blendvps %%xmm3, %%xmm5" : : : "xmm5");
-      asm __volatile__ ("paddd %%xmm4, %%xmm3" : : : "xmm3");
+
+      asm __volatile__ ("movups %[fptr], %%xmm7 \n\t"
+                        "movaps %%xmm7, %%xmm0 \n\t"
+                        "cmpnleps %%xmm6, %%xmm0 \n\t"
+                        "blendvps %%xmm7, %%xmm6 \n\t"
+                        "blendvps %%xmm3, %%xmm5 \n\t"
+                        "paddd %%xmm4, %%xmm3 \n\t"
+                        : : [fptr] "m" (fptr[0]) : "xmm0", "xmm3", "xmm5", "xmm6", "xmm7");
     }
-    asm __volatile__ ("movups %%xmm6, %[tmp]" : [tmp] "=m" (tmp[0]) : : );
-    asm __volatile__ ("movups %%xmm5, %[itemp]" : [itemp] "=m" (itemp[0]) : );
+
+    asm __volatile__ ("movups %%xmm6, %[tmp] \n\t" 
+                      "movups %%xmm5, %[itemp]" 
+                      : [tmp] "=m" (tmp[0]), [itemp] "=m" (itemp[0]) : : );
     
     for (i=0; i < 4; i++) {
       cur_val = tmp[i];
@@ -307,21 +371,27 @@ namespace Makros {
     
     volatile wchar_t itemp[4] = {1,1,1,1}; 
 
-    asm __volatile__ ("movups %[tmp], %%xmm6" : : [tmp] "m" (tmp[0]) : "xmm6" );
-    asm __volatile__ ("xorps %%xmm5, %%xmm5" : : : "xmm5" ); //sets xmm5 (= argmax) to zero
-    asm __volatile__ ("movups %[itemp], %%xmm4" : : [itemp] "m" (itemp[0]) : "xmm4"); //vector of 1s
-    asm __volatile__ ("xorps %%xmm3, %%xmm3" : : : "xmm3"); //contains candidate argmax
+    asm __volatile__ ("movups %[tmp], %%xmm6 \n\t"
+                      "xorps %%xmm5, %%xmm5 \n\t" //sets xmm5 (= argmin) to zero
+                      "movups %[itemp], %%xmm4 \n\t"
+                      "xorps %%xmm3, %%xmm3 \n\t" //contains candidate argmin
+                      : : [tmp] "m" (tmp[0]), [itemp] "m" (itemp[0]) :  "xmm3" , "xmm4" , "xmm5", "xmm6");
+
     for (i=0; (i+4) <= nData; i += 4) {
       fptr = data+i;
-      asm __volatile__ ("movups %[fptr], %%xmm7" : : [fptr] "m" (fptr[0]) : "xmm7");
-      asm __volatile__ ("movaps %%xmm7, %%xmm0" : : : "xmm7", "xmm0");
-      asm __volatile__ ("cmpltps %%xmm6, %%xmm0" : : : "xmm0"); //mask is stored in xmm0
-      asm __volatile__ ("blendvps %%xmm7, %%xmm6" : : : "xmm6"); //xmm0 is implicit argument
-      asm __volatile__ ("blendvps %%xmm3, %%xmm5" : : : "xmm5");
-      asm __volatile__ ("paddd %xmm4, %xmm3");
+
+      asm __volatile__ ("movups %[fptr], %%xmm7 \n\t"
+                        "movaps %%xmm7, %%xmm0 \n\t"
+                        "cmpltps %%xmm6, %%xmm0 \n\t"
+                        "blendvps %%xmm7, %%xmm6 \n\t"
+                        "blendvps %%xmm3, %%xmm5 \n\t"
+                        "paddd %%xmm4, %%xmm3 \n\t"
+                        : : [fptr] "m" (fptr[0]) : "xmm0", "xmm3", "xmm5", "xmm6", "xmm7");
     }
-    asm __volatile__ ("movups %%xmm6, %[tmp]" : [tmp] "=m" (tmp[0]) : : "xmm6" );
-    asm __volatile__ ("movups %%xmm5, %[itemp]" : [itemp] "=m" (itemp[0]) : : "xmm5");
+
+    asm __volatile__ ("movups %%xmm6, %[tmp] \n\t"
+                      "movups %%xmm5, %[itemp] \n\t"
+                      : [tmp] "=m" (tmp[0]), [itemp] "=m" (itemp[0]) : : "xmm5", "xmm6");
 
     //std::cerr << "intermediate minval: " << min_val << std::endl;
 
@@ -362,9 +432,10 @@ namespace Makros {
 
     for (i=0; i+4 <= nData; i+=4) {
       fptr = data + i;
-      asm volatile ("movups %[fptr], %%xmm6" : : [fptr] "m" (fptr[0]) : "xmm6" );
-      asm volatile ("mulps %%xmm7, %%xmm6" : : : "xmm6");
-      asm volatile ("movups %%xmm6, %[fptr]" : [fptr] "=m" (fptr[0]) : : );
+      asm volatile ("movups %[fptr], %%xmm6 \n\t"
+                    "mulps %%xmm7, %%xmm6 \n\t"
+                    "movups %%xmm6, %[fptr] \n\t"
+                    : [fptr] "+m" (fptr[0]) : : "xmm6");
     }
     
     for (i= nData - (nData % 4); i < nData; i++) {
@@ -389,9 +460,11 @@ namespace Makros {
 
     for (i=0; i+2 <= nData; i+=2) {
       dptr = data + i;
-      asm volatile ("movupd %[dptr], %%xmm6" : : [dptr] "m" (dptr[0]) : "xmm6" );
-      asm volatile ("mulpd %%xmm7, %%xmm6" : : : "xmm6");
-      asm volatile ("movupd %%xmm6, %[dptr]" : [dptr] "=m" (dptr[0]) : : );
+
+      asm volatile ("movupd %[dptr], %%xmm6 \n\t"
+                    "mulpd %%xmm7, %%xmm6 \n\t"
+                    "movupd %%xmm6, %[dptr] \n\t"
+                    : [dptr] "+m" (dptr[0]) : : "xmm6");
     }
     
     for (i= nData - (nData % 2); i < nData; i++) {
@@ -418,12 +491,14 @@ namespace Makros {
     asm volatile ("movupd %[temp], %%xmm7" : : [temp] "m" (temp[0]) : "xmm7" );
     for (i=0; i+2 <= nData; i+=2) {
       cdptr = data2+i;
-      asm volatile ("movupd %[cdptr], %%xmm6" : : [cdptr] "m" (cdptr[0]) : "xmm6" );
-      asm volatile ("mulpd %%xmm7, %%xmm6" : : : "xmm6");
       dptr = data+i;
-      asm volatile ("movupd %[dptr], %%xmm5" : : [dptr] "m" (dptr[0]) : "xmm5" );
-      asm volatile ("subpd %%xmm6, %%xmm5" : : : "xmm5");
-      asm volatile ("movupd %%xmm5, %[dptr]" : [dptr] "=m" (dptr[0]) : : );
+  
+      asm volatile ("movupd %[cdptr], %%xmm6 \n\t"
+                    "mulpd %%xmm7, %%xmm6 \n\t"
+                    "movupd %[dptr], %%xmm5 \n\t"
+                    "subpd %%xmm6, %%xmm5 \n\t"
+                    "movupd %%xmm5, %[dptr] \n\t"
+                    : [dptr] "+m" (dptr[0]) : [cdptr] "m" (cdptr[0]) : "xmm5", "xmm6");
     }
     
     for (i= nData - (nData % 2); i < nData; i++) 
@@ -431,17 +506,16 @@ namespace Makros {
 #endif
   }
   
-
+  template<typename T1, typename T2>
+  class first_lower {
+  public:
+    bool operator()(const std::pair<T1,T2>& p1, const std::pair<T1,T2>& p2) {
+      return (p1.first < p2.first);
+    } 
+  };
 
 } //end of namespace Makros
 
 
-/*** use std::swap instead!! ***/
-// template<typename T>
-// inline void swap(T& x, T& y) {
-//   T z = x;
-//   x = y;
-//   y = z;
-// }
 
 #endif

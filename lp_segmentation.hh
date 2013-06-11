@@ -10,13 +10,19 @@
 
 //solves a segmentation problem with length regularity via an LP
 double lp_segment_lenreg(const Math2D::Matrix<float>& data_term, const LPSegOptions& options,
-			 double energy_offset, Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels = 0);
+                         double energy_offset, Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels = 0);
 
 //solves a segmentation problem with length and curvature regularity via an LP
 double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
-			  Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels = 0);
+                          Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels = 0);
+
+
+double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
+                                          Math2D::Matrix<uint>& segmentation, std::string method = "bp",
+                                          const Math2D::Matrix<int>* fixed_labels = 0);
+
 
 double curv_icm(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset,
-		Math2D::Matrix<uint>& segmentation);
+                Math2D::Matrix<uint>& segmentation);
 
 #endif
