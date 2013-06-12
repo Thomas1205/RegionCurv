@@ -13,10 +13,8 @@
 #include "sampling.hh"
 #include "lp_segmenter.hh"
 
-#ifdef HAS_QPBO
 //by Petter Strandmark
 #include "qpbo_segmentation.hh"
-#endif
 
 void check_filename(std::string name)
 {
@@ -30,45 +28,45 @@ void check_filename(std::string name)
 int main(int argc, char** argv) {
 
   if (argc == 1 || (argc == 2 && strings_equal(argv[1],"-h"))) {
-
+    
     std::cerr << "USAGE: " << argv[0] << std::endl
-      << "  -i <pgm or ppm> : filename of input image (to be segmented)" << std::endl
-      << "  -lambda <double> : length weight" << std::endl
-      << "  -gamma <double> : curvature weight" << std::endl
-      << "  -o <filename> : name of the output segmentation" << std::endl
-      << "  -method (lp | factor-lp) " << std::endl
-      << "  -regions <uint>" << std::endl
-      << "  -mu0 <double> -mu1 <double> : mean values for background and foreground, respectively" << std::endl
-      << "  -griddim <uint> : dimension of the mesh, default is the image size" << std::endl
-      << "     if you want a non-square mesh different from the image size, use -griddimx <uint> and -griddimy <uint>" << std::endl
-      << "  -boundary-constraints (tight | simple | extra | off) : constraints to ensure consistency of regions and boundaries." 
-      << "     default is tight (= Strandmark&Kahl 11), extra unites simple and tight " << std::endl 
-      << " [-n (4|8|16)] : size of neighborhood, default 8" << std::endl
-      << " [-ignore-crossings] : allow crossings of line pairs, e.g. when three regions meet in a point" << std::endl
-      << " [-light-constraints] : take only half of the optional constraints" << std::endl
-      << " [-hex-mesh] : use hexagonal mesh instead of squared mesh" << std::endl
-      << " [-adaptive (uint)] : use adaptive meshing" << std::endl
-      << " [-debug-svg]: draw SVG files for debugging" << std::endl
-      << " [-reduce-pairs] : same some memory and run-time by not considering pairs with very high curvature" << std::endl
-      << " -solver ( clp | gurobi | cplex | xpress | own-conv ) : default clp" << std::endl
-      << " -mode ( standard | msed | qpbo | icm )" << std::endl
-      << std::endl;
+              << "  -i <pgm or ppm> : filename of input image (to be segmented)" << std::endl
+              << "  -lambda <double> : length weight" << std::endl
+              << "  -gamma <double> : curvature weight" << std::endl
+              << "  -o <filename> : name of the output segmentation" << std::endl
+              << "  -method (lp | factor-lp) " << std::endl
+              << "  -regions <uint>" << std::endl
+              << "  -mu0 <double> -mu1 <double> : mean values for background and foreground, respectively" << std::endl
+              << "  -griddim <uint> : dimension of the mesh, default is the image size" << std::endl
+              << "     if you want a non-square mesh different from the image size, use -griddimx <uint> and -griddimy <uint>" << std::endl
+              << "  -boundary-constraints (tight | simple | extra | off) : constraints to ensure consistency of regions and boundaries." 
+              << std::endl << "     default is tight (= Strandmark&Kahl 11), extra unites simple and tight " << std::endl 
+              << " [-n (4|8|16)] : size of neighborhood, default 8" << std::endl
+              << " [-ignore-crossings] : allow crossings of line pairs, e.g. when three regions meet in a point" << std::endl
+              << " [-light-constraints] : take only half of the optional constraints" << std::endl
+              << " [-hex-mesh] : use hexagonal mesh instead of squared mesh" << std::endl
+              << " [-adaptive (uint)] : use adaptive meshing" << std::endl
+              << " [-debug-svg]: draw SVG files for debugging" << std::endl
+              << " [-reduce-pairs] : same some memory and run-time by not considering pairs with very high curvature" << std::endl
+              << " [-solver ( clp | gurobi | cplex | xpress | own-conv) : default clp]" << std::endl
+              << " [-mode (standard | bp | mplp | msd | factor-dd | chain-dd | smooth-chain-dd | trws | qpbo | icm | sep-msd | sep-trws | sep-chain-dd )" << std::endl
+              << std::endl;
 
     exit(0);
   }
 
   ParamDescr  params[] = {{"-i",mandInFilename,0,""},{"-lambda",optWithValue,1,"1.0"},
-			  {"-gamma",optWithValue,1,"1.0"},{"-o",mandOutFilename,0,""},{"-n",optWithValue,1,"8"},
-			  {"-boundary-constraints",optWithValue,1,"tight"},
-			  {"-method",optWithValue,1,"lp"},{"-bruckstein",flag,0,""},
-			  {"-adaptive",optWithValue,0,""},{"-hex-mesh",flag,0,""},{"-regions",optWithValue,1,"2"},
-			  {"-light-constraints",flag,0,""},{"-debug-svg",flag,0,""},{"-mu0",optWithValue,1,"-1"},
-			  {"-mu1",optWithValue,1,"-1"},{"-griddim",optWithValue,1,"-1"},{"-griddimx",optWithValue,1,"-1"},
-			  {"-griddimy",optWithValue,1,"-1"},{"-solver",optWithValue,1,"clp"},
-			  {"-ignore-crossings",flag,0,""},{"-no-touching-regions",flag,0,""},{"-convex",flag,0,""},
-			  {"-reduce-pairs",flag,0,""},{"-mode",optWithValue,1,"standard"},
-			  {"-refine",flag,0,""},{"-min-objects",optWithValue,1,"0"}, {"-max-objects",optWithValue,1,"1000000"}, 
-			  {"-curv-power",optWithValue,1,"2.0"},{"-factorize-frequency",optWithValue,0,""}};
+                          {"-gamma",optWithValue,1,"1.0"},{"-o",mandOutFilename,0,""},{"-n",optWithValue,1,"8"},
+                          {"-boundary-constraints",optWithValue,1,"tight"},{"-mode",optWithValue,1,"standard"},
+                          {"-method",optWithValue,1,"lp"},{"-bruckstein",flag,0,""},
+                          {"-adaptive",optWithValue,0,""},{"-hex-mesh",flag,0,""},{"-regions",optWithValue,1,"2"},
+                          {"-light-constraints",flag,0,""},{"-debug-svg",flag,0,""},{"-mu0",optWithValue,1,"-1"},
+                          {"-mu1",optWithValue,1,"-1"},{"-griddim",optWithValue,1,"-1"},{"-griddimx",optWithValue,1,"-1"},
+                          {"-griddimy",optWithValue,1,"-1"},{"-solver",optWithValue,1,"clp"},
+                          {"-ignore-crossings",flag,0,""},{"-no-touching-regions",flag,0,""},
+                          {"-reduce-pairs",flag,0,""},{"-convex",flag,0,""},{"-factorize-frequency",optWithValue,0,""},
+			  {"-rescale",flag,0,""},{"-refine",flag,0,""},{"-curv-power",optWithValue,1,"2.0"},
+			  {"-min-objects",optWithValue,1,"0"},{"-max-objects",optWithValue,1,"1000000"}};
 
   const int nParams = sizeof(params)/sizeof(ParamDescr);
 
@@ -88,6 +86,9 @@ int main(int argc, char** argv) {
   uint yDim = uint( color_image.yDim() );
   uint zDim = uint( color_image.zDim() );
 
+  std::string method_string = app.getParam("-method");
+  std::string mode_string = app.getParam("-mode");
+
   Math2D::NamedGrayImage<float> gray_image(xDim,yDim,color_image.max_intensity(),MAKENAME(gray_image));
   for (uint y=0; y < yDim; y++) {
     for (uint x=0; x < xDim; x++) {
@@ -103,15 +104,13 @@ int main(int argc, char** argv) {
   uint nRegions = convert<uint>(app.getParam("-regions"));
   uint neighborhood = convert<uint>(app.getParam("-n"));
 
-  std::string method_string = app.getParam("-method");
-  std::string mode_string = app.getParam("-mode");
-
   Math2D::NamedMatrix<float> data_term(xDim,yDim,MAKENAME(data_term));
   Math2D::NamedMatrix<uint> segmentation(xDim,yDim,0,MAKENAME(segmentation));
 
   float energy_offset = 0.0;
   float mu0 = convert<float>(app.getParam("-mu0"));
   float mu1 = convert<float>(app.getParam("-mu1"));
+
 
   // If mu0 and mu1 are unspecified
   if (mu0 < 0 || mu1 < 0) {
@@ -195,7 +194,6 @@ int main(int argc, char** argv) {
     }
 
     std::cerr << "mu0 = " << mu0 << "  mu1 = " << mu1 << std::endl;
-
   }
 
   for (uint y=0; y < yDim; y++) {
@@ -220,13 +218,13 @@ int main(int argc, char** argv) {
     for (uint i=0; i < gray_image.size(); i++)
       intensity[i] = gray_image.direct_access(i);
     std::sort(intensity.direct_access(),intensity.direct_access()+gray_image.size());
-
+    
     //spread percentiles equally
     double share = 1.0 / nRegions;
     for (uint i=0; i < nRegions; i++) {
       mean[i] = intensity[std::size_t(gray_image.size() * (i+0.5)*share)];
     }
-
+    
     for (uint y=0; y < yDim; y++) {
       for (uint x=0; x < xDim; x++) {
         float cur = gray_image(x,y);
@@ -236,10 +234,19 @@ int main(int argc, char** argv) {
         }
       }
     }
+
   }
+
 
   double lambda = convert<double>(app.getParam("-lambda"));
   double gamma = convert<double>(app.getParam("-gamma"));
+
+  if (app.is_set("-rescale")) {
+    data_term *= 1.0 / 10000.0;
+    multi_data_term *= 1.0 / 10000.0;
+    lambda *= 1.0 / 10000.0;
+    gamma *= 1.0 / 10000.0;
+  }
 
   std::clock_t tStartComputation, tEndComputation;
   tStartComputation = std::clock();
@@ -258,12 +265,12 @@ int main(int argc, char** argv) {
   seg_opts.griddim_yDim_ = yDim;
   seg_opts.solver_ = app.getParam("-solver");
   seg_opts.base_filename_ = base_filename;
-  seg_opts.convex_prior_ =  app.is_set("-convex");
-  seg_opts.refine_ =  app.is_set("-refine");
-  seg_opts.min_objects_ = convert<int>( app.getParam("-min-objects") );
-  seg_opts.max_objects_ = convert<int>( app.getParam("-max-objects") );
+  seg_opts.convex_prior_ = app.is_set("-convex");
   seg_opts.debug_svg_ = app.is_set("-debug-svg");
   seg_opts.curv_power_ = convert<double>(app.getParam("-curv-power"));
+
+  if (app.is_set("-factorize-frequency"))
+    seg_opts.factorization_frequency_ = convert<uint>(app.getParam("-factorize-frequency"));
 
   if (app.is_set("-reduce-pairs"))
     seg_opts.reduce_edge_pairs_ = true;
@@ -271,9 +278,7 @@ int main(int argc, char** argv) {
     seg_opts.gridtype_ = LPSegOptions::Hex;
   if (app.is_set("-adaptive"))
     seg_opts.adaptive_mesh_n_ = convert<int>(app.getParam("-adaptive"));
-  if (app.is_set("-factorize-frequency"))
-    seg_opts.factorization_frequency_ = convert<uint>(app.getParam("-factorize-frequency"));
-
+  
   std::string constraint_string = app.getParam("-boundary-constraints");
   if (constraint_string == "tight") {
     seg_opts.enforce_regionedge_ = true;
@@ -287,8 +292,8 @@ int main(int argc, char** argv) {
   }
   else if (constraint_string != "off") {
     USER_ERROR << "unknown boundary constraint mode \"" << constraint_string << "\"" << std::endl
-      << " choose from (tight | simple | extra | off)" << std::endl
-      << "  Exiting." << std::endl;
+               << " choose from (tight | simple | extra | off)" << std::endl
+               << "  Exiting." << std::endl;
     exit(1);
   }
 
@@ -307,78 +312,108 @@ int main(int argc, char** argv) {
     seg_opts.output_factor_ = 1; // Usually no need to enlarge output now
   }
 
+
   bool need_curvature = false;
   if (gamma != 0.0 || seg_opts.min_objects_ > 0 || seg_opts.max_objects_ < 1000000 || seg_opts.convex_prior_) {
     need_curvature = true;
   }
 
   if ( ! need_curvature ) {
-
+      
     if (nRegions == 2)
       lp_segment_lenreg(data_term, seg_opts, energy_offset, segmentation);
     else {
-
+      
       LpSegmenter lp_segmenter(gray_image, seg_opts, nRegions, false);
-
+      
       lp_segmenter.segment(1);
-
+      
       segmentation = lp_segmenter.segmentation();
     }
   }
   else {
 
     if (method_string == "lp") {
+
       if (nRegions == 2) {
-        if (mode_string == "icm")
-          curv_icm(data_term, seg_opts, energy_offset, segmentation);
-        else
-          lp_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
+	
+	if (mode_string == "standard") 
+	  lp_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
+	else if (mode_string == "bp" || mode_string == "mplp" || mode_string == "msd" || mode_string == "trws"
+		 || mode_string == "factor-dd" || mode_string == "chain-dd")
+	  lp_segment_curvreg_message_passing(data_term, seg_opts, energy_offset, segmentation, mode_string);
+	else if (mode_string == "icm") {
+	  curv_icm(data_term, seg_opts, energy_offset, segmentation);
+	}
+	else {
+	  
+	  USER_ERROR << "invalid mode \"" << mode_string << "\" for constraint-based curvature. Exiting..." << std::endl;
+	  exit(1);
+	}
       }
       else {
 
-        if (mode_string == "icm") {
-          multi_curv_icm(multi_data_term, seg_opts, segmentation);
-        }
-        else {
-          LpSegmenter lp_segmenter(gray_image, seg_opts, nRegions, false);
-
-          lp_segmenter.segment(1);
-
-          segmentation = lp_segmenter.segmentation();
-        }
+	if (mode_string == "icm") {
+	  multi_curv_icm(multi_data_term, seg_opts, segmentation);
+	}
+	else {
+	  LpSegmenter lp_segmenter(gray_image, seg_opts, nRegions, false);
+	  
+	  lp_segmenter.segment(1);
+	  
+	  segmentation = lp_segmenter.segmentation();
+	}
       }
     }
     else {
+      
+      if (nRegions != 2) {
+	if (mode_string != "standard" && mode_string != "msd" && mode_string != "icm")
+	  std::cerr << "!!!WARNING: the number of regions is ignored in this mode!!!" << std::endl;
+	else
+	  energy_offset = 0.0;
+      }
+      
 
-      if (mode_string == "msd") {
-        //clique_lp_segment_curvreg_minsum_diffusion(data_term, seg_opts, energy_offset, segmentation);
-        factor_lp_segment_curvreg_minsum_diffusion_memsave(multi_data_term, seg_opts, energy_offset, segmentation);
+      if (mode_string == "standard") {
+	if (nRegions == 2)
+	  factor_lp_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
+	else {
+	  //factor_lp_segment_pottscurvreg(multi_data_term, seg_opts, segmentation);
+	  factor_lp_segment_pottscurvreg_layered(multi_data_term, seg_opts, segmentation);
+	}
       }
+      else if (mode_string == "msd") {
+	if (nRegions == 2) {
+	  multi_data_term.resize(xDim,yDim,2,0.0);
+	  for (uint y=0; y < yDim; y++)
+	    for (uint x=0; x < xDim; x++)
+	      multi_data_term(x,y,1) = data_term(x,y);
+	}
+	//factor_lp_segment_curvreg_minsum_diffusion(data_term, seg_opts, energy_offset, segmentation);
+	factor_lp_segment_curvreg_minsum_diffusion_memsave(multi_data_term, seg_opts, energy_offset, segmentation);
+	factor_lp_segment_curvreg_message_passing(data_term, seg_opts, energy_offset, segmentation, "msd");
+      }
+      else if (mode_string == "factor-dd" || mode_string == "chain-dd" || mode_string == "smooth-chain-dd" 
+	       || mode_string == "trws" || mode_string == "bp" || mode_string == "mplp"
+	       || mode_string == "sep-msd" || mode_string == "sep-trws" || mode_string == "sep-chain-dd")
+	factor_lp_segment_curvreg_message_passing(data_term, seg_opts, energy_offset, segmentation, mode_string, 0 , app.is_set("-rescale"));
       else if (mode_string == "qpbo") {
-#ifdef HAS_QPBO
-        qpbo_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
-#else
-        USER_ERROR << "method QPBO is not available in this pacakage" << std::endl;
-        exit(1);
-#endif
-      }
+	qpbo_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
+      } 
       else if (mode_string == "icm") {
-        if (nRegions == 2)
-          factor_curv_icm(data_term, seg_opts, energy_offset, segmentation);
-        else
-          factor_curv_icm(multi_data_term, seg_opts, segmentation);
+	if (nRegions == 2)
+	  factor_curv_icm(data_term, seg_opts, energy_offset, segmentation);
+	else
+	  factor_curv_icm(multi_data_term, seg_opts, segmentation);
       }
       else {
-        if (nRegions == 2)
-          factor_lp_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
-        else {
-          //clique_lp_segment_pottscurvreg(multi_data_term, seg_opts, segmentation);
-          factor_lp_segment_pottscurvreg_layered(multi_data_term, seg_opts, segmentation);
-        }
+
+	USER_ERROR << "invalid mode \"" << mode_string << "\" for factor-based curvature. Exiting..." << std::endl;
+	exit(1);
       }
     }
   }
-
 
   tEndComputation = std::clock();
 
@@ -390,21 +425,21 @@ int main(int argc, char** argv) {
   make_color_image(color_image,out_image);  
 
   uint scale_fac = 255 / (nRegions - 1);
-
+    
   Math2D::Matrix<float> true_seg(segmentation.xDim(),segmentation.yDim());
   for (uint i=0; i < true_seg.size(); i++) {
-
+    
     true_seg.direct_access(i) = double(segmentation.direct_access(i)) / double(scale_fac) + 0.5;
   }
-
+  
   Math2D::Matrix<float> fscaled_seg(xDim,yDim);
   downsample_matrix(true_seg, fscaled_seg);
 
   Math2D::Matrix<uint> scaled_seg(xDim,yDim);
   for (uint i=0; i < scaled_seg.size(); i++) {
-    scaled_seg.direct_access(i) = uint (fscaled_seg.direct_access(i));
+    scaled_seg.direct_access(i) = uint (fscaled_seg.direct_access(i) + 0.5);
   }
-
+  
   draw_segmentation(scaled_seg, out_image, 250.0, 250.0, 150.0);
 
   out_image.savePPM(base_filename + ".out.ppm");
