@@ -3498,14 +3498,14 @@ double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term
   if (bp_fac == 1) 
     facMPBP.mpbp(500);
   else if (trws_fac == 1)
-    lower_bound = facTRWS.optimize(/*250*/ 7);
+    lower_bound = facTRWS.optimize(250);
   else if (dd_fac == 1) 
-    lower_bound = dual_decomp.optimize(50,7500.0);
+    lower_bound = dual_decomp.optimize(500,7500.0);
   else {
     if (method == "mplp")
-      lower_bound = facDO.dual_bca(50,DUAL_BCA_MODE_MPLP,true,false);
+      lower_bound = facDO.dual_bca(500,DUAL_BCA_MODE_MPLP,true,false);
     else if (method == "msd")
-      lower_bound = facDO.dual_bca(50,DUAL_BCA_MODE_MSD,true,false);
+      lower_bound = facDO.dual_bca(500,DUAL_BCA_MODE_MSD,true,false);
     else
       lower_bound = facDO.subgradient_opt(500,0.001);
   }
