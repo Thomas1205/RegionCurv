@@ -47,9 +47,9 @@ int main(int argc, char** argv) {
               << " [-hex-mesh] : use hexagonal mesh instead of squared mesh" << std::endl
               << " [-adaptive (uint)] : use adaptive meshing" << std::endl
               << " [-debug-svg]: draw SVG files for debugging" << std::endl
-              << " [-reduce-pairs] : same some memory and run-time by not considering pairs with very high curvature" << std::endl
+              << " [-reduce-pairs] : save some memory and run-time by not considering pairs with very high curvature" << std::endl
               << " [-solver ( clp | gurobi | cplex | xpress | own-conv) : default clp]" << std::endl
-              << " [-mode (standard | bp | mplp | msd | factor-dd | chain-dd | smooth-chain-dd | trws | qpbo | icm | sep-msd | sep-trws | sep-chain-dd )" << std::endl
+              << " [-mode (standard | bp | mplp | msd | factor-dd | chain-dd | trws | qpbo | icm | sep-msd | sep-trws | sep-chain-dd )" << std::endl
               << std::endl;
 
     exit(0);
@@ -86,8 +86,8 @@ int main(int argc, char** argv) {
   uint yDim = uint( color_image.yDim() );
   uint zDim = uint( color_image.zDim() );
 
-  std::string method_string = app.getParam("-method");
-  std::string mode_string = app.getParam("-mode");
+  std::string method_string = downcase(app.getParam("-method"));
+  std::string mode_string = downcase(app.getParam("-mode"));
 
   Math2D::NamedGrayImage<float> gray_image(xDim,yDim,color_image.max_intensity(),MAKENAME(gray_image));
   for (uint y=0; y < yDim; y++) {
@@ -263,7 +263,7 @@ int main(int argc, char** argv) {
   seg_opts.light_constraints_ = app.is_set("-light-constraints");
   seg_opts.griddim_xDim_ = xDim;
   seg_opts.griddim_yDim_ = yDim;
-  seg_opts.solver_ = app.getParam("-solver");
+  seg_opts.solver_ = downcase(app.getParam("-solver"));
   seg_opts.base_filename_ = base_filename;
   seg_opts.convex_prior_ = app.is_set("-convex");
   seg_opts.debug_svg_ = app.is_set("-debug-svg");
@@ -279,7 +279,7 @@ int main(int argc, char** argv) {
   if (app.is_set("-adaptive"))
     seg_opts.adaptive_mesh_n_ = convert<int>(app.getParam("-adaptive"));
   
-  std::string constraint_string = app.getParam("-boundary-constraints");
+  std::string constraint_string = downcase(app.getParam("-boundary-constraints"));
   if (constraint_string == "tight") {
     seg_opts.enforce_regionedge_ = true;
   }
@@ -394,7 +394,7 @@ int main(int argc, char** argv) {
 	factor_lp_segment_curvreg_minsum_diffusion_memsave(multi_data_term, seg_opts, energy_offset, segmentation);
 	factor_lp_segment_curvreg_message_passing(data_term, seg_opts, energy_offset, segmentation, "msd");
       }
-      else if (mode_string == "factor-dd" || mode_string == "chain-dd" || mode_string == "smooth-chain-dd" 
+      else if (mode_string == "factor-dd" || mode_string == "chain-dd" 
 	       || mode_string == "trws" || mode_string == "bp" || mode_string == "mplp"
 	       || mode_string == "sep-msd" || mode_string == "sep-trws" || mode_string == "sep-chain-dd")
 	factor_lp_segment_curvreg_message_passing(data_term, seg_opts, energy_offset, segmentation, mode_string, 0 , app.is_set("-rescale"));

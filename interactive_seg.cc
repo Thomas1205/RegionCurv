@@ -163,7 +163,7 @@ int main(int argc, char** argv) {
   if (app.is_set("-reduce-pairs"))
     seg_opts.reduce_edge_pairs_ = true;
 
-  std::string constraint_string = app.getParam("-boundary-constraints");
+  std::string constraint_string = downcase(app.getParam("-boundary-constraints"));
   if (constraint_string == "tight") {
     seg_opts.enforce_regionedge_ = true;
   }
@@ -193,7 +193,7 @@ int main(int argc, char** argv) {
     seg_opts.light_constraints_ = app.is_set("-light-constraints");
     seg_opts.griddim_xDim_ = xDim;
     seg_opts.griddim_yDim_ = yDim;
-    seg_opts.solver_ = app.getParam("-solver");
+    seg_opts.solver_ = downcase(app.getParam("-solver"));
 
     int griddim = convert<int>(app.getParam("-griddim"));
     if (griddim > 0) {
