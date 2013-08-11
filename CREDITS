@@ -1,8 +1,11 @@
 This code was written by Thomas Schoenemann, Petter Strandmark and Yubin Kuang
-in 2009-2011. Thomas Schoenemann worked on this in his free time, at Lund
-University, Sweden, and at the University of Pisa, Italy. Petter Strandmark
-and Yubin Kuang worked on this at Lund Univeristy, Sweden.
+in 2009-2013. Thomas Schoenemann worked on this in his free time, at Lund
+University, Sweden, at the University of Pisa, Italy and at the University of
+Düsseldorf, Germany. Petter Strandmark and Yubin Kuang worked on this at Lund
+Univeristy, Sweden.
 
+Some parts of the code (relating to message passing) were developed in close
+collaboration with Vladimir Kolmogorov.
 
 The first version was written by Thomas Schoenemann in 2009, based on
 open publications. Later, the code was completed and augmented at Lund
@@ -11,4 +14,5 @@ Petter Strandmark, with additional assistance by Yubin Kuang and
 Fredrik Kahl.
 
 Furthermore, the project includes parts of the C++-Toolbox in version
-0.925, written by Thomas Schoenemann.
+1.03, written by Thomas Schoenemann.
+

@@ -5,7 +5,7 @@ The code may be used, modified and distributed at the below given conditions.
 
 To use this software, you need the following packages:
 
-- Clp http://www.coin-or.org/projects/Clp.xml (tested with Version 2.4.0)
+- Cbc http://www.coin-or.org/projects/Cbc.xml (tested with Version 2.4.0)
 - GPC http://www.cs.man.ac.uk/~toby/alan/software/
 
 
@@ -23,7 +23,7 @@ entirely at your own risk. In no event shall the copyright holder be
 liable for any direct, indirect or perceived damage whatsoever
 connected with the use of this work.
 
-3. If you use this software for image segmentation, you are requested to cite
+3. If you use this software for image SEGMENTATION, you are requested to cite
 the paper
 
 "T. Schoenemann, F. Kahl and D. Cremers - Curvature Regularity for
@@ -37,11 +37,16 @@ in a Global Optimization framework, EMMCVPR 2011"
 
 in resulting publications. 
 
-If you are using QPBO, please also consider citing [EL Zehiry and Grady, CVPR 2010].
+If you use message passing (MPLP,TRWS or Dual Decomposition), please cite 
 
-4. If you use this software for image inpainting, you are requested to
+"V. Kolmogorov and T. Schoenemann - Generalized Sequential Tree-reweighted
+message passing", Arxiv Report, 2012.
+
+If you are use QPBO, please also consider citing [EL Zehiry and Grady, CVPR 2010].
+
+
+4. If you use this software for image INPAINTING, you are requested to
 cite the more appropriate of the following papers:
-
 
 - "T. Schoenemann, F. Kahl and D. Cremers - Curvature Regularity for
 Region-based Image Segmentation and Inpainting: A linear programming
