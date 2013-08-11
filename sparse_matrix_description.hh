@@ -15,6 +15,7 @@ public:
 
   ~SparseMatrixDescription();
 
+
   void sort_by_column(Math1D::Vector<uint>& column_start, bool sort_each_column = false);
 
   void sort_by_row(Math1D::Vector<uint>& row_start, bool sort_each_row = false);
@@ -46,6 +47,9 @@ public:
   void reset();
 
   void reset(uint new_size, int new_nRows = -1, int new_nCols = -1);
+
+  //returns true if all entries are 1 or -1
+  bool is_plusminus_one();
 
 protected:
 
@@ -135,16 +139,16 @@ void SparseMatrixDescription<T>::sort_by_column(Math1D::Vector<uint>& column_sta
 
       if (size >= 2) {
 
-	//bubble sort
-	for (uint k1=1; k1 < size; k1++) {
-	  for (uint k2=column_start[col]; k2 < column_start[col+1]-k1; k2++) {
+        //bubble sort
+        for (uint k1=1; k1 < size; k1++) {
+          for (uint k2=column_start[col]; k2 < column_start[col+1]-k1; k2++) {
 	    
-	    if (temp_row_idx[k2+1] < temp_row_idx[k2]) {
-	      std::swap(temp_row_idx[k2+1],temp_row_idx[k2]);
-	      std::swap(temp_value[k2+1],temp_value[k2]);
-	    }
-	  }
-	}
+            if (temp_row_idx[k2+1] < temp_row_idx[k2]) {
+              std::swap(temp_row_idx[k2+1],temp_row_idx[k2]);
+              std::swap(temp_value[k2+1],temp_value[k2]);
+            }
+          }
+        }
       }
     }
   }
@@ -205,16 +209,16 @@ void SparseMatrixDescription<T>::sort_by_row(Math1D::Vector<uint>& row_start, bo
 
       if (size >= 2) {
 
-	for (uint k1=1; k1 < size; k1++) {
-	  for (uint k2=row_start[row]; k2 < row_start[row+1]-k1; k2++) {
+        for (uint k1=1; k1 < size; k1++) {
+          for (uint k2=row_start[row]; k2 < row_start[row+1]-k1; k2++) {
 
-	    if (temp_col_idx[k2+1] < temp_col_idx[k2]) {
+            if (temp_col_idx[k2+1] < temp_col_idx[k2]) {
 	    
-	      std::swap(temp_col_idx[k2+1],temp_col_idx[k2]);
-	      std::swap(temp_value[k2+1],temp_value[k2]);
-	    }
-	  }
-	}	
+              std::swap(temp_col_idx[k2+1],temp_col_idx[k2]);
+              std::swap(temp_value[k2+1],temp_value[k2]);
+            }
+          }
+        }	
       }
     }
   }
@@ -322,6 +326,19 @@ void SparseMatrixDescription<T>::add_entry(uint row, uint col, T value) {
 }
 
 
+template<typename T>
+bool SparseMatrixDescription<T>::is_plusminus_one() {
 
+  const bool T_is_signed = ( (T(-1)) < (T(1)) );
+  
+  for (uint k=0; k < nActualEntries_; k++) {
+
+    const T entry = value_[k];
+    if (entry != T(1) && ( (!T_is_signed) || entry != T(-1) ) )
+      return false;
+  }
+
+  return true;
+}
 
 #endif
