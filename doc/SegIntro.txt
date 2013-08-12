@@ -93,7 +93,7 @@ to the command line. Here there are several computational methods available:
 -mode bp | msd | mplp | trws | chain-dd : 
                various message passing routines, developed in collaboration
                with Vladimir Kolmogorov (see [Kolmogorov & Schoenemann Arxiv 2012]).
-               If -ignore-crossings is set this is currently ignored
+               If -ignore-crossings is not set this is currently ignored
                       
 
 
