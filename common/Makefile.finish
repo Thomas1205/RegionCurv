@@ -2,17 +2,17 @@
 tidy:
 	rm *~
 
-clean:
-	-rm $(DEBUGDIR)/*.o $(DEBUGDIR)/*.cu_o
-	-rm $(OPTDIR)/*.o $(OPTDIR)/*.cu_o
-	-rm QPBO-v1.3.src/*.o
-	-rm thirdparty/*.o
+#clean:
+#	-rm $(DEBUGDIR)/*.o $(DEBUGDIR)/*.cu_o
+#	-rm $(OPTDIR)/*.o $(OPTDIR)/*.cu_o
+#	-rm QPBO-v1.3.src/*.o
+#	-rm thirdparty/*.o
 
 $(DEBUGDIR)/%.o : %.cc
 	$(COMPILER) $(INCLUDE) -c $< $(DEBUGFLAGS) -o $@
 
 $(DEBUGDIR)/%.cu_o : %.cu
-		  $(NVCC) $(NVCCOPTFLAGS) -c $< -o $@
+		   $(NVCC) $(NVCCOPTFLAGS) -c $< -o $@
 
 $(OPTDIR)/%.o : %.cc
 	$(COMPILER) $(INCLUDE) -c $< $(OPTFLAGS) -o $@

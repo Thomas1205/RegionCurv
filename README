@@ -37,9 +37,39 @@ Kolmogorov.
 Optionally, you can download the packages QPBO (by Vladimir Kolmogorov) and
 HOCR (by Hiroshi Ishikawa). These are needed for QPBO-based routines.
 
-A sample Makefile has been included, but you will most likely need to
-modify it.
+********** INSTALLATION **********
 
+For Linux users: a sample Makefile has been included, but you will most likely
+need to modify it. In particular, you will need to set the location of your
+Cbc installation. And if you do not want to use QPBO and HOCR you will have to
+outcomment some lines.
+
+For Windows users: there is a Visual Studio configuration file in the
+subdirectory project/
+
+
+*********** DEPENDENCIES *********
+
+** mandatory: 
+
+- Coin-OR Cbc  https://projects.coin-or.org/Cbc
+- GPC (UManchester) http://www.cs.man.ac.uk/~toby/alan/software/ 
+
+
+** optional toolkits:
+
+- QPBO by Vladimir Kolmogorov  http://pub.ist.ac.at/~vnk/software/QPBO-v1.3.src.tar.gz 
+- HOCR by Hiroshi Ishikawa  http://www.f.waseda.jp/hfs/HOCR1.02.zip
+
+** optional LP-solvers (in no particular order)
+
+- Gurobi          http://www.gurobi.com/
+- FICO XPress     http://www.fico.com/en/Products/DMTools/Pages/FICO-Xpress-Optimization-Suite.aspx
+- IBM ILOG CPLEX  http://www-01.ibm.com/software/commerce/optimization/cplex-optimizer/
+
+
+you can use the provided script download_thirdparty.sh to get the most common
+dependencies, except for Cbc.
 
 ************ CREDITS ********** 
 
@@ -53,5 +83,5 @@ See file doc/SegIntro.txt
 
 This software has been successfully tested in the following environments:
 
-- 64 Bit SuSE Linux, g++ 4.5.0
+- 64 Bit SuSE Linux, g++ 4.5.0 - 4.7.2
 - Microsoft Windows 7 64 with Microsoft Visual Studio 2010 (64 Bit)

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-wget http://www.cs.ucl.ac.uk/staff/V.Kolmogorov/software/QPBO-v1.3.src.tar.gz
+wget http://pub.ist.ac.at/~vnk/software/QPBO-v1.3.src.tar.gz
 tar -xzf QPBO-v1.3.src.tar.gz
 
 wget http://www.f.waseda.jp/hfs/HOCR1.02.zip

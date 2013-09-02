@@ -1,1 +1,10 @@
 http://www.cs.man.ac.uk/~toby/alan/software/
+https://projects.coin-or.org/Cbc
+
+
+optional:
+http://pub.ist.ac.at/~vnk/software/QPBO-v1.3.src.tar.gz
+http://www.f.waseda.jp/hfs/HOCR1.02.zip
+
+
+Also, have a look at / try download_thirdparty.sh one directory up

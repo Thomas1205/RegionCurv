@@ -8,5 +8,9 @@ $(LIB)/commonlib.debug: $(DEBUGDIR)/fileio.o $(DEBUGDIR)/stringprocessing.o $(DE
 $(LIB)/commonlib.opt: $(OPTDIR)/fileio.o $(OPTDIR)/stringprocessing.o $(OPTDIR)/application.o $(OPTDIR)/timing.o $(OPTDIR)/vector.o $(OPTDIR)/matrix.o $(OPTDIR)/tensor.o  $(OPTDIR)/makros.o  $(OPTDIR)/combinatoric.o $(OPTDIR)/storage1D.o $(OPTDIR)/storage2D.o
 	ar rs $@ $(OPTDIR)/fileio.o $(OPTDIR)/stringprocessing.o $(OPTDIR)/application.o $(OPTDIR)/timing.o $(OPTDIR)/vector.o $(OPTDIR)/matrix.o $(OPTDIR)/tensor.o  $(OPTDIR)/makros.o  $(OPTDIR)/combinatoric.o $(OPTDIR)/storage1D.o $(OPTDIR)/storage2D.o
 
+clean:
+	-rm $(DEBUGDIR)/*.o 
+	-rm $(OPTDIR)/*.o 
+
 include Makefile.finish
 
