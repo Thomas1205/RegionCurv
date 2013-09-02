@@ -383,7 +383,7 @@ public:
 
   /**** run inference ***/
 
-  void mpbp(uint nIter);
+  void mpbp(uint nIter, bool quiet=false);
 
   /**** get the state of the solver ****/
 

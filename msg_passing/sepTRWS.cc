@@ -3050,7 +3050,7 @@ void AllInclusiveSepCumTRWS::add_fourth_order_factor(uint v1, uint v2, uint v3, 
   add_factor(new FourthOrderAllInclusiveSepCumTRWSFactor(vars,seps,cost_copy));
 }
 
-double AllInclusiveSepCumTRWS::optimize(uint nIter)
+double AllInclusiveSepCumTRWS::optimize(uint nIter, bool quiet)
 {
 
   labeling_.resize(nUsedVars_,0);
@@ -3107,9 +3107,10 @@ double AllInclusiveSepCumTRWS::optimize(uint nIter)
 
   //std::cerr << "start energy: " << cur_bound() << std::endl;
 
-  size_t effort_per_iteration = 0;
+  if (!quiet) {
 
-  {
+    size_t effort_per_iteration = 0;
+
     size_t message_effort = 0;
     
     for (uint f=0; f < nUsedFactors_; f++) {
@@ -3159,7 +3160,8 @@ double AllInclusiveSepCumTRWS::optimize(uint nIter)
       labeling_[v] = arg_min;
     }
 
-    std::cerr << "iteration " << iter << ", forward bound: " << fwd_bound << std::endl;
+    if (!quiet)
+      std::cerr << "iteration " << iter << ", forward bound: " << fwd_bound << std::endl;
 
     /*** backward ***/
 

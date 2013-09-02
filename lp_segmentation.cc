@@ -3015,32 +3015,22 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 }
 
 
-
 double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
-                                          Math2D::Matrix<uint>& segmentation, std::string method, const Math2D::Matrix<int>* fixed_labels) {
+                                          Math2D::Matrix<uint>& segmentation, std::string method, uint nIter,
+					  const Math2D::Matrix<int>* fixed_labels, bool quiet, bool trws_reuse) {
 
 
 
   //Get the options
   double lambda = options.lambda_;
   double gamma = options.gamma_;
-  //bool enforce_consistent_boundaries = options.enforce_consistent_boundaries_;
-  //bool enforce_consistent_points = options.enforce_consistent_points_;
-  //bool enforce_regionedge = options.enforce_regionedge_;
-  
 
-  //bool prevent_crossings = options.prevent_crossings_; //not handled so far
-
-  //bool light_constraints = options.light_constraints_;
   bool bruckstein = options.bruckstein_;
   bool reduce_edge_pairs = options.reduce_edge_pairs_;
 
   std::string solver = options.solver_;
 
   std::cerr.precision(10);
-
-  //uint light_factor = (light_constraints) ? 1 : 2;
-  //std::cerr << "light constraints: " << light_constraints << std::endl;
 
   assert(options.neighborhood_ <= 16); 
 
@@ -3112,9 +3102,9 @@ double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term
     bin_cost[1] = cost;
     
     if (var_ub[i] == 0.0)
-      bin_cost[1] = 1e30;
+      bin_cost[1] = 10000;//1e30;
     else if (var_lb[i] == 1.0)
-      bin_cost[0] = 1e30;
+      bin_cost[0] = 10000;//1e30;
   
     if (bp_fac == 1) 
       facMPBP.add_var(bin_cost);
@@ -3130,26 +3120,11 @@ double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term
 
   for (uint j=0; j < edge_pairs.size(); j++) {
 
-    // uint first = edge_pairs[j].first_edge_idx_;
-    // uint nFirstAdjacent = uint( mesh.adjacent_faces(first).size() );
-    
-    // uint second = edge_pairs[j].second_edge_idx_;
-    // uint nSecondAdjacent = uint( mesh.adjacent_faces(second).size() );
-    
-    // double weight = 0.0;
-    // if (nFirstAdjacent > 1)
-    //   weight += 0.5*lambda*mesh.edge_length(first);
-    // if (nSecondAdjacent > 1)
-    //   weight += 0.5*lambda*mesh.edge_length(second);
-    // //do not penalize the image corners for their curvature
-    // if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
-    //   weight += gamma * curv_weight(mesh,edge_pairs[j],2.0,bruckstein);
-    
     for (uint i=0; i < 2; i++) {
 
       Math1D::Vector<float> bin_cost(2,0.0);
       Math1D::Vector<double> dbin_cost(2,0.0);
-      bin_cost[1] = region_cost[edge_pair_var_offs+2*j+i];  //weight;
+      bin_cost[1] = region_cost[edge_pair_var_offs+2*j+i];
       dbin_cost[1] = bin_cost[1];
       
       if (var_ub[edge_pair_var_offs + 2*j+i] == 0.0) {
@@ -3183,8 +3158,6 @@ double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term
 
   for (uint c = 0; c < row_start.size()-1; c++) {
 
-    //std::cerr << "c: " << c << std::endl;
-      
     uint nCurVars = row_start[c+1] - row_start[c];
 
     if (nCurVars == 0)
@@ -3222,7 +3195,7 @@ double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term
     if (bp_fac == 1)
       facMPBP.add_binary_ilp_factor(var,positive,rhs_lower[c],rhs_upper[c]);
     else if (trws_fac == 1)
-      facTRWS.add_binary_ilp_factor(var,positive,rhs_lower[c],rhs_upper[c],true/*(nCurVars >= 7)*/);
+      facTRWS.add_binary_ilp_factor(var,positive,rhs_lower[c],rhs_upper[c],trws_reuse);
     else if (dd_fac == 1)
       dual_decomp.add_binary_ilp_factor(var,positive,rhs_lower[c],rhs_upper[c]);
     else
@@ -3244,18 +3217,18 @@ double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term
   std::clock_t tStart = std::clock();
   
   if (bp_fac == 1) 
-    facMPBP.mpbp(500);
+    facMPBP.mpbp(nIter,quiet);
   else if (trws_fac == 1)
-    lower_bound = facTRWS.optimize(250);
+    lower_bound = facTRWS.optimize(nIter/2,quiet);
   else if (dd_fac == 1) 
-    lower_bound = dual_decomp.optimize(500,7500.0);
+    lower_bound = dual_decomp.optimize(nIter,7500.0,quiet);
   else {
     if (method == "mplp")
-      lower_bound = facDO.dual_bca(500,DUAL_BCA_MODE_MPLP,true,true);
+      lower_bound = facDO.dual_bca(nIter,DUAL_BCA_MODE_MPLP,true,quiet);
     else if (method == "msd")
-      lower_bound = facDO.dual_bca(500,DUAL_BCA_MODE_MSD,true,true);
+      lower_bound = facDO.dual_bca(nIter,DUAL_BCA_MODE_MSD,true,quiet);
     else
-      lower_bound = facDO.subgradient_opt(500,0.001);
+      lower_bound = facDO.subgradient_opt(nIter,0.001);
   }
 
   std::cerr << "lower bound: " << lower_bound << "(" << (lower_bound + energy_offset) << ")" << std::endl;
@@ -3263,7 +3236,7 @@ double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term
   std::clock_t tEnd = std::clock();
   std::cerr << "solver call took " << diff_seconds(tEnd,tStart) << " seconds" << std::endl; 
 
-  const Math1D::Vector<uint>& labels = (bp_fac == 1) ? facMPBP.labeling() 
+  Math1D::Vector<uint> labels = (bp_fac == 1) ? facMPBP.labeling() 
     : (trws_fac == 1) ? facTRWS.labeling() :  (dd_fac == 1) ? dual_decomp.labeling() : facDO.labeling();
 
   //produce segmentation
@@ -3272,6 +3245,14 @@ double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term
                               lambda, gamma, bruckstein, true);
 
   std::cerr << "primal energy: " << energy << std::endl;
+
+
+  double icm_energy = curv_icm(labels.direct_access(), region_cost.direct_access(), mesh,
+			       lambda, gamma, options.curv_power_, bruckstein, energy_offset, true) 
+    + energy_offset;
+    
+  std::cerr << "energy after ICM: " << icm_energy << std::endl;
+
 
   uint out_factor = options.output_factor_;
 
@@ -3299,3 +3280,4 @@ double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term
 
   return lower_bound + energy_offset; 
 }
+

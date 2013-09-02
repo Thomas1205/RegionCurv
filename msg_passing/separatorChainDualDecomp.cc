@@ -1915,16 +1915,18 @@ void SeparatorChainDualDecomposition::set_up_chains() {
 
 }
 
-double SeparatorChainDualDecomposition::optimize(uint nIter, double start_step_size) {
+double SeparatorChainDualDecomposition::optimize(uint nIter, double start_step_size, bool quiet) {
 
   std::cerr.precision(10);
 
   std::cerr << "subgradient optimization" << std::endl;
-  std::cerr << nUsedFactors_ << " factors" << std::endl;
+  if (!quiet)
+    std::cerr << nUsedFactors_ << " factors" << std::endl;
 
   if (!optimize_called_) {
     set_up_chains();
-    std::cerr << "chains created" << std::endl;
+    if (!quiet)
+      std::cerr << "chains created" << std::endl;
     
     for (uint v=0; v < nUsedVars_; v++)
       var_[v]->set_up_chains();
@@ -2207,19 +2209,21 @@ double SeparatorChainDualDecomposition::optimize(uint nIter, double start_step_s
     }
   }
 
+  if (!quiet) {
 
-  size_t message_effort = 0;
+    size_t message_effort = 0;
     
-  for (uint f=0; f < nUsedFactors_; f++) {
+    for (uint f=0; f < nUsedFactors_; f++) {
+      
+      uint var_size = factor_[f]->involved_vars().size();
+      uint sep_size = factor_[f]->involved_separators().size();
+      
+      message_effort += (var_size + sep_size);
+    }
+    message_effort *= nIter;
     
-    uint var_size = factor_[f]->involved_vars().size();
-    uint sep_size = factor_[f]->involved_separators().size();
-    
-    message_effort += (var_size + sep_size);
+    std::cerr << "message effort: " << message_effort << std::endl;
   }
-  message_effort *= nIter;
-
-  std::cerr << "message effort: " << message_effort << std::endl;
 
   return best_dual;
 }

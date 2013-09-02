@@ -21,17 +21,18 @@ double factor_lp_segment_pottscurvreg_layered(const Math3D::Tensor<float>& data_
                                               Math2D::Matrix<uint>& segmentation);
 
 double factor_lp_segment_curvreg_minsum_diffusion(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
-                                                  Math2D::Matrix<uint>& segmentation, 
+                                                  Math2D::Matrix<uint>& segmentation, uint nIter = 12000,
                                                   const Math2D::Matrix<int>* fixed_labels = 0);
 
 double factor_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<float>& data_term, 
                                                           const LPSegOptions& options, double energy_offset, 
-                                                          Math2D::Matrix<uint>& segmentation, 
+                                                          Math2D::Matrix<uint>& segmentation, uint nIter = 12000,
                                                           const Math2D::Matrix<int>* fixed_labels = 0);
 
 double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
-                                                 Math2D::Matrix<uint>& segmentation, std::string method = "bp",
-                                                 const Math2D::Matrix<int>* fixed_labels = 0, bool rescale=false);
+                                                 Math2D::Matrix<uint>& segmentation, std::string method = "bp", uint nIter = 500, 
+						 bool quiet = false, const Math2D::Matrix<int>* fixed_labels = 0, bool rescale=false);
+
 
 double factor_curv_icm(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset,
                        Math2D::Matrix<uint>& segmentation);

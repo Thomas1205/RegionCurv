@@ -33,8 +33,9 @@ int main(int argc, char** argv) {
               << "  -i <pgm or ppm> : filename of input image (to be segmented)" << std::endl
               << "  -lambda <double> : length weight" << std::endl
               << "  -gamma <double> : curvature weight" << std::endl
+	      << "  [-curv-power <double> ] : curvature power" << std::endl
               << "  -o <filename> : name of the output segmentation" << std::endl
-              << "  -method (lp | factor-lp) " << std::endl
+              << "  -method (lp | factor-lp | edge-ilp) " << std::endl
               << "  -regions <uint>" << std::endl
               << "  -mu0 <double> -mu1 <double> : mean values for background and foreground, respectively" << std::endl
               << "  -griddim <uint> : dimension of the mesh, default is the image size" << std::endl
@@ -48,11 +49,13 @@ int main(int argc, char** argv) {
               << " [-adaptive (uint)] : use adaptive meshing" << std::endl
               << " [-debug-svg]: draw SVG files for debugging" << std::endl
               << " [-reduce-pairs] : save some memory and run-time by not considering pairs with very high curvature" << std::endl
-              << " [-solver ( clp | gurobi | cplex | xpress | own-conv) : default clp]" << std::endl
-              << " [-mode (standard | bp | mplp | msd | factor-dd | chain-dd | trws | qpbo | icm | sep-msd | sep-trws | sep-chain-dd )" << std::endl
+              << " [-solver ( clp | gurobi | cplex | xpress | own-conv | slp ) : default clp]" << std::endl
+              << " [-mode (standard | bp | mplp | msd | factor-dd | chain-dd | smooth-chain-dd | trws | qpbo | icm | sep-msd | sep-trws | sep-chain-dd )" << std::endl
+	      << " [-mp-iter <uint>] : number of iterations in message passing mode" << std::endl
+	      << " [-no-trws-reuse] : saves memory, but increases the running time for method lp with mode trws" << std::endl
               << std::endl;
 
-    exit(0);
+    exit(1);
   }
 
   ParamDescr  params[] = {{"-i",mandInFilename,0,""},{"-lambda",optWithValue,1,"1.0"},
@@ -66,19 +69,18 @@ int main(int argc, char** argv) {
                           {"-ignore-crossings",flag,0,""},{"-no-touching-regions",flag,0,""},
                           {"-reduce-pairs",flag,0,""},{"-convex",flag,0,""},{"-factorize-frequency",optWithValue,0,""},
 			  {"-rescale",flag,0,""},{"-refine",flag,0,""},{"-curv-power",optWithValue,1,"2.0"},
-			  {"-min-objects",optWithValue,1,"0"},{"-max-objects",optWithValue,1,"1000000"}};
+			  {"-min-objects",optWithValue,1,"0"},{"-max-objects",optWithValue,1,"1000000"},
+			  {"-mp-iter",optWithValue,1,"500"},{"-no-trws-reuse",flag,0,""},{"-mp-quiet",flag,0,""}};
 
   const int nParams = sizeof(params)/sizeof(ParamDescr);
 
   Application app(argc,argv,params,nParams);
 
   std::string base_filename = app.getParam("-o");
-  //check_filename(base_filename + ".final.svg");
-  //check_filename(base_filename + ".lp.svg");
-  //check_filename(base_filename + ".lp_simple.svg");
   check_filename(base_filename + ".out.ppm");
   check_filename(base_filename + ".seg.pgm");
-  //check_filename(base_filename + ".frac.pgm");
+
+  bool quiet_mp = app.is_set("-mp-quiet");
 
   Math3D::NamedColorImage<float> color_image(app.getParam("-i"),MAKENAME(color_image));
 
@@ -340,8 +342,11 @@ int main(int argc, char** argv) {
 	if (mode_string == "standard") 
 	  lp_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
 	else if (mode_string == "bp" || mode_string == "mplp" || mode_string == "msd" || mode_string == "trws"
-		 || mode_string == "factor-dd" || mode_string == "chain-dd")
-	  lp_segment_curvreg_message_passing(data_term, seg_opts, energy_offset, segmentation, mode_string);
+		 || mode_string == "factor-dd" || mode_string == "chain-dd") {
+	  uint nIter = convert<uint>(app.getParam("-mp-iter"));
+	  lp_segment_curvreg_message_passing(data_term, seg_opts, energy_offset, segmentation, mode_string, nIter,0,
+					     quiet_mp,!app.is_set("-no-trws-reuse"));
+	}
 	else if (mode_string == "icm") {
 	  curv_icm(data_term, seg_opts, energy_offset, segmentation);
 	}
@@ -366,6 +371,8 @@ int main(int argc, char** argv) {
       }
     }
     else {
+
+      uint nIter = convert<uint>(app.getParam("-mp-iter"));
       
       if (nRegions != 2) {
 	if (mode_string != "standard" && mode_string != "msd" && mode_string != "icm")
@@ -391,13 +398,16 @@ int main(int argc, char** argv) {
 	      multi_data_term(x,y,1) = data_term(x,y);
 	}
 	//factor_lp_segment_curvreg_minsum_diffusion(data_term, seg_opts, energy_offset, segmentation);
-	factor_lp_segment_curvreg_minsum_diffusion_memsave(multi_data_term, seg_opts, energy_offset, segmentation);
-	factor_lp_segment_curvreg_message_passing(data_term, seg_opts, energy_offset, segmentation, "msd");
+	factor_lp_segment_curvreg_minsum_diffusion_memsave(multi_data_term, seg_opts, energy_offset, segmentation, nIter);
+	//factor_lp_segment_curvreg_message_passing(data_term, seg_opts, energy_offset, segmentation, "msd");
       }
       else if (mode_string == "factor-dd" || mode_string == "chain-dd" 
 	       || mode_string == "trws" || mode_string == "bp" || mode_string == "mplp"
-	       || mode_string == "sep-msd" || mode_string == "sep-trws" || mode_string == "sep-chain-dd")
-	factor_lp_segment_curvreg_message_passing(data_term, seg_opts, energy_offset, segmentation, mode_string, 0 , app.is_set("-rescale"));
+	       || mode_string == "sep-msd" || mode_string == "sep-trws" || mode_string == "sep-chain-dd") {
+
+	factor_lp_segment_curvreg_message_passing(data_term, seg_opts, energy_offset, segmentation, mode_string, nIter,
+						  quiet_mp, 0 , app.is_set("-rescale"));
+      }
       else if (mode_string == "qpbo") {
 	qpbo_segment_curvreg(data_term, seg_opts, energy_offset, segmentation);
       } 

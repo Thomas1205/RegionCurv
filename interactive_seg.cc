@@ -18,37 +18,45 @@ void check_filename(std::string name)
   }
 }
 
+
 int main(int argc, char** argv) {
 
   if (argc == 1 || (argc == 2 && strings_equal(argv[1],"-h"))) {
 
     std::cerr << "USAGE: " << argv[0] << std::endl
-	      << "  -i <ppm or ppm> : filename of input image (to be segmented)" << std::endl
-	      << "  -lambda <double> : length weight" << std::endl
-	      << "  -gamma <double> : curvature weight" << std::endl
-	      << "  -o <filename> : name of the output segmentation" << std::endl
-	      << "  -fg-mask <filename> : file containing foreground seeds" << std::endl
-	      << "  -bg-mask <filename> : file containing background seeds" << std::endl
-	      << "  -boundary-constraints (tight | simple | extra | off) : constraints to ensure consistency of regions and boundaries." 
-	      << "     default is tight (= Strandmark&Kahl 11), extra unites simple and tight " << std::endl 
-	      << " [-n (4|8|16)]: size of neighborhood, default 8" << std::endl
-	      << " [-bruckstein]: curvature discretization according to Bruckstein et al." << std::endl
-	      << " [-ignore-crossings] : allow crossings of line pairs, e.g. when three regions meet in a point" << std::endl
+              << "  -i <ppm or ppm> : filename of input image (to be segmented)" << std::endl
+              << "  -lambda <double> : length weight" << std::endl
+              << "  -gamma <double> : curvature weight" << std::endl
+	      << "  [-curv-power <double> ] : curvature power" << std::endl
+              << "  -o <filename> : name of the output segmentation" << std::endl
+              << "  -fg-mask <filename> : file containing foreground seeds" << std::endl
+              << "  -bg-mask <filename> : file containing background seeds" << std::endl
+              << "  -boundary-constraints (tight | simple | extra | off) : constraints to ensure consistency of regions and boundaries." 
+              << "     default is tight (= Strandmark&Kahl 11), extra unites simple and tight " << std::endl 
+              << " [-n (4|8|16)]: size of neighborhood, default 8" << std::endl
+              << " [-bruckstein]: curvature discretization according to Bruckstein et al." << std::endl
+              << " [-ignore-crossings] : allow crossings of line pairs, e.g. when three regions meet in a point" << std::endl
               << " [-light-constraints] : take only half of the optional constraints" << std::endl
-	      << " [-reduce-pairs] : same some memory and run-time by not considering pairs with very high curvature" << std::endl
-	      << " -solver ( clp | gurobi | mosek | cplex | xpress | own-conv ) : default clp" << std::endl;
+              << " [-reduce-pairs] : save some memory and run-time by not considering pairs with very high curvature" << std::endl
+              << " [-solver ( clp | gurobi | mosek | cplex | xpress | own-conv ) : default clp]" << std::endl
+	      << " [-mp-iter <uint> : number of iterations in message passing mode]" << std::endl
+	      << " [-no-trws-reuse : save memory but increase the running times in mode trws]" << std::endl
+	      << std::endl;
 
-    exit(0);
+    exit(1);
   }
 
  
   ParamDescr  params[] = {{"-i",mandInFilename,0,""},{"-lambda",optWithValue,1,"1.0"},
                           {"-gamma",optWithValue,1,"1.0"},{"-o",mandOutFilename,0,""},
-                          {"-n",optWithValue,1,"8"},{"-boundary-constraints",optWithValue,0,"tight"},{"-light-constraints",flag,0,""},
+                          {"-n",optWithValue,1,"8"},{"-boundary-constraints",optWithValue,1,"tight"},{"-light-constraints",flag,0,""},
                           {"-bruckstein",flag,0,""},{"-solver",optWithValue,1,"clp"},
                           {"-fg-mask",mandInFilename,0,""},{"-bg-mask",mandInFilename,0,""},
                           {"-griddim",optWithValue,1,"-1"},{"-debug-svg",flag,0,""},{"-ignore-crossings",flag,0,""},
-			  {"-no-touching-regions",flag,0,""},{"-reduce-pairs",flag,0,""}};
+                          {"-no-touching-regions",flag,0,""},{"-reduce-pairs",flag,0,""},
+			  {"-mode",optWithValue,1,"standard"},{"-mp-iter",optWithValue,1,"500"},
+			  {"-no-trws-reuse",flag,0,""},{"-curv-power",optWithValue,1,"2.0"},
+			  {"-factorize-frequency",optWithValue,0,""},{"-mp-quiet",flag,0,""}};
 
   const int nParams = sizeof(params)/sizeof(ParamDescr);
 
@@ -57,12 +65,10 @@ int main(int argc, char** argv) {
   Math3D::NamedColorImage<float> color_image(app.getParam("-i"),MAKENAME(color_image));
 
   std::string base_filename = app.getParam("-o");
-  //check_filename(base_filename + ".final.svg");
-  //check_filename(base_filename + ".lp.svg");
-  //check_filename(base_filename + ".lp_simple.svg");
   check_filename(base_filename + ".out.ppm");
   check_filename(base_filename + ".seg.pgm");
-  //check_filename(base_filename + ".frac.pgm");
+
+  bool quiet_mp = app.is_set("-mp-quiet");
 
   uint xDim = uint( color_image.xDim() );
   uint yDim = uint( color_image.yDim() );
@@ -181,6 +187,7 @@ int main(int argc, char** argv) {
     exit(1);
   }
 
+
   if (gamma == 0.0) {
     
     lp_segment_lenreg(data_term, seg_opts, energy_offset, segmentation, &seeds);
@@ -201,8 +208,21 @@ int main(int argc, char** argv) {
       seg_opts.griddim_yDim_ = griddim;
     }
     seg_opts.debug_svg_ = app.is_set("-debug-svg");
-    
-    lp_segment_curvreg(data_term, seg_opts, energy_offset, segmentation ,&seeds);
+
+    std::string mode = downcase(app.getParam("-mode"));
+
+    if (mode == "standard")
+      lp_segment_curvreg(data_term, seg_opts, energy_offset, segmentation ,&seeds);
+    else if (mode == "bp" || mode == "mplp" || mode == "msd" || mode == "trws"
+	     || mode == "factor-dd" || mode == "chain-dd" || mode == "smooth-chain-dd") {
+      uint nIter = convert<uint>(app.getParam("-mp-iter"));
+      lp_segment_curvreg_message_passing(data_term, seg_opts, energy_offset, segmentation, mode, nIter, &seeds, 
+					 quiet_mp,!app.is_set("-no-trws-reuse"));
+    }
+    else {
+      USER_ERROR << "unknown mode \"" << mode << "\"" << std::endl;
+      exit(1);
+    }
   }
 
   tEndComputation = std::clock();

@@ -1906,7 +1906,7 @@ void FactorMPBP::icm(uint nIter) {
 }
 
 /**** run inference ***/
-void FactorMPBP::mpbp(uint nIter) {
+void FactorMPBP::mpbp(uint nIter, bool quiet) {
 
   Math1D::Vector<double> belief;
 
@@ -1958,15 +1958,18 @@ void FactorMPBP::mpbp(uint nIter) {
       labeling_[v] = arg_min;
     }
 
-    std::cerr << "belief range: [" << min_best_belief << "," << max_best_belief << "]" << std::endl;
-
+    if (!quiet)
+      std::cerr << "belief range: [" << min_best_belief << "," << max_best_belief << "]" << std::endl;
+    
     process_labeling();
 
-    double label_energy = labeling_energy();
-    std::cerr << "labeling cost: " << label_energy << std::endl;
+    if (!quiet) {
+      double label_energy = labeling_energy();
+      std::cerr << "labeling cost: " << label_energy << std::endl;
 
-    //icm(5);
-    //std::cerr << "after ICM: " << labeling_energy() << std::endl;
+      //icm(5);
+      //std::cerr << "after ICM: " << labeling_energy() << std::endl;
+    }
   }
 
 }

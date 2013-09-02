@@ -79,8 +79,6 @@ double multi_point_energy(const Mesh2D& mesh, uint point, const LPSegOptions& op
     uint edge = point_edge[point][e];
     drop_idx[edge] = e;
 
-    //std::cerr << "edge " << edge << std::endl;
-
     const std::vector<uint>& adjacent_faces = mesh.adjacent_faces(edge);
 
     Math1D::Vector<double> cur_drop(nRegions,0.0);
@@ -89,8 +87,6 @@ double multi_point_energy(const Mesh2D& mesh, uint point, const LPSegOptions& op
       uint face = adjacent_faces[i];
 
       uint cur_label = integral_solution[face];
-
-      //std::cerr << "face " << face << " ---> label " << cur_label << std::endl;
 
       cur_drop[cur_label] += mesh.match(face,edge);
     }
@@ -3045,7 +3041,7 @@ double factor_lp_segment_pottscurvreg_layered(const Math3D::Tensor<float>& data_
 
 
 double factor_lp_segment_curvreg_minsum_diffusion(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
-                                                  Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels) {
+                                                  Math2D::Matrix<uint>& segmentation, uint nIter, const Math2D::Matrix<int>* fixed_labels) {
 
   //NOTE: fixed_labels is currently ignored
 
@@ -3323,7 +3319,7 @@ double factor_lp_segment_curvreg_minsum_diffusion(const Math2D::Matrix<float>& d
   std::cerr.precision(12);
   
   /**** problem constructed, now start the minsum-diffusion ****/
-  for (uint iter = 1; iter <= 12000; iter++) {
+  for (uint iter = 1; iter <= nIter; iter++) {
     
     std::cerr << "******** iteration " << iter << std::endl;
     
@@ -3528,7 +3524,7 @@ double factor_lp_segment_curvreg_minsum_diffusion(const Math2D::Matrix<float>& d
 
 double factor_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<float>& data_term, 
                                                           const LPSegOptions& options, double energy_offset, 
-                                                          Math2D::Matrix<uint>& segmentation, 
+                                                          Math2D::Matrix<uint>& segmentation, uint nIter,
                                                           const Math2D::Matrix<int>* fixed_labels) {
   //NOTE: fixed_labels is currently ignored
 
@@ -3892,7 +3888,7 @@ double factor_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 
   Math1D::Vector<uint> face_uint_solution(mesh.nFaces(),0);
   
-  for (uint iter=1; iter <= 1000; iter++) {
+  for (uint iter=1; iter <= nIter; iter++) {
 
     std::cerr << "**** iter: " << iter << " *****" << std::endl;
 
@@ -4357,8 +4353,8 @@ double factor_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 
 
 double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
-                                                 Math2D::Matrix<uint>& segmentation, std::string method, const Math2D::Matrix<int>* fixed_labels,
-						 bool rescale) {
+                                                 Math2D::Matrix<uint>& segmentation, std::string method, uint nIter, bool quiet,
+						 const Math2D::Matrix<int>* fixed_labels, bool rescale) {
 
 
   //Get the options
@@ -4389,7 +4385,6 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
   uint sep_trws_fac = (method == "sep-trws") ? 1 : 0;
   uint sep_dd_fac = (method == "sep-chain-dd") ? 1 : 0;
 
-  //std::cerr << "sum: " << (bp_fac + do_fac + trws_fac + dd_fac + sep_fac) << std::endl;
   assert(bp_fac + do_fac + trws_fac + dd_fac + sep_fac + sep_trws_fac + sep_dd_fac == 1);
 
   FactorMPBP facMPBP(bp_fac * mesh.nFaces(), bp_fac * edge_pairs.size());
@@ -4452,8 +4447,6 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
   // add factors
   for (uint p=0; p < edge_pairs.size(); p++) {
 
-    //std::cerr << "p: " << p << std::endl;
-    
     const uint first_edge = edge_pairs[p].first_edge_idx_;
     const uint second_edge = edge_pairs[p].second_edge_idx_;    
     
@@ -4466,10 +4459,6 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
     double curvature_weight = gamma * curv_weight(mesh,edge_pairs[p],options.curv_power_,bruckstein);
     if (adj1.size() == 1 && adj2.size() == 1)
       curvature_weight = 0.0; //don't penalize the image corner
-    
-    
-    //TODO: check if curvature is zero
-    //   if so, this can be decomposed into two two-cliques
     
     double boundary_cost = curvature_weight;
     if (adj1.size() > 1)
@@ -4504,7 +4493,6 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
     }      
 
     Storage1D<uint> sep;
-#if 1
     if (sep_fac + sep_trws_fac + sep_dd_fac == 1) {
       if (sep_num[first_edge] != MAX_UINT) {
         sep.resize(sep.size()+1);
@@ -4515,7 +4503,6 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
         sep[sep.size()-1] = sep_num[second_edge];
       }
     }
-#endif
     
     //now really add the factors
     if (adjacent_regions.size() == 4) {
@@ -4556,60 +4543,9 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
         facMPBP.add_generic_fourth_order_factor(v1,v2,v3,v4,cost);
       else if (method == "trws") {
         facTRWS.add_fourth_order_factor(v1,v2,v3,v4,cost);
-
-        // Math1D::Vector<size_t> dims(4,2);
-        // VarDimStorage<float> var_cost(dims,0.0);
-
-        // Math1D::Vector<size_t> pos(4,0);
-        // pos[1] = 1;
-        // pos[3] = 1;
-        // var_cost(pos) = pair_cost;
-        
-        // pos.set_constant(0);
-        // pos[0] = 1;
-        // pos[2] = 1;
-        // var_cost(pos) = pair_cost;
-        
-        // Math1D::Vector<uint> vars(4);
-        // vars[0] = v1;
-        // vars[1] = v2;
-        // vars[2] = v3;
-        // vars[3] = v4;
-        
-        // facTRWS.add_generic_factor(vars,var_cost);
-
-
-
-        // Math1D::Vector<uint> var(4);
-        // var[0] = v1;
-        // var[1] = v2;
-        // var[2] = v3;
-        // var[3] = v4;
-        // facTRWS.add_two_level_factor(var,exceptions,pair_cost,0.0);
       }
       else if (dd_fac == 1) {
         dual_decomp.add_fourth_order_factor(v1,v2,v3,v4,cost);
-        
-        // Math1D::Vector<size_t> dims(4,2);
-        // VarDimStorage<float> var_cost(dims,0.0);
-
-        // Math1D::Vector<size_t> pos(4,0);
-        // pos[1] = 1;
-        // pos[3] = 1;
-        // var_cost(pos) = pair_cost;
-        
-        // pos.set_constant(0);
-        // pos[0] = 1;
-        // pos[2] = 1;
-        // var_cost(pos) = pair_cost;
-        
-        // Math1D::Vector<uint> vars(4);
-        // vars[0] = v1;
-        // vars[1] = v2;
-        // vars[2] = v3;
-        // vars[3] = v4;
-        
-        // dual_decomp.add_generic_factor(vars,var_cost);
       }
       else if (sep_fac == 1) {
         sepDO.add_fourth_order_factor(v1,v2,v3,v4,sep,cost);
@@ -4621,27 +4557,6 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
         sepChainDD.add_fourth_order_factor(v1,v2,v3,v4,sep,cost);
       else
         facDO.add_generic_fourth_order_factor(v1,v2,v3,v4,cost);
-
-      // Math1D::Vector<size_t> dims(4,2);
-      // VarDimStorage<float> var_cost(dims,0.0);
-
-      // Math1D::Vector<size_t> pos(4,0);
-      // pos[1] = 1;
-      // pos[3] = 1;
-      // var_cost(pos) = pair_cost;
-
-      // pos.set_constant(0);
-      // pos[0] = 1;
-      // pos[2] = 1;
-      // var_cost(pos) = pair_cost;
-
-      // Math1D::Vector<uint> vars(4);
-      // vars[0] = v1;
-      // vars[1] = v2;
-      // vars[2] = v3;
-      // vars[3] = v4;
-
-      //facMPBP.add_generic_factor(vars,var_cost);
     }
     else if (adjacent_regions.size() == 3) {
 
@@ -4649,8 +4564,6 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
       
       if (adj1.size() == 1) {
         //boundary edge pair
-	
-        //std::cerr << "A" << std::endl;
 	
         uint v1 = adj1[0];
         double m1 = match1[v1]*mul1;
@@ -4671,12 +4584,6 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
           facMPBP.add_generic_ternary_factor(v1,v2,v3,cost);
         else if (method == "trws") {
           facTRWS.add_ternary_factor(v1,v2,v3,cost);
-
-          // Math1D::Vector<uint> var(3);
-          // var[0] = v1;
-          // var[1] = v2;
-          // var[2] = v3;
-          // facTRWS.add_two_level_factor(var,exceptions,pair_cost,0.0);
         }
         else if (dd_fac == 1)
           dual_decomp.add_ternary_factor(v1,v2,v3,cost);
@@ -4692,8 +4599,6 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
           facDO.add_generic_ternary_factor(v1,v2,v3,cost);
       }
       else if (adj2.size() == 1) {
-
-        //std::cerr << "B" << std::endl;
 
         //boundary edge pair
 	
@@ -4715,12 +4620,6 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
           facMPBP.add_generic_ternary_factor(v1,v2,v3,cost);
         else if (method == "trws") {
           facTRWS.add_ternary_factor(v1,v2,v3,cost);
-
-          // Math1D::Vector<uint> var(3);
-          // var[0] = v1;
-          // var[1] = v2;
-          // var[2] = v3;
-          // facTRWS.add_two_level_factor(var,exceptions,pair_cost,0.0);
         }
         else if (dd_fac == 1)
           dual_decomp.add_ternary_factor(v1,v2,v3,cost);
@@ -4738,8 +4637,6 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
       }
       else {
         //interior edge pair with a region that borders both edges
-
-        //std::cerr << "C" << std::endl;
 
         //find shared regions
         uint shared = MAX_UINT;
@@ -4802,10 +4699,6 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
       }
       else {
 
-        //std::cerr << "should this happen?" << std::endl;
-        //std::cerr << "adj1: " << adj1 << std::endl;
-        //std::cerr << "adj2: " << adj2 << std::endl;
-
         //there should only be one shared region
         assert(adj1.size() == 1 || adj2.size() == 1);
 
@@ -4840,41 +4733,40 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
 
   std::cerr << "starting inference" << std::endl;
 
+  std::clock_t tStart = std::clock();
+
   if (method == "bp")
-    facMPBP.mpbp(500);
+    facMPBP.mpbp(nIter,quiet);
   else if (method == "trws") {
-    lower_bound = facTRWS.optimize(250) + energy_offset;
+    lower_bound = facTRWS.optimize(nIter/2,quiet) + energy_offset;
   }
   else if (dd_fac == 1) {
-      double alpha = 2000.0; //with 1/t
-      //double alpha = 10.0; //with primal-dual
-      if (rescale)
-	alpha /= 10000.0;
-      lower_bound = dual_decomp.optimize(500,alpha) + energy_offset;
+    double alpha = 2000.0; //with 1/t
+    //double alpha = 10.0; //with primal-dual
+    if (rescale)
+      alpha /= 10000.0;
+    lower_bound = dual_decomp.optimize(nIter,alpha,quiet) + energy_offset;
   }
   else if (sep_fac == 1) {
 
-    sepDO.save_problem();
-
     std::cerr << "calling optimize" << std::endl;
-    lower_bound = sepDO.optimize(500,DUAL_BCA_MODE_MSD,true) + energy_offset;
+    lower_bound = sepDO.optimize(nIter,DUAL_BCA_MODE_MSD,quiet) + energy_offset;
   }
   else if (sep_trws_fac == 1) {
 
     std::cerr << "calling optimize" << std::endl;
-    //lower_bound = sepTRWS.optimize(250,false) + energy_offset;
-    lower_bound = sepTRWS.optimize(250) + energy_offset;
+    lower_bound = sepTRWS.optimize(nIter/2,quiet) + energy_offset;
   }
   else if (sep_dd_fac == 1) {
 
-    lower_bound = sepChainDD.optimize(500,5000.0) + energy_offset;
+    lower_bound = sepChainDD.optimize(nIter,5000.0,quiet) + energy_offset;
   }
   else {
     if (method != "factor-dd") {
       if (method == "mplp")
-        lower_bound = facDO.dual_bca(500, DUAL_BCA_MODE_MPLP,true,true) + energy_offset;
+        lower_bound = facDO.dual_bca(nIter, DUAL_BCA_MODE_MPLP,true,quiet) + energy_offset;
       else
-        lower_bound = facDO.dual_bca(500, DUAL_BCA_MODE_MSD,true,true) + energy_offset;
+        lower_bound = facDO.dual_bca(nIter, DUAL_BCA_MODE_MSD,true,quiet) + energy_offset;
     }
     else
       lower_bound = facDO.subgradient_opt(500) + energy_offset;
@@ -4882,6 +4774,10 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
 
 
   std::cerr << "lower bound: " << lower_bound << std::endl;
+
+  std::clock_t tEnd = std::clock();
+  std::cerr << "solver call took " << diff_seconds(tEnd,tStart) << " seconds" << std::endl; 
+
 
   //derive integral solution
   uint out_factor = options.output_factor_;

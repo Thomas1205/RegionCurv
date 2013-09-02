@@ -359,7 +359,7 @@ public:
   void add_fourth_order_factor(uint var1, uint var2, uint var3, uint var4, const Storage1D<uint>& separators,
                                const Storage1D<Math3D::Tensor<float> >& cost);
 
-  double optimize(uint nIter);
+  double optimize(uint nIter, bool quiet = false);
 
   const Math1D::Vector<uint>& labeling() const;
 

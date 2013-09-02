@@ -117,6 +117,13 @@ to the command line. There are some more modes here:
                 with Vladimir Kolmogorov (see [Kolmogorov & Schoenemann Arxiv 2012]) 
 
 
+NOTE: if you select message passing approaches, you can specify a few more
+options:
+-mp-iter <uint> allows you to set the number of iterations run
+-mp-quiet       allows you to reduce the amount of output (may speed up the computation in some cases)
+
+if you use   trws  for the method   lp:
+-no-trws-reuse   activates a slower but memory saving variant 
 
 ***** Selecting the mesh ******
 

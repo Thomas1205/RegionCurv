@@ -16,11 +16,9 @@ double lp_segment_lenreg(const Math2D::Matrix<float>& data_term, const LPSegOpti
 double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
                           Math2D::Matrix<uint>& segmentation, const Math2D::Matrix<int>* fixed_labels = 0);
 
-
 double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
-                                          Math2D::Matrix<uint>& segmentation, std::string method = "bp",
-                                          const Math2D::Matrix<int>* fixed_labels = 0);
-
+                                          Math2D::Matrix<uint>& segmentation, std::string method = "bp", uint nIter = 500,
+                                          const Math2D::Matrix<int>* fixed_labels = 0, bool quiet = false, bool trws_reuse = true);
 
 double curv_icm(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset,
                 Math2D::Matrix<uint>& segmentation);
