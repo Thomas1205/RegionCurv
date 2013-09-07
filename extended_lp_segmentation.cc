@@ -4809,7 +4809,7 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
   }
   for (uint y=0; y < yDim*out_factor; y++) {
     for (uint x=0; x < xDim*out_factor; x++) {
-      segmentation(x,y) = uint(output(x,y)*255.0);
+      segmentation(x,y) = uint(output(x,y)*255.0+0.5);
     }
   }
 

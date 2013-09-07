@@ -2265,6 +2265,11 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     Petter::statusOK();
   }
 
+
+#ifndef NDEBUG 
+  //originally we ran the full-scale lp again to get the energy of the thresholded solution.
+  //but now there is a separate energy routine which gives consistently the same results.
+
   if (nNonInt > 0 && !options.convex_prior_) { // Thresholding does not work with convex prior, because 
     // the problem will most likely be infeasible
 
@@ -2658,6 +2663,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     std::cerr << "energy of thresholded solution: " << thresh_energy 
               << "  (" << nNonIntThresh << " non-integral variables)" << std::endl;
   }
+#endif
 
   uint nOpposingLinePairs_after = 0;
 
@@ -3274,7 +3280,7 @@ double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term
         uint face = shares[k].face_idx_;
         sum += mesh.convex_area(face) * shares[k].share_ * labels[face];
       }
-      segmentation(x,y) = uint(sum*255.0);
+      segmentation(x,y) = uint(sum*255.0+0.5);
     }
   }
 
