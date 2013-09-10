@@ -121,7 +121,10 @@ void downsample_matrix(const Math2D::Matrix<T>& source, Math2D::Matrix<T>& targe
   
   const double scale_x = ((double) sxDim) / ((double) txDim);
   const double scale_y = ((double) syDim) / ((double) tyDim);
+
+#ifndef NDEBUG
   const double pixel_area = scale_x*scale_y; 
+#endif
 
   for (uint y=0; y < tyDim; y++) {
 

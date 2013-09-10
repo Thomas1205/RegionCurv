@@ -8,6 +8,7 @@
 #include "lp_segmentation.hh"
 #include "timing.hh"
 #include "smoothing.hh"
+#include "sampling.hh"
 
 void check_filename(std::string name)
 {
@@ -227,7 +228,32 @@ int main(int argc, char** argv) {
 
   tEndComputation = std::clock();
 
-  std::cerr << "computation took " << diff_seconds(tEndComputation, tStartComputation) << " seconds." << std::endl;
+  std::cerr << "computation took " << (diff_seconds(tEndComputation, tStartComputation) / 60.0) << " minutes." << std::endl;
 
-  segmentation.savePGM(app.getParam("-o")+".out.ppm",255);
+  segmentation.savePGM(app.getParam("-o")+".seg.pgm",255);
+
+
+  Math3D::NamedColorImage<float> out_image(MAKENAME(out_image));
+  make_color_image(color_image,out_image);  
+
+  uint scale_fac = 255;
+  
+  Math2D::Matrix<float> true_seg(segmentation.xDim(),segmentation.yDim());
+  for (uint i=0; i < true_seg.size(); i++) {
+    
+    true_seg.direct_access(i) = double(segmentation.direct_access(i)) / double(scale_fac);
+  }
+  
+  Math2D::Matrix<float> fscaled_seg(xDim,yDim);
+  downsample_matrix(true_seg, fscaled_seg);
+  
+  Math2D::Matrix<uint> scaled_seg(xDim,yDim);
+  for (uint i=0; i < scaled_seg.size(); i++) {
+    scaled_seg.direct_access(i) = uint (fscaled_seg.direct_access(i) + 0.5);
+  }
+  
+  draw_segmentation(scaled_seg, out_image, 250.0, 250.0, 150.0);
+
+  out_image.savePPM(base_filename + ".out.ppm");
+
 }

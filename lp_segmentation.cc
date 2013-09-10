@@ -179,7 +179,7 @@ double lp_segment_lenreg(const Math2D::Matrix<float>& data_term, const LPSegOpti
 
   tEndCLP = std::clock();
 
-  std::cerr << "CLP-time: " << diff_seconds(tEndCLP,tStartCLP) << " seconds. " << std::endl;
+  std::cerr << "CLP-time: " << (diff_seconds(tEndCLP,tStartCLP) / 60.0) << " minutes. " << std::endl;
 
   if (error)
     std::cerr << "WARNING: solving the LP-relaxation failed!!!" << std::endl;
@@ -1551,7 +1551,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
                                                    gamma*50.0, stepsize_coeff, 3000, 8, 1.25);
     tEndConv = std::clock();
 
-    std::cerr << "convex solver needed " << diff_seconds(tEndConv,tStartConv) << " seconds. " << std::endl;
+    std::cerr << "convex solver needed " << (diff_seconds(tEndConv,tStartConv) / 60.0) << " minutes. " << std::endl;
   }
 
 #ifdef HAS_CPLEX
@@ -1901,7 +1901,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     if (error != 0)
       std::cerr << "!!!!!!!!!!!!!!LP-solver failed!!!!!!!!!!!!!!!!!!!" << std::endl;
 
-    std::cerr << "CLP-time: " << diff_seconds(tEndCLP,tStartCLP) << " seconds. " << std::endl;
+    std::cerr << "CLP-time: " << (diff_seconds(tEndCLP,tStartCLP) / 60.0) << " minutes. " << std::endl;
     solverTime = diff_seconds(tEndCLP,tStartCLP);
 
     if (mesh.nFaces() <= 20000) {
@@ -1924,7 +1924,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
   }
 
   std::clock_t tEndSolver = std::clock();
-  std::cerr << "core solver call took " << diff_seconds(tEndSolver,tStartSolver) << " seconds." << std::endl;
+  std::cerr << "core solver call took " << (diff_seconds(tEndSolver,tStartSolver) / 60.0) << " minutes." << std::endl;
   
   //list of edge pairs that have the respective point as the common point
   Storage1D<std::vector<uint> > point_pairs(mesh.nPoints());
@@ -2376,7 +2376,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       
 
       error = 1 - lpSolver.isProvenOptimal();
-      assert(!error || enforce_consistent_points);
+      assert(!error || options.enforce_consistent_points_);
     }
 #ifdef HAS_GUROBI
     if (solver == "gurobi") {
@@ -2423,7 +2423,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 #endif
 
     uint nIter = 0;
-    while (prevent_crossings && !enforce_consistent_points) {
+    while (prevent_crossings && !options.enforce_consistent_points_) {
 
       nIter++;
 
@@ -3226,8 +3226,10 @@ double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term
     facMPBP.mpbp(nIter,quiet);
   else if (trws_fac == 1)
     lower_bound = facTRWS.optimize(nIter/2,quiet);
-  else if (dd_fac == 1) 
-    lower_bound = dual_decomp.optimize(nIter,7500.0,quiet);
+  else if (dd_fac == 1) {
+    const double initial_step_size = (options.neighborhood_ <= 8) ? 7500.0 : 100.0;
+    lower_bound = dual_decomp.optimize(nIter,initial_step_size,quiet);
+  }
   else {
     if (method == "mplp")
       lower_bound = facDO.dual_bca(nIter,DUAL_BCA_MODE_MPLP,true,quiet);
@@ -3240,7 +3242,7 @@ double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term
   std::cerr << "lower bound: " << lower_bound << "(" << (lower_bound + energy_offset) << ")" << std::endl;
 
   std::clock_t tEnd = std::clock();
-  std::cerr << "solver call took " << diff_seconds(tEnd,tStart) << " seconds" << std::endl; 
+  std::cerr << "solver call took " << (diff_seconds(tEnd,tStart) / 60.0) << " minutes" << std::endl; 
 
   Math1D::Vector<uint> labels = (bp_fac == 1) ? facMPBP.labeling() 
     : (trws_fac == 1) ? facTRWS.labeling() :  (dd_fac == 1) ? dual_decomp.labeling() : facDO.labeling();
