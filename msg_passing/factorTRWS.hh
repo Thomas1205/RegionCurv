@@ -422,8 +422,7 @@ protected:
   short zero_offset_;
   
   //QUESTION: are two vectors enough? we will need to go backwards
-  Math2D::Matrix<double,uint> forward_light_; 
-  Math2D::Matrix<double,uint> backward_light_; //we shift everything by one as we would never need the first row
+  Math2D::Matrix<double,uint> fwdbwd_light_;
 
   uint to_update_;
 };
