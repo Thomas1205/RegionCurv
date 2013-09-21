@@ -908,7 +908,7 @@ double lp_segment_pottscurvreg(const Math3D::Tensor<float>& data_term, const LPS
   if (error != 0)
     std::cerr << "!!!!!!!!!!!!!!LP-solver failed!!!!!!!!!!!!!!!!!!!" << std::endl;
 
-  std::cerr << "CLP-time: " << diff_seconds(tEndCLP,tStartCLP) << " seconds. " << std::endl;
+  std::cerr << "CLP-time: " << (diff_seconds(tEndCLP,tStartCLP) / 60.0) << " minutes. " << std::endl;
 
   uint nFrac = 0;
   double energy = 0.0;
@@ -2029,7 +2029,7 @@ double factor_lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const L
                                                  gamma*100.0, stepsize_coeff, 1500, 15, 1.25);
   tEndConv = std::clock();
 
-  std::cerr << "convex solver needed " << diff_seconds(tEndConv,tStartConv) << " seconds. " << std::endl;
+  std::cerr << "convex solver needed " << (diff_seconds(tEndConv,tStartConv) / 60.0) << " minutes. " << std::endl;
 #endif
 
   CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
@@ -2077,13 +2077,21 @@ double factor_lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const L
   
   double energy = lp_energy;
 
-  double disc_energy = factor_curv_energy(mesh, edge_pairs, data_term, options, face_uint_solution)
-    + energy_offset;
+  double disc_energy = factor_curv_energy(mesh, edge_pairs, data_term, options, face_uint_solution);
 
-  std::cerr << "solution energy found by discrete routine: " << disc_energy << std::endl;
+  std::cerr << "solution energy found by discrete routine: " << disc_energy 
+            << " (" << (disc_energy + energy_offset) << ")"
+	    << std::endl;
+
+  double icm_energy = factor_curv_icm(mesh, edge_pairs, data_term, options, energy_offset, face_uint_solution);
+
+  std::cerr << "energy of ICM solution: " << icm_energy 
+            << " (" << (icm_energy + energy_offset) << ")"
+            << std::endl;  
   
   if (nNonInt > 0) {
     
+#ifndef NDEBUG
     std::cerr << nNonInt << " non-integral region variables. Computing thresholded solution" << std::endl;
     
     //fix the region variables (according to the above thresholding) and re-run the solver
@@ -2143,6 +2151,7 @@ double factor_lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const L
     std::cerr << nTernFactors << " ternary factors" << std::endl;
 
     energy = thresh_energy;
+#endif
   }
   else
     std::cerr << "global optimum found!!" << std::endl;
@@ -3040,487 +3049,488 @@ double factor_lp_segment_pottscurvreg_layered(const Math3D::Tensor<float>& data_
 
 
 
-double factor_lp_segment_curvreg_minsum_diffusion(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
-                                                  Math2D::Matrix<uint>& segmentation, uint nIter, const Math2D::Matrix<int>* fixed_labels) {
+// double factor_lp_segment_curvreg_minsum_diffusion(const Math2D::Matrix<float>& data_term, const LPSegOptions& options, double energy_offset, 
+//                                                   Math2D::Matrix<uint>& segmentation, uint nIter, const Math2D::Matrix<int>* fixed_labels) {
 
-  //NOTE: fixed_labels is currently ignored
+//   //NOTE: fixed_labels is currently ignored
 
-  //Get the options
-  double lambda = options.lambda_;
-  double gamma = options.gamma_;
-  bool bruckstein = options.bruckstein_;
-  bool reduce_edge_pairs = options.reduce_edge_pairs_;
+//   //Get the options
+//   double lambda = options.lambda_;
+//   double gamma = options.gamma_;
+//   bool bruckstein = options.bruckstein_;
+//   bool reduce_edge_pairs = options.reduce_edge_pairs_;
   
-  assert(options.neighborhood_ <= 16); 
+//   assert(options.neighborhood_ <= 16); 
 
-  std::cerr.precision(8);
+//   std::cerr.precision(8);
 
-  uint xDim = uint( data_term.xDim() );
-  uint yDim = uint( data_term.yDim() );
+//   uint xDim = uint( data_term.xDim() );
+//   uint yDim = uint( data_term.yDim() );
 
-  Mesh2D mesh;  
-  create_mesh(options, data_term, fixed_labels, mesh);
+//   Mesh2D mesh;  
+//   create_mesh(options, data_term, fixed_labels, mesh);
   
-  std::vector<Mesh2DEdgePair> edge_pairs;
-  mesh.generate_edge_pair_list(edge_pairs);
+//   std::vector<Mesh2DEdgePair> edge_pairs;
+//   mesh.generate_edge_pair_list(edge_pairs);
 
-  size_t nRemoved = 0;
-  if (reduce_edge_pairs) {
-    nRemoved = filter_edge_pairs(mesh, edge_pairs); 
-    std::cerr << "removed " << nRemoved << " edge pairs." << std::endl;
-  }
+//   size_t nRemoved = 0;
+//   if (reduce_edge_pairs) {
+//     nRemoved = filter_edge_pairs(mesh, edge_pairs); 
+//     std::cerr << "removed " << nRemoved << " edge pairs." << std::endl;
+//   }
 
-  std::cerr << edge_pairs.size() << " edge pairs." << std::endl;
+//   std::cerr << edge_pairs.size() << " edge pairs." << std::endl;
 
-  uint nVars = 2*mesh.nFaces(); // for the diffusion we have two variables per face
-  uint nConstraints = 0;
-  uint nEntries = 0;
+//   uint nVars = 2*mesh.nFaces(); // for the diffusion we have two variables per face
+//   uint nConstraints = 0;
+//   uint nEntries = 0;
 
-  Math1D::Vector<uint> pair_var_base(edge_pairs.size()+1);
-  Math1D::Vector<uint> pair_con_base(edge_pairs.size());
+//   Math1D::Vector<uint> pair_var_base(edge_pairs.size()+1);
+//   Math1D::Vector<uint> pair_con_base(edge_pairs.size());
 
-  uint nQuadCliques = 0;
-  uint nTripleCliques = 0;
-  uint nDoubleCliques = 0;
-  for (uint p=0; p < edge_pairs.size(); p++) {
+//   uint nQuadCliques = 0;
+//   uint nTripleCliques = 0;
+//   uint nDoubleCliques = 0;
+//   for (uint p=0; p < edge_pairs.size(); p++) {
 
-    pair_var_base[p] = nVars;
-    pair_con_base[p] = nConstraints;
+//     pair_var_base[p] = nVars;
+//     pair_con_base[p] = nConstraints;
 
-    uint first_edge = edge_pairs[p].first_edge_idx_;
-    uint second_edge = edge_pairs[p].second_edge_idx_;    
+//     uint first_edge = edge_pairs[p].first_edge_idx_;
+//     uint second_edge = edge_pairs[p].second_edge_idx_;    
 
-    std::set<uint> adjacent_regions;
+//     std::set<uint> adjacent_regions;
 
-    const std::vector<uint>& adj1 = mesh.adjacent_faces(first_edge);
-    for (std::vector<uint>::const_iterator it = adj1.begin(); it != adj1.end(); it++)
-      adjacent_regions.insert(*it);
+//     const std::vector<uint>& adj1 = mesh.adjacent_faces(first_edge);
+//     for (std::vector<uint>::const_iterator it = adj1.begin(); it != adj1.end(); it++)
+//       adjacent_regions.insert(*it);
 
-    const std::vector<uint>& adj2 = mesh.adjacent_faces(second_edge);
-    for (std::vector<uint>::const_iterator it = adj2.begin(); it != adj2.end(); it++)
-      adjacent_regions.insert(*it);
+//     const std::vector<uint>& adj2 = mesh.adjacent_faces(second_edge);
+//     for (std::vector<uint>::const_iterator it = adj2.begin(); it != adj2.end(); it++)
+//       adjacent_regions.insert(*it);
 
-    if (adjacent_regions.size() == 4) {
-      nVars += 16;
-      nConstraints += 4*2;
-      nEntries += 16*4 + 4*2;
+//     if (adjacent_regions.size() == 4) {
+//       nVars += 16;
+//       nConstraints += 4*2;
+//       nEntries += 16*4 + 4*2;
 
-      nQuadCliques++;
-    }
-    else if (adjacent_regions.size() == 3) {
-      nVars += 8;
-      nConstraints += 3*2;
-      nEntries += 8*3 + 3*2;
+//       nQuadCliques++;
+//     }
+//     else if (adjacent_regions.size() == 3) {
+//       nVars += 8;
+//       nConstraints += 3*2;
+//       nEntries += 8*3 + 3*2;
       
-      nTripleCliques++;
-    }
-    else if (adjacent_regions.size() == 2) {
-      nVars += 4; 
-      nConstraints += 2*2; 
-      nEntries += 4*2 + 2*2;
-      nDoubleCliques++;
-    }
+//       nTripleCliques++;
+//     }
+//     else if (adjacent_regions.size() == 2) {
+//       nVars += 4; 
+//       nConstraints += 2*2; 
+//       nEntries += 4*2 + 2*2;
+//       nDoubleCliques++;
+//     }
     
-    //NOTE: even a count of 1 is possible, at the image corners. 
-    // The cost can then be directly added to the cost of the face, so there is no need for extra variables
-  }
+//     //NOTE: even a count of 1 is possible, at the image corners. 
+//     // The cost can then be directly added to the cost of the face, so there is no need for extra variables
+//   }
 
-  pair_var_base[edge_pairs.size()] = nVars;
+//   pair_var_base[edge_pairs.size()] = nVars;
 
-  Math1D::Vector<double> cost(nVars,0.0);
+//   Math1D::Vector<double> cost(nVars,0.0);
   
-  for (uint i=0; i<mesh.nFaces(); ++i) {
-    cost[2*i] = calculate_data_term(i, mesh, data_term);
+//   for (uint i=0; i<mesh.nFaces(); ++i) {
+//     cost[2*i] = calculate_data_term(i, mesh, data_term);
     
-    if (options.fix_regions_) {
-      TODO("implement fixing of regions");
-    }
-  }
+//     if (options.fix_regions_) {
+//       TODO("implement fixing of regions");
+//     }
+//   }
 
-  //SparseMatrixDescription<double> lp_descr(nEntries, nConstraints, nVars); //for the current comp. of lower bounds
-  SparseMatrixDescription<char> lp_descr(nEntries, nConstraints, nVars);
+//   //SparseMatrixDescription<double> lp_descr(nEntries, nConstraints, nVars); //for the current comp. of lower bounds
+//   SparseMatrixDescription<char> lp_descr(nEntries, nConstraints, nVars);
 
-  /*** joint calculation of cost and constraint system ***/
-  for (uint p=0; p < edge_pairs.size(); p++) {
+//   /*** joint calculation of cost and constraint system ***/
+//   for (uint p=0; p < edge_pairs.size(); p++) {
 
-    const uint first_edge = edge_pairs[p].first_edge_idx_;
-    const uint second_edge = edge_pairs[p].second_edge_idx_;    
+//     const uint first_edge = edge_pairs[p].first_edge_idx_;
+//     const uint second_edge = edge_pairs[p].second_edge_idx_;    
 
-    const std::vector<uint>& adj1 = mesh.adjacent_faces(first_edge);
-    const std::vector<uint>& adj2 = mesh.adjacent_faces(second_edge);
+//     const std::vector<uint>& adj1 = mesh.adjacent_faces(first_edge);
+//     const std::vector<uint>& adj2 = mesh.adjacent_faces(second_edge);
 
-    double mul1 = (mesh.edge(first_edge).to_idx_ == edge_pairs[p].common_point_idx_) ? 1.0 : -1.0;
-    double mul2 = (mesh.edge(second_edge).from_idx_ == edge_pairs[p].common_point_idx_) ? 1.0 : -1.0;
+//     double mul1 = (mesh.edge(first_edge).to_idx_ == edge_pairs[p].common_point_idx_) ? 1.0 : -1.0;
+//     double mul2 = (mesh.edge(second_edge).from_idx_ == edge_pairs[p].common_point_idx_) ? 1.0 : -1.0;
 
-    double curvature_weight = gamma * curv_weight(mesh,edge_pairs[p],options.curv_power_,bruckstein);
-    if (adj1.size() == 1 && adj2.size() == 1)
-      curvature_weight = 0.0; //don't penalize the image corners
+//     double curvature_weight = gamma * curv_weight(mesh,edge_pairs[p],options.curv_power_,bruckstein);
+//     if (adj1.size() == 1 && adj2.size() == 1)
+//       curvature_weight = 0.0; //don't penalize the image corners
 
-    double boundary_cost = curvature_weight;
+//     double boundary_cost = curvature_weight;
 
-    //no length for the image border
-    if (adj1.size() > 1)
-      boundary_cost += 0.5*lambda*mesh.edge_length(first_edge); 
-    if (adj2.size() > 1)
-      boundary_cost += 0.5*lambda*mesh.edge_length(second_edge);
+//     //no length for the image border
+//     if (adj1.size() > 1)
+//       boundary_cost += 0.5*lambda*mesh.edge_length(first_edge); 
+//     if (adj2.size() > 1)
+//       boundary_cost += 0.5*lambda*mesh.edge_length(second_edge);
 
-    std::set<uint> adjacent_regions_set;
-    std::map<uint,double> match1;
-    std::map<uint,double> match2;
+//     std::set<uint> adjacent_regions_set;
+//     std::map<uint,double> match1;
+//     std::map<uint,double> match2;
 
-    for (std::vector<uint>::const_iterator it = adj1.begin(); it != adj1.end(); it++) {
-      adjacent_regions_set.insert(*it);
-      match1[*it] = mesh.match(*it,first_edge);
-    }
+//     for (std::vector<uint>::const_iterator it = adj1.begin(); it != adj1.end(); it++) {
+//       adjacent_regions_set.insert(*it);
+//       match1[*it] = mesh.match(*it,first_edge);
+//     }
 
-    for (std::vector<uint>::const_iterator it = adj2.begin(); it != adj2.end(); it++) {
-      adjacent_regions_set.insert(*it);
-      match2[*it] = mesh.match(*it,second_edge);
-    }
+//     for (std::vector<uint>::const_iterator it = adj2.begin(); it != adj2.end(); it++) {
+//       adjacent_regions_set.insert(*it);
+//       match2[*it] = mesh.match(*it,second_edge);
+//     }
 
-    const uint cur_var_base = pair_var_base[p];
-    const uint cur_con_base = pair_con_base[p];
+//     const uint cur_var_base = pair_var_base[p];
+//     const uint cur_con_base = pair_con_base[p];
   
-    Math1D::Vector<uint> adjacent_regions(adjacent_regions_set.size());
-    uint k=0;
-    for (std::set<uint>::iterator it = adjacent_regions_set.begin(); it != adjacent_regions_set.end(); it++) {
-      adjacent_regions[k] = *it;
-      k++;
-    }
+//     Math1D::Vector<uint> adjacent_regions(adjacent_regions_set.size());
+//     uint k=0;
+//     for (std::set<uint>::iterator it = adjacent_regions_set.begin(); it != adjacent_regions_set.end(); it++) {
+//       adjacent_regions[k] = *it;
+//       k++;
+//     }
 
-    if (adjacent_regions.size() == 4) {
+//     if (adjacent_regions.size() == 4) {
 
-      for (uint f=0; f < 4; f++) {
+//       for (uint f=0; f < 4; f++) {
 	
-        lp_descr.add_entry(cur_con_base + 2*f, 2*adjacent_regions[f], -1);
-        lp_descr.add_entry(cur_con_base + 2*f+1, 2*adjacent_regions[f]+1, -1);
-      }
+//         lp_descr.add_entry(cur_con_base + 2*f, 2*adjacent_regions[f], -1);
+//         lp_descr.add_entry(cur_con_base + 2*f+1, 2*adjacent_regions[f]+1, -1);
+//       }
       
-      for (uint v_addon = 0; v_addon < 16; v_addon++) {
+//       for (uint v_addon = 0; v_addon < 16; v_addon++) {
 
-        double sum_e1 = 0.0;
-        double sum_e2 = 0.0;
+//         double sum_e1 = 0.0;
+//         double sum_e2 = 0.0;
 
-        for (uint f=0; f < 4; f++) {
+//         for (uint f=0; f < 4; f++) {
 
-          uint mask = 1 << f;
-          assert(mask != 0);
+//           uint mask = 1 << f;
+//           assert(mask != 0);
 
-          uint offs = 1 - ((v_addon & mask) >> f);
-          lp_descr.add_entry(cur_con_base + 2*f+offs, cur_var_base + v_addon, 1);
+//           uint offs = 1 - ((v_addon & mask) >> f);
+//           lp_descr.add_entry(cur_con_base + 2*f+offs, cur_var_base + v_addon, 1);
 
-          sum_e1 += (1 - offs) * match1[adjacent_regions[f]];
-          sum_e2 += (1 - offs) * match2[adjacent_regions[f]];	  
-        }
+//           sum_e1 += (1 - offs) * match1[adjacent_regions[f]];
+//           sum_e2 += (1 - offs) * match2[adjacent_regions[f]];	  
+//         }
 
-        sum_e1 *= mul1;
-        sum_e2 *= mul2;
+//         sum_e1 *= mul1;
+//         sum_e2 *= mul2;
 
-        if (fabs(sum_e1) > 0.5 && fabs(sum_e2) > 0.5 && sum_e1*sum_e2 > 0.0) {
-          cost[cur_var_base + v_addon] = boundary_cost;
-        }
-      }
-    }
-    else if (adjacent_regions.size() == 3) {
+//         if (fabs(sum_e1) > 0.5 && fabs(sum_e2) > 0.5 && sum_e1*sum_e2 > 0.0) {
+//           cost[cur_var_base + v_addon] = boundary_cost;
+//         }
+//       }
+//     }
+//     else if (adjacent_regions.size() == 3) {
       
-      for (uint f=0; f < 3; f++) {
+//       for (uint f=0; f < 3; f++) {
 	
-        lp_descr.add_entry(cur_con_base + 2*f, 2*adjacent_regions[f], -1);
-        lp_descr.add_entry(cur_con_base + 2*f+1, 2*adjacent_regions[f]+1, -1);
-      }
+//         lp_descr.add_entry(cur_con_base + 2*f, 2*adjacent_regions[f], -1);
+//         lp_descr.add_entry(cur_con_base + 2*f+1, 2*adjacent_regions[f]+1, -1);
+//       }
       
-      for (uint v_addon = 0; v_addon < 8; v_addon++) {
+//       for (uint v_addon = 0; v_addon < 8; v_addon++) {
 
-        double sum_e1 = 0.0;
-        double sum_e2 = 0.0;
+//         double sum_e1 = 0.0;
+//         double sum_e2 = 0.0;
 
-        for (uint f=0; f < 3; f++) {
+//         for (uint f=0; f < 3; f++) {
 	
-          uint mask = 1 << f;
-          assert(mask != 0);
+//           uint mask = 1 << f;
+//           assert(mask != 0);
 
-          uint offs = 1 - ((v_addon & mask) >> f);
-          lp_descr.add_entry(cur_con_base + 2*f+offs, cur_var_base + v_addon, 1);
+//           uint offs = 1 - ((v_addon & mask) >> f);
+//           lp_descr.add_entry(cur_con_base + 2*f+offs, cur_var_base + v_addon, 1);
 	  
-          sum_e1 += (1 - offs) * match1[adjacent_regions[f]];
-          sum_e2 += (1 - offs) * match2[adjacent_regions[f]];
-        }
+//           sum_e1 += (1 - offs) * match1[adjacent_regions[f]];
+//           sum_e2 += (1 - offs) * match2[adjacent_regions[f]];
+//         }
 
-        sum_e1 *= mul1;
-        sum_e2 *= mul2;
+//         sum_e1 *= mul1;
+//         sum_e2 *= mul2;
 
-        if (fabs(sum_e1) > 0.5 && fabs(sum_e2) > 0.5 && sum_e1*sum_e2 > 0.0) {
+//         if (fabs(sum_e1) > 0.5 && fabs(sum_e2) > 0.5 && sum_e1*sum_e2 > 0.0) {
 
-          //at the image boundary there can be triple cliques that do not share a region
-          if (adj1.size() > 1 && adj2.size() > 1) {
+//           //at the image boundary there can be triple cliques that do not share a region
+//           if (adj1.size() > 1 && adj2.size() > 1) {
 	    
-            assert(sum_e1*sum_e2 > 0.0);
-          }
+//             assert(sum_e1*sum_e2 > 0.0);
+//           }
 	  
-          cost[cur_var_base + v_addon] = boundary_cost;
-        }
-      }
-    }
-    else if (adjacent_regions.size() == 2) {
+//           cost[cur_var_base + v_addon] = boundary_cost;
+//         }
+//       }
+//     }
+//     else if (adjacent_regions.size() == 2) {
       
-      //here we use the construction via the absolute differences
+//       //here we use the construction via the absolute differences
 
-      for (uint f=0; f < 2; f++) {
+//       for (uint f=0; f < 2; f++) {
 	
-        lp_descr.add_entry(cur_con_base + 2*f, 2*adjacent_regions[f], -1);
-        lp_descr.add_entry(cur_con_base + 2*f+1, 2*adjacent_regions[f]+1, -1);
-      }
+//         lp_descr.add_entry(cur_con_base + 2*f, 2*adjacent_regions[f], -1);
+//         lp_descr.add_entry(cur_con_base + 2*f+1, 2*adjacent_regions[f]+1, -1);
+//       }
       
-      for (uint v_addon = 0; v_addon < 4; v_addon++) {
+//       for (uint v_addon = 0; v_addon < 4; v_addon++) {
 
-        double sum_e1 = 0.0;
-        double sum_e2 = 0.0;
+//         double sum_e1 = 0.0;
+//         double sum_e2 = 0.0;
 
-        for (uint f=0; f < 2; f++) {
+//         for (uint f=0; f < 2; f++) {
 	
-          uint mask = 1 << f;
-          assert(mask != 0);
+//           uint mask = 1 << f;
+//           assert(mask != 0);
 
-          uint offs = 1 - ((v_addon & mask) >> f);
-          lp_descr.add_entry(cur_con_base + 2*f+offs, cur_var_base + v_addon, 1);
+//           uint offs = 1 - ((v_addon & mask) >> f);
+//           lp_descr.add_entry(cur_con_base + 2*f+offs, cur_var_base + v_addon, 1);
 	  
-          sum_e1 += (1-offs) * match1[adjacent_regions[f]];
-          sum_e2 += (1-offs) * match2[adjacent_regions[f]];
-        }
+//           sum_e1 += (1-offs) * match1[adjacent_regions[f]];
+//           sum_e2 += (1-offs) * match2[adjacent_regions[f]];
+//         }
 
-        sum_e1 *= mul1;
-        sum_e2 *= mul2;
+//         sum_e1 *= mul1;
+//         sum_e2 *= mul2;
 
-        if (fabs(sum_e1) > 0.5 && fabs(sum_e2) > 0.5 && sum_e1*sum_e2 > 0.0) {
+//         if (fabs(sum_e1) > 0.5 && fabs(sum_e2) > 0.5 && sum_e1*sum_e2 > 0.0) {
 
-          //at the image boundary there can be double cliques that do not share a region
-          //if (adj1.size() > 1 && adj2.size() > 1) {
-          //  assert(sum_e1*sum_e2 > 0.0);
-          //}
+//           //at the image boundary there can be double cliques that do not share a region
+//           //if (adj1.size() > 1 && adj2.size() > 1) {
+//           //  assert(sum_e1*sum_e2 > 0.0);
+//           //}
 	  
-          cost[cur_var_base + v_addon] = boundary_cost;
-        }
-      }
-    }
-  }
+//           cost[cur_var_base + v_addon] = boundary_cost;
+//         }
+//       }
+//     }
+//   }
 
-  Math1D::Vector<uint> row_start;
-  lp_descr.sort_by_row(row_start,true);
+//   Math1D::Vector<uint> row_start;
+//   lp_descr.sort_by_row(row_start,true);
 
-  //we only need the column indices, so to save memory we copy them, then release the sparse matrix
-  Math1D::Vector<uint> col_idx(lp_descr.nEntries());
-  for (uint i=0; i < col_idx.size(); i++)
-    col_idx[i] = lp_descr.col_indices()[i];
+//   //we only need the column indices, so to save memory we copy them, then release the sparse matrix
+//   Math1D::Vector<uint> col_idx(lp_descr.nEntries());
+//   for (uint i=0; i < col_idx.size(); i++)
+//     col_idx[i] = lp_descr.col_indices()[i];
   
-  lp_descr.reset(0);
+//   lp_descr.reset(0);
 
-  double lower_bound = 0.0;
+//   double lower_bound = 0.0;
 
-  std::cerr.precision(12);
+//   std::cerr.precision(12);
   
-  /**** problem constructed, now start the minsum-diffusion ****/
-  for (uint iter = 1; iter <= nIter; iter++) {
+//   /**** problem constructed, now start the minsum-diffusion ****/
+//   for (uint iter = 1; iter <= nIter; iter++) {
     
-    std::cerr << "******** iteration " << iter << std::endl;
+//     std::cerr << "******** iteration " << iter << std::endl;
     
-    //a) compute current lower bound
-    lower_bound = 0.0;
-    for (uint f=0; f < mesh.nFaces(); f++) {
+//     //a) compute current lower bound
+//     lower_bound = 0.0;
+//     for (uint f=0; f < mesh.nFaces(); f++) {
       
-      lower_bound += std::min(cost[2*f],cost[2*f+1]);
-    }
-    std::cerr << "unaries: " << lower_bound << std::endl;
-    for (uint p=0; p < edge_pairs.size(); p++) {
+//       lower_bound += std::min(cost[2*f],cost[2*f+1]);
+//     }
+//     std::cerr << "unaries: " << lower_bound << std::endl;
+//     for (uint p=0; p < edge_pairs.size(); p++) {
 	
-      const uint cur_var_base = pair_var_base[p];
-      const uint cur_var_end = pair_var_base[p+1];
+//       const uint cur_var_base = pair_var_base[p];
+//       const uint cur_var_end = pair_var_base[p+1];
 	
-      double min_val = MAX_DOUBLE;
-      for (uint v=cur_var_base; v < cur_var_end; v++) {
-        double val = cost[v];
-        if (val < min_val)
-          min_val = val;
-      }
+//       double min_val = MAX_DOUBLE;
+//       for (uint v=cur_var_base; v < cur_var_end; v++) {
+//         double val = cost[v];
+//         if (val < min_val)
+//           min_val = val;
+//       }
 	
-      lower_bound += min_val;
-    }    
+//       lower_bound += min_val;
+//     }    
       
-    std::cerr << "lower bound: " << lower_bound << "   (" << (lower_bound+energy_offset) << ")" << std::endl;
+//     std::cerr << "lower bound: " << lower_bound << "   (" << (lower_bound+energy_offset) << ")" << std::endl;
       
-    //b) update the cost parameters
-    for (uint row = 0; row < row_start.size()-1; row++) {
+//     //b) update the cost parameters
+//     for (uint row = 0; row < row_start.size()-1; row++) {
       
-      //std::cerr << "row: " << row << std::endl;
+//       //std::cerr << "row: " << row << std::endl;
       
-      double a = MAX_DOUBLE;
-      double b = MAX_DOUBLE;
+//       double a = MAX_DOUBLE;
+//       double b = MAX_DOUBLE;
       
-      for (uint k = row_start[row]; k < row_start[row+1];  k++) {
+//       for (uint k = row_start[row]; k < row_start[row+1];  k++) {
 	
-        uint var_idx = col_idx[k]; 
+//         uint var_idx = col_idx[k]; 
 	
-        if (var_idx < 2*mesh.nFaces()) {
+//         if (var_idx < 2*mesh.nFaces()) {
 	  
-          assert(b == MAX_DOUBLE);
-          b = cost[var_idx];
-        }
-        else if (cost[var_idx] < a)
-          a = cost[var_idx];
-      }
+//           assert(b == MAX_DOUBLE);
+//           b = cost[var_idx];
+//         }
+//         else if (cost[var_idx] < a)
+//           a = cost[var_idx];
+//       }
       
-      double shift = 0.5*(b-a);
+//       double shift = 0.5*(b-a);
 	
-      for (uint k = row_start[row]; k < row_start[row+1];  k++) {
+//       for (uint k = row_start[row]; k < row_start[row+1];  k++) {
 	  
-        uint var_idx = col_idx[k]; 
+//         uint var_idx = col_idx[k]; 
 	  
-        if (var_idx < 2*mesh.nFaces()) {
-          cost[var_idx] -= shift;
-        }
-        else 
-          cost[var_idx] += shift;
-      }
-    }    
-  }
+//         if (var_idx < 2*mesh.nFaces()) {
+//           cost[var_idx] -= shift;
+//         }
+//         else 
+//           cost[var_idx] += shift;
+//       }
+//     }    
+//   }
 
-  /**** analyzation stage ****/
-  uint nNegligible = 0;
-  for (uint p=0; p < edge_pairs.size(); p++) {
+//   /**** analyzation stage ****/
+//   uint nNegligible = 0;
+//   for (uint p=0; p < edge_pairs.size(); p++) {
     
-    const uint first_edge = edge_pairs[p].first_edge_idx_;
-    const uint second_edge = edge_pairs[p].second_edge_idx_;
+//     const uint first_edge = edge_pairs[p].first_edge_idx_;
+//     const uint second_edge = edge_pairs[p].second_edge_idx_;
     
-    std::set<uint> adjacent_regions_set;
+//     std::set<uint> adjacent_regions_set;
       
-    const std::vector<uint>& adj1 = mesh.adjacent_faces(first_edge);
-    for (std::vector<uint>::const_iterator it = adj1.begin(); it != adj1.end(); it++) {
-      adjacent_regions_set.insert(*it);
-    }
+//     const std::vector<uint>& adj1 = mesh.adjacent_faces(first_edge);
+//     for (std::vector<uint>::const_iterator it = adj1.begin(); it != adj1.end(); it++) {
+//       adjacent_regions_set.insert(*it);
+//     }
       
-    const std::vector<uint>& adj2 = mesh.adjacent_faces(second_edge);
-    for (std::vector<uint>::const_iterator it = adj2.begin(); it != adj2.end(); it++) {
-      adjacent_regions_set.insert(*it);
-    }
+//     const std::vector<uint>& adj2 = mesh.adjacent_faces(second_edge);
+//     for (std::vector<uint>::const_iterator it = adj2.begin(); it != adj2.end(); it++) {
+//       adjacent_regions_set.insert(*it);
+//     }
       
-    Math1D::Vector<uint> adjacent_regions(adjacent_regions_set.size());
-    uint k=0;
-    for (std::set<uint>::iterator it = adjacent_regions_set.begin(); it != adjacent_regions_set.end(); it++) {
-      adjacent_regions[k] = *it;
-      k++;
-    }
+//     Math1D::Vector<uint> adjacent_regions(adjacent_regions_set.size());
+//     uint k=0;
+//     for (std::set<uint>::iterator it = adjacent_regions_set.begin(); it != adjacent_regions_set.end(); it++) {
+//       adjacent_regions[k] = *it;
+//       k++;
+//     }
       
-    if (adjacent_regions.size() > 1) {
+//     if (adjacent_regions.size() > 1) {
 	
-      uint nCurParams = 1 << adjacent_regions.size();
+//       uint nCurParams = 1 << adjacent_regions.size();
 	
-      const uint cur_var_base = pair_var_base[p];
+//       const uint cur_var_base = pair_var_base[p];
       
-      double sum = 0.0;
-      for (uint v = cur_var_base; v < cur_var_base + nCurParams; v++)
-        sum += fabs(cost[v]);
+//       double sum = 0.0;
+//       for (uint v = cur_var_base; v < cur_var_base + nCurParams; v++)
+//         sum += fabs(cost[v]);
       
-      if (sum < 1e-3) 
-        nNegligible++;
-    }
-  }
+//       if (sum < 1e-3) 
+//         nNegligible++;
+//     }
+//   }
     
-  std::cerr << nNegligible << " cliques are negligible after reparameterization" << std::endl;
+//   std::cerr << nNegligible << " cliques are negligible after reparameterization" << std::endl;
 
-  /*** extract solution ***/
-  Math1D::Vector<double> face_solution(mesh.nFaces(),0.0);
-  Math1D::Vector<uint> face_uint_solution(mesh.nFaces(),0);
+//   /*** extract solution ***/
+//   Math1D::Vector<double> face_solution(mesh.nFaces(),0.0);
+//   Math1D::Vector<uint> face_uint_solution(mesh.nFaces(),0);
   
-  for (uint f=0; f < mesh.nFaces(); f++) {
+//   for (uint f=0; f < mesh.nFaces(); f++) {
     
-    if (cost[2*f] < cost[2*f+1]) {
-      face_solution[f] = 1.0;
-      face_uint_solution[f] = 1;
-    }
-  }
+//     if (cost[2*f] < cost[2*f+1]) {
+//       face_solution[f] = 1.0;
+//       face_uint_solution[f] = 1;
+//     }
+//   }
 
-  double disc_energy = factor_curv_energy(mesh, edge_pairs, data_term, options, face_uint_solution)
-    + energy_offset;
+//   double disc_energy = factor_curv_energy(mesh, edge_pairs, data_term, options, face_uint_solution)
+//     + energy_offset;
   
-  std::cerr << "solution found by stand-alone routine: " << disc_energy << std::endl;
+//   std::cerr << "solution found by stand-alone routine: " << disc_energy << std::endl;
 
-  double icm_energy = factor_curv_icm(mesh, edge_pairs, data_term, options, energy_offset, face_uint_solution)
-    + energy_offset;
+//   double icm_energy = factor_curv_icm(mesh, edge_pairs, data_term, options, energy_offset, face_uint_solution)
+//     + energy_offset;
 
-  std::cerr << "energy of ICM solution: " << icm_energy << std::endl;
+//   std::cerr << "energy of ICM solution: " << icm_energy << std::endl;
 
-  //compute cost of solution
-  //currently based on calling an lp-solver
-  // {
+//   //compute cost of solution
+//   //currently based on calling an lp-solver
+//   // {
 
-  //   Math1D::Vector<double> var_lb(nVars,0.0);
-  //   Math1D::Vector<double> var_ub(nVars,1.0);
+//   //   Math1D::Vector<double> var_lb(nVars,0.0);
+//   //   Math1D::Vector<double> var_ub(nVars,1.0);
 
-  //   for (uint f=0; f < mesh.nFaces(); f++) {
+//   //   for (uint f=0; f < mesh.nFaces(); f++) {
 
-  //     if (face_solution[f] == 1) {
-  // 	var_lb[2*f] = 1.0;
-  // 	var_ub[2*f+1] = 0.0;
-  //     }
-  //     else {
-  // 	var_ub[2*f] = 0.0;
-  // 	var_lb[2*f+1] = 1.0;
-  //     }
-  //   }
+//   //     if (face_solution[f] == 1) {
+//   // 	var_lb[2*f] = 1.0;
+//   // 	var_ub[2*f+1] = 0.0;
+//   //     }
+//   //     else {
+//   // 	var_ub[2*f] = 0.0;
+//   // 	var_lb[2*f+1] = 1.0;
+//   //     }
+//   //   }
 
 
-  //   CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
-  // 				lp_descr.value(),lp_descr.nEntries());
+//   //   CoinPackedMatrix coinMatrix(false,(int*) lp_descr.row_indices(),(int*) lp_descr.col_indices(),
+//   // 				lp_descr.value(),lp_descr.nEntries());
 
-  //   Math1D::Vector<double> rhs(nConstraints,0.0); //only needed to compute the cost of the thresholded solution
+//   //   Math1D::Vector<double> rhs(nConstraints,0.0); //only needed to compute the cost of the thresholded solution
     
-  //   ClpSimplex lpSolver;
-  //   lpSolver.loadProblem(coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
-  // 			 cost.direct_access(), rhs.direct_access(), rhs.direct_access());
+//   //   ClpSimplex lpSolver;
+//   //   lpSolver.loadProblem(coinMatrix, var_lb.direct_access(), var_ub.direct_access(),   
+//   // 			 cost.direct_access(), rhs.direct_access(), rhs.direct_access());
 
-  //   coinMatrix.cleanMatrix();
+//   //   coinMatrix.cleanMatrix();
     
-  //   for (uint v=0; v < nVars; v++) {
-  //     lpSolver.setInteger(v);
-  //   }
+//   //   for (uint v=0; v < nVars; v++) {
+//   //     lpSolver.setInteger(v);
+//   //   }
   
-  //   lpSolver.dual();
+//   //   lpSolver.dual();
 
-  //   uint nNonInt = 0;
-  //   for (uint v=0; v < nVars; v++) {
-  //     double val = lpSolver.primalColumnSolution()[v];
+//   //   uint nNonInt = 0;
+//   //   for (uint v=0; v < nVars; v++) {
+//   //     double val = lpSolver.primalColumnSolution()[v];
 
-  //     if (val > 0.01 && val < 0.99)
-  // 	nNonInt++;
-  //   }
+//   //     if (val > 0.01 && val < 0.99)
+//   // 	nNonInt++;
+//   //   }
 
 
-  //   double int_energy = lpSolver.getObjValue() + energy_offset;
+//   //   double int_energy = lpSolver.getObjValue() + energy_offset;
 
-  //   std::cerr.precision(10);
-  //   std::cerr << "energy of thresholded solution: " << int_energy 
-  // 	      << "(" << nNonInt << " non-integral variables)" << std::endl;
+//   //   std::cerr.precision(10);
+//   //   std::cerr << "energy of thresholded solution: " << int_energy 
+//   // 	      << "(" << nNonInt << " non-integral variables)" << std::endl;
 
-  // }
+//   // }
   
-  uint out_factor = options.output_factor_;
-  mesh.enlarge(out_factor,out_factor);
+//   uint out_factor = options.output_factor_;
+//   mesh.enlarge(out_factor,out_factor);
     
-  segmentation.resize(xDim*out_factor,yDim*out_factor);
+//   segmentation.resize(xDim*out_factor,yDim*out_factor);
 
-  Math1D::Vector<int> labels(mesh.nFaces());
+//   Math1D::Vector<int> labels(mesh.nFaces());
   
-  Math2D::Matrix<double> output(xDim*out_factor,yDim*out_factor,0);
-  for (uint i=0;i<mesh.nFaces();++i) {
-    add_grid_output(i,face_solution[i],mesh,output);	
-  }
-  for (uint y=0; y < yDim*out_factor; y++) {
-    for (uint x=0; x < xDim*out_factor; x++) {
-      segmentation(x,y) = uint(output(x,y)*255.0);
-    }
-  }
+//   Math2D::Matrix<double> output(xDim*out_factor,yDim*out_factor,0);
+//   for (uint i=0;i<mesh.nFaces();++i) {
+//     add_grid_output(i,face_solution[i],mesh,output);	
+//   }
+//   for (uint y=0; y < yDim*out_factor; y++) {
+//     for (uint x=0; x < xDim*out_factor; x++) {
+//       segmentation(x,y) = uint(output(x,y)*255.0);
+//     }
+//   }
 
-  return lower_bound;
-}
+//   return lower_bound;
+// }
+
 
 double factor_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<float>& data_term, 
                                                           const LPSegOptions& options, double energy_offset, 
@@ -3844,7 +3854,7 @@ double factor_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
     else if (adjacent_regions.size() == 2) {
 
       uint v1 = adjacent_regions[0];
-      uint v2 = adjacent_regions[0];
+      uint v2 = adjacent_regions[1];
       
 
       if (adj1.size() == 1 && adj2.size() == 1) {
@@ -3892,132 +3902,7 @@ double factor_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
 
     std::cerr << "**** iter: " << iter << " *****" << std::endl;
 
-    //a) compute current cost
-    double cur_bound = 0.0;
-    for (uint f=0; f < mesh.nFaces(); f++) {
-      double best = 1e300;
-      for (uint l=0; l < nLabels; l++) {
-
-        double hyp = var_cost(f,l);
-	
-        if (hyp < best) {
-          best = hyp;
-          face_uint_solution[f] = l;
-        }
-      }
-
-      cur_bound += best;
-    }
-
-    for (uint p=0; p < edge_pairs.size(); p++) {
-
-      uint start_pos = repar_start[p];
-
-      uchar cur_type = factor_type[p];
-
-      double* cur_repar = repar.direct_access() + nLabels*start_pos;
-
-      double cur_weight = factor_weight[p];
-
-      double best = 1e300;
-
-      if (cur_type == 0) {
-        //4-clique
-
-        for (uint l1=0; l1 < nLabels; l1++) {
-          for (uint l2=0; l2 < nLabels; l2++) {
-            for (uint l3=0; l3 < nLabels; l3++) {
-              for (uint l4=0; l4 < nLabels; l4++) {
-
-                double hyp= cur_weight * cost0[l1](l2,l3,l4)
-                  + cur_repar[l1] + cur_repar[nLabels + l2] + cur_repar[2*nLabels + l3] + cur_repar[3*nLabels + l4];
-		
-                if (hyp < best)
-                  best = hyp;
-              }
-            }
-          }
-        } 
-
-      }
-      else if (cur_type <= 2) {
-        //3-clique
-        const Math3D::Tensor<float>& cost = (cur_type == 1) ? cost1 : cost2;
-
-
-        for (uint l1=0; l1 < nLabels; l1++) {
-          for (uint l2=0; l2 < nLabels; l2++) {
-            for (uint l3=0; l3 < nLabels; l3++) {
-
-              double hyp= cur_weight * cost(l1,l2,l3)
-                + cur_repar[l1] + cur_repar[nLabels + l2] + cur_repar[2*nLabels + l3];
-
-              if (hyp < best)
-                best = hyp;
-            }
-          }
-        } 
-	
-      }
-      else if (cur_type <= 5) {
-        //2-clique
-        const Math2D::Matrix<float>& cost = (cur_type == 3) ? cost3 : ((cur_type == 4) ? cost4 : cost5);
-
-
-        for (uint l1=0; l1 < nLabels; l1++) {
-          for (uint l2=0; l2 < nLabels; l2++) {
-
-            double hyp= cur_weight * cost(l1,l2)
-              + cur_repar[l1] + cur_repar[nLabels + l2];
-
-            if (hyp < best)
-              best = hyp;
-          }
-        } 
-      }
-      else {
-        //std::cerr << "WARNING: unknown type " << cur_type << std::endl;
-        best = 0.0;
-      }
-
-      cur_bound += best;
-    }
-
-    std::cerr << "bound: " << cur_bound << std::endl;
-    bound = cur_bound;
-
-
-    // b) reparamterize
-
-    // double a = MAX_DOUBLE;
-    // double b = MAX_DOUBLE;
-      
-    // for (uint k = row_start[row]; k < row_start[row+1];  k++) {
-	
-    // 	uint var_idx = col_idx[k]; 
-	
-    // 	if (var_idx < 2*mesh.nFaces()) {
-	  
-    // 	  assert(b == MAX_DOUBLE);
-    // 	  b = cost[var_idx];
-    // 	}
-    // 	else if (cost[var_idx] < a)
-    // 	  a = cost[var_idx];
-    // }
-      
-    // double shift = 0.5*(b-a);
-	
-    // for (uint k = row_start[row]; k < row_start[row+1];  k++) {
-	  
-    // 	uint var_idx = col_idx[k]; 
-	  
-    // 	if (var_idx < 2*mesh.nFaces()) {
-    // 	  cost[var_idx] -= shift;
-    // 	}
-    // 	else 
-    // 	  cost[var_idx] += shift;
-    // }
-
+    // a) reparamterize
 
     for (uint p=0; p < edge_pairs.size(); p++) {
 
@@ -4276,11 +4161,130 @@ double factor_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
       else {
         //std::cerr << "WARNING: unknown type " << cur_type << std::endl;
       }
-
     }
+
+
+    // b) compute current cost
+
+    double cur_bound = 0.0;
+    for (uint f=0; f < mesh.nFaces(); f++) {
+      double best = 1e300;
+      for (uint l=0; l < nLabels; l++) {
+
+        double hyp = var_cost(f,l);
+	
+        if (hyp < best) {
+          best = hyp;
+          face_uint_solution[f] = l;
+        }
+      }
+
+      cur_bound += best;
+    }
+
+    for (uint p=0; p < edge_pairs.size(); p++) {
+
+      uint start_pos = repar_start[p];
+
+      uchar cur_type = factor_type[p];
+
+      double* cur_repar = repar.direct_access() + nLabels*start_pos;
+
+      double cur_weight = factor_weight[p];
+
+      double best = 1e300;
+
+      if (cur_type == 0) {
+        //4-clique
+
+        for (uint l1=0; l1 < nLabels; l1++) {
+
+	  const double im1 = cur_repar[l1];
+
+          for (uint l2=0; l2 < nLabels; l2++) {
+	    
+	    const double im2 = im1 + cur_repar[nLabels + l2];
+
+            for (uint l3=0; l3 < nLabels; l3++) {
+
+	      const double im3 = im2 + cur_repar[2*nLabels + l3];
+
+              for (uint l4=0; l4 < nLabels; l4++) {
+
+                // double hyp= cur_weight * cost0[l1](l2,l3,l4)
+                //   + cur_repar[l1] + cur_repar[nLabels + l2] + cur_repar[2*nLabels + l3] + cur_repar[3*nLabels + l4];
+
+                double hyp= cur_weight * cost0[l1](l2,l3,l4) + im3 + cur_repar[3*nLabels + l4];
+		
+                if (hyp < best)
+                  best = hyp;
+              }
+            }
+          }
+        } 
+
+      }
+      else if (cur_type <= 2) {
+        //3-clique
+        const Math3D::Tensor<float>& cost = (cur_type == 1) ? cost1 : cost2;
+
+
+        for (uint l1=0; l1 < nLabels; l1++) {
+
+	  const double im1 = cur_repar[l1];
+
+          for (uint l2=0; l2 < nLabels; l2++) {
+
+	    const double im2 = im1 + cur_repar[nLabels + l2];
+
+            for (uint l3=0; l3 < nLabels; l3++) {
+
+              // double hyp= cur_weight * cost(l1,l2,l3)
+              //   + cur_repar[l1] + cur_repar[nLabels + l2] + cur_repar[2*nLabels + l3];
+
+              double hyp= cur_weight * cost(l1,l2,l3) + im2 + cur_repar[2*nLabels + l3];
+
+              if (hyp < best)
+                best = hyp;
+            }
+          }
+        } 
+	
+      }
+      else if (cur_type <= 5) {
+        //2-clique
+        const Math2D::Matrix<float>& cost = (cur_type == 3) ? cost3 : ((cur_type == 4) ? cost4 : cost5);
+
+
+        for (uint l1=0; l1 < nLabels; l1++) {
+
+	  const double im1 = cur_repar[l1];
+
+          for (uint l2=0; l2 < nLabels; l2++) {
+
+            // double hyp= cur_weight * cost(l1,l2)
+            //   + cur_repar[l1] + cur_repar[nLabels + l2];
+
+            double hyp= cur_weight * cost(l1,l2) + im1 + cur_repar[nLabels + l2];
+
+            if (hyp < best)
+              best = hyp;
+          }
+        } 
+      }
+      else {
+        //std::cerr << "WARNING: unknown type " << cur_type << std::endl;
+        best = 0.0;
+      }
+
+      cur_bound += best;
+    }
+
+    std::cerr << "bound: " << cur_bound << std::endl;
+    bound = cur_bound;
   }
 
-  std::cerr << "offset: " << energy_offset << std::endl;
+  std::cerr << "lower bound: " << bound << " (" << (bound+energy_offset) << ")" << std::endl;
 
   double disc_energy = factor_curv_energy(mesh, edge_pairs, data_term, options, face_uint_solution)
     + energy_offset;
@@ -4296,8 +4300,6 @@ double factor_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
   Storage1D<PixelFaceRelation> shares;
   Math1D::Vector<uint> share_start;
 
-  Math1D::Vector<int> labels(mesh.nFaces(),-1);
-  
   uint out_factor = options.output_factor_;
 
   segmentation.resize(xDim*out_factor,yDim*out_factor);
@@ -4320,17 +4322,6 @@ double factor_lp_segment_curvreg_minsum_diffusion_memsave(const Math3D::Tensor<f
         double cur_share = shares[k].share_;
         votes[face_uint_solution[face]] += mesh.convex_area(face) * cur_share;
       }
-
-      // for (uint r=0; r < nLabels; r++) {
-      // 	double sum = 0.0;
-      // 	for (uint k= share_start[y*(xDim*out_factor)+x]; k < share_start[y*(xDim*out_factor)+x+1]; k++) {
-      // 	  uint face = shares[k].face_idx_;
-      // 	  double cur_share = shares[k].share_;
-      // 	  sum += mesh.convex_area(face) * cur_share * lp_solution[face*nLabels + r];
-      // 	}
-
-      // 	votes[r] = sum;
-      // }
 
       double max_val = 0.0;
       uint arg_max = MAX_UINT;
@@ -4741,7 +4732,7 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
     lower_bound = facTRWS.optimize(nIter/2,quiet) + energy_offset;
   }
   else if (dd_fac == 1) {
-    double alpha = 2000.0; //with 1/t
+    double alpha = (options.neighborhood_ <= 8) ? 2000.0 : 200.0; //with 1/t
     //double alpha = 10.0; //with primal-dual
     if (rescale)
       alpha /= 10000.0;
@@ -4759,7 +4750,8 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
   }
   else if (sep_dd_fac == 1) {
 
-    lower_bound = sepChainDD.optimize(nIter,5000.0,quiet) + energy_offset;
+    const double initial_step_size = (options.neighborhood_ <= 8) ? 5000.0 : 500.0;
+    lower_bound = sepChainDD.optimize(nIter,initial_step_size,quiet) + energy_offset;
   }
   else {
     if (method != "factor-dd") {
@@ -4776,7 +4768,7 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
   std::cerr << "lower bound: " << lower_bound << std::endl;
 
   std::clock_t tEnd = std::clock();
-  std::cerr << "solver call took " << diff_seconds(tEnd,tStart) << " seconds" << std::endl; 
+  std::cerr << "solver call took " << (diff_seconds(tEnd,tStart) / 60.0) << " minutes" << std::endl; 
 
 
   //derive integral solution
@@ -4817,13 +4809,13 @@ double factor_lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& da
   double disc_energy = factor_curv_energy(mesh, edge_pairs, data_term, options, face_solution);
   
   std::cerr << "solution found by stand-alone routine: " << disc_energy 
-            << "(" << (disc_energy + energy_offset) << ")"
+            << " (" << (disc_energy + energy_offset) << ")"
             << std::endl;
 
   double icm_energy = factor_curv_icm(mesh, edge_pairs, data_term, options, energy_offset, face_solution);
 
   std::cerr << "energy of ICM solution: " << icm_energy 
-            << "(" << (icm_energy + energy_offset) << ")"
+            << " (" << (icm_energy + energy_offset) << ")"
             << std::endl;  
 
   return lower_bound;
