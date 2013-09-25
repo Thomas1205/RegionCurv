@@ -61,6 +61,8 @@ public:
   
   void add_pair_separator(AllInclusiveSepCumTRWSPairSeparator* adjacent_sep);
 
+  void add_cost(const Math1D::Vector<float>& cost);
+
   uint nLabels() const;
 
   uint rank() const;
@@ -89,7 +91,7 @@ protected:
   //NOTE: right now, all listed entries are dead ends
   Storage1D<AllInclusiveSepCumTRWSVarChainLink*> chain_link_;
 
-  const Math1D::Vector<float> cost_;
+  Math1D::Vector<float> cost_;
 
   Math1D::Vector<double> cum_cost_;
 
@@ -358,6 +360,8 @@ public:
 
   void add_fourth_order_factor(uint var1, uint var2, uint var3, uint var4, const Storage1D<uint>& separators,
                                const Storage1D<Math3D::Tensor<float> >& cost);
+
+  AllInclusiveSepCumTRWSVariable* get_variable(uint v);
 
   double optimize(uint nIter, bool quiet = false);
 

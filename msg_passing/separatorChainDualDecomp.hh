@@ -36,8 +36,6 @@ public:
 
   void set_up_chains();
 
-  //double dual_value(uint& arg_min);
-
 protected:
 
   Math1D::Vector<float> cost_;
@@ -256,6 +254,8 @@ public:
 
   void add_fourth_order_factor(uint var1, uint var2, uint var3, uint var4, const Storage1D<uint>& separators, 
                                const Storage1D<Math3D::Tensor<float> >& cost);
+
+  SepChainDDVar* get_variable(uint v);
 
   double optimize(uint nIter, double start_step_size = 1.0, bool quiet=false);
 

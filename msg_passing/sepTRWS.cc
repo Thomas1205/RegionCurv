@@ -45,6 +45,11 @@ void AllInclusiveSepCumTRWSVariable::add_factor(AllInclusiveSepCumTRWSFactor* ad
   adjacent_factor_.resize(nFac+1);
   adjacent_factor_[nFac] = adjacent_fac;
 }
+
+void AllInclusiveSepCumTRWSVariable::add_cost(const Math1D::Vector<float>& cost) {
+
+  cost_ += cost;
+}
   
 void AllInclusiveSepCumTRWSVariable::add_pair_separator(AllInclusiveSepCumTRWSPairSeparator* adjacent_sep) {
 
@@ -3050,6 +3055,14 @@ void AllInclusiveSepCumTRWS::add_fourth_order_factor(uint v1, uint v2, uint v3, 
   add_factor(new FourthOrderAllInclusiveSepCumTRWSFactor(vars,seps,cost_copy));
 }
 
+AllInclusiveSepCumTRWSVariable* AllInclusiveSepCumTRWS::get_variable(uint v) {
+
+  if (v < nUsedVars_)
+    return var_[v];
+  return 0;
+}
+
+
 double AllInclusiveSepCumTRWS::optimize(uint nIter, bool quiet)
 {
 
@@ -3098,17 +3111,15 @@ double AllInclusiveSepCumTRWS::optimize(uint nIter, bool quiet)
   }
 
   uint arg_min;
-  
-  std::cerr << "starting main loop of memory-efficient scheme" << std::endl;
+
+  if (!quiet)
+    std::cerr << "starting main loop of memory-efficient scheme" << std::endl;
 
   optimize_called_ = true;
 
   std::cerr.precision(8);
 
-  //std::cerr << "start energy: " << cur_bound() << std::endl;
-
   if (!quiet) {
-
     size_t effort_per_iteration = 0;
 
     size_t message_effort = 0;
@@ -3129,11 +3140,13 @@ double AllInclusiveSepCumTRWS::optimize(uint nIter, bool quiet)
 
     /*** forward ***/
 
+    //DEBUG
+    //double single_share = 0.0;
+    //double fwd_av_share = 0.0;
+    //END_DEBUG
     
     double fwd_bound = 0.0;
     for (uint v=0; v < nUsedVars_; v++) {
-
-      //std::cerr << "v: " << v << std::endl;
 
       //average the separators
       const Storage1D<AllInclusiveSepCumTRWSPairSeparator*>& adj_sep = var_[v]->adjacent_separators();
@@ -3146,17 +3159,21 @@ double AllInclusiveSepCumTRWS::optimize(uint nIter, bool quiet)
 
 	  double temp = adj_sep[s]->average();
 	  fwd_bound += temp;
+	  //fwd_av_share += temp;
 	}
       }
+
 
       //std::cerr << "now averaging var" << std::endl;
 
       //now average the var
       double temp = var_[v]->reparameterize_forward();
+      //single_share += temp;
       fwd_bound += temp;
 
       temp = var_[v]->average(arg_min);
       fwd_bound += temp;
+      //fwd_av_share += temp;
       labeling_[v] = arg_min;
     }
 
@@ -3164,6 +3181,10 @@ double AllInclusiveSepCumTRWS::optimize(uint nIter, bool quiet)
       std::cerr << "iteration " << iter << ", forward bound: " << fwd_bound << std::endl;
 
     /*** backward ***/
+
+    //DEBUG
+    //double bwd_av_share = 0.0;
+    //END_DEBUG
 
     double bwd_bound = 0.0;
     for (int v=nUsedVars_-1; v >= 0; v--) {
@@ -3174,6 +3195,7 @@ double AllInclusiveSepCumTRWS::optimize(uint nIter, bool quiet)
 
       double temp = var_[v]->average(arg_min);
       bwd_bound += temp;
+      //bwd_av_share += temp;
       labeling_[v] = arg_min;
 
       //now average the pair separators
@@ -3187,6 +3209,7 @@ double AllInclusiveSepCumTRWS::optimize(uint nIter, bool quiet)
 
 	  double temp = adj_sep[s]->average();
 	  bwd_bound += temp;
+	  //bwd_av_share += temp;
 	}
       }
 
@@ -3201,9 +3224,11 @@ double AllInclusiveSepCumTRWS::optimize(uint nIter, bool quiet)
   return bound;
 }
 
+
 const Math1D::Vector<uint>& AllInclusiveSepCumTRWS::labeling() const {
   return labeling_;
 }
+
 
 double AllInclusiveSepCumTRWS::cur_bound(bool backward) {
 

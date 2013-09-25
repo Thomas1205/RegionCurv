@@ -18,6 +18,11 @@ void VariableNode::add_factor(FactorNode* node) {
   message_matrix_.resize(nLabels(),nPrevFactors+1,0.0); 
 }
 
+void VariableNode::add_cost(const Math1D::Vector<float>& cost) {
+
+  cost_ += cost;
+}
+
 uint VariableNode::nLabels() const {
   return message_matrix_.xDim();
 }
@@ -93,7 +98,7 @@ void VariableNode::compute_messages() {
     double min_message = 1e300;
 
     for (uint l=0; l < nLabels; l++) {
-      
+
       assert(!isnan(cost_[l]));
 
       double cur_cost = cost_[l];
@@ -509,7 +514,7 @@ void TernaryFactorNodeBase::compute_messages(const Math3D::Tensor<float>& cost) 
   double msg_min = message1_.min();
   for (uint k=0; k < message1_.size(); k++)
     message1_[k] -= msg_min;
-  
+
   //Message 2
   for (uint k=0; k < nLabels2; k++) {
 
@@ -554,6 +559,8 @@ void TernaryFactorNodeBase::compute_messages(const Math3D::Tensor<float>& cost) 
   for (uint k=0; k < message3_.size(); k++)
     message3_[k] -= msg_min;
 }
+
+
 
 
 /***********************************/
@@ -1426,6 +1433,8 @@ BILPConstraintFactorNode::BILPConstraintFactorNode(const Storage1D<VariableNode*
             }
           }
 	  
+          //assert(arg_best != MAX_UINT);
+
           forward(sum,l,v) = best_prev + beliefs(v,l);
           trace(sum,l,v) = arg_best;
         }
@@ -1453,7 +1462,7 @@ BILPConstraintFactorNode::BILPConstraintFactorNode(const Storage1D<VariableNode*
         }
       }
     }
-  
+
     labels[participating_var_.size()-1] = label;
 
     for (int v =  int(participating_var_.size())-2; v >= 0; v--) {
@@ -1949,7 +1958,7 @@ void FactorMPBP::mpbp(uint nIter, bool quiet) {
           arg_min = k;
         }
       }
-
+      
       min_best_belief = std::min(min_best_belief,min_cost);
       max_best_belief = std::max(max_best_belief,min_cost);
 
@@ -1960,7 +1969,7 @@ void FactorMPBP::mpbp(uint nIter, bool quiet) {
 
     if (!quiet)
       std::cerr << "belief range: [" << min_best_belief << "," << max_best_belief << "]" << std::endl;
-    
+
     process_labeling();
 
     if (!quiet) {

@@ -733,6 +733,7 @@ void create_curvreg_lp(const Math2D::Matrix<float>& data_term, Mesh2D& mesh, con
   std::cerr << edge_pairs.size() << " edge pairs." << std::endl;
 
   nVars = uint( mesh.nFaces() + 2*edge_pairs.size() );
+
   nConstraints = 3*mesh.nEdges();
 
   const uint consistency_con_offs = nConstraints;
@@ -805,64 +806,6 @@ void create_curvreg_lp(const Math2D::Matrix<float>& data_term, Mesh2D& mesh, con
   }
   Petter::statusOK();
 
-  edge_pair_var_offs = mesh.nFaces();
-
-  Petter::statusTry("Line pair costs...");
-  for (uint j=0; j < edge_pairs.size(); j++) {
-
-    uint first = edge_pairs[j].first_edge_idx_;
-    uint nFirstAdjacent = uint( mesh.adjacent_faces(first).size() );
-
-    uint second = edge_pairs[j].second_edge_idx_;
-    uint nSecondAdjacent = uint( mesh.adjacent_faces(second).size() );
-
-    double weight = 0.0;
-    if (nFirstAdjacent > 1)
-      weight += 0.5*lambda*mesh.edge_length(first);
-    if (nSecondAdjacent > 1)
-      weight += 0.5*lambda*mesh.edge_length(second);
-    //do not penalize the image corners for their curvature
-    if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
-      weight += gamma * curv_weight(mesh,edge_pairs[j],curv_power,bruckstein);
-
-    cost[edge_pair_var_offs+2*j] = weight;
-    cost[edge_pair_var_offs+2*j+1] = weight;
-
-    /*** check if (at the image border) one of the edge pairs is impossible. if so, set its upper bound to 0 ***/
-    uint edge = first;
-    if (mesh.adjacent_faces(edge).size() == 1) {
-      int match = mesh.match(mesh.adjacent_faces(edge)[0],edge);
-
-      uint y = edge_pair_var_offs+2*j;
-
-      if (edge_pairs[j].common_point_idx_ == mesh.edge(edge).from_idx_)
-        match *= -1;
-
-      if (match == -1)
-        var_ub[y+1] = 0.0;
-      else if (match == 1)
-        var_ub[y] = 0.0;
-    }
-
-    edge = second;
-    if (mesh.adjacent_faces(edge).size() == 1) {
-      int match = mesh.match(mesh.adjacent_faces(edge)[0],edge);
-
-      uint y = edge_pair_var_offs+2*j;
-
-      if (edge_pairs[j].common_point_idx_ == mesh.edge(edge).from_idx_)
-        match *= -1;
-
-      if (match == -1)
-        var_ub[y] = 0.0;
-      else if (match == 1)
-        var_ub[y+1] = 0.0;
-    }
-  }
-  Petter::statusOK();
-
-  rhs_lower.resize(nConstraints,0.0);
-  rhs_upper.resize(nConstraints,0.0);
 
   if (fixed_labels != 0) {
     Storage1D<PixelFaceRelation> shares;
@@ -902,6 +845,137 @@ void create_curvreg_lp(const Math2D::Matrix<float>& data_term, Mesh2D& mesh, con
       }
     }
   }
+
+
+
+  edge_pair_var_offs = mesh.nFaces();
+
+  Petter::statusTry("Line pair costs...");
+
+  for (uint j=0; j < edge_pairs.size(); j++) {
+
+    uint first = edge_pairs[j].first_edge_idx_;
+    uint nFirstAdjacent = uint( mesh.adjacent_faces(first).size() );
+
+    uint second = edge_pairs[j].second_edge_idx_;
+    uint nSecondAdjacent = uint( mesh.adjacent_faces(second).size() );
+
+    double weight = 0.0;
+    if (nFirstAdjacent > 1)
+      weight += 0.5*lambda*mesh.edge_length(first);
+    if (nSecondAdjacent > 1)
+      weight += 0.5*lambda*mesh.edge_length(second);
+    //do not penalize the image corners for their curvature
+    if (nFirstAdjacent > 1 || nSecondAdjacent > 1)
+      weight += gamma * curv_weight(mesh,edge_pairs[j],curv_power,bruckstein);
+
+    cost[edge_pair_var_offs+2*j] = weight;
+    cost[edge_pair_var_offs+2*j+1] = weight;
+
+    /*** check if (at the image border) one of the edge pairs is impossible. if so, set its upper bound to 0 ***/
+    /*** also check if for one of the edges both involved faces are fixed. So far we only handle the case where 
+     ***  both sides are fixed to the SAME region. The other case is TODO ***/
+    //NOTE: if options.fix_regions is set, fixing edge vars may not be what we want
+
+    const std::vector<uint>& first_faces = mesh.adjacent_faces(first);
+    const std::vector<uint>& second_faces = mesh.adjacent_faces(second);
+
+    int match1 = mesh.match(first_faces[0],first);
+
+    uint y = edge_pair_var_offs+2*j;
+
+    //uint edge = first;
+    if (first_faces.size() == 1) {
+
+      //int match = mesh.match(first_faces[0],edge);
+
+      //uint y = edge_pair_var_offs+2*j;
+
+      if (edge_pairs[j].common_point_idx_ == mesh.edge(first).from_idx_)
+        match1 *= -1;
+
+      if (match1 == -1)
+        var_ub[y+1] = 0.0;
+      else if (match1 == 1)
+        var_ub[y] = 0.0;
+    }
+    else {
+
+      bool fixed1 = (var_lb[first_faces[0]] == var_ub[first_faces[0]]);
+      bool fixed2 = (var_lb[first_faces[1]] == var_ub[first_faces[1]]);
+
+      if (fixed1 && fixed2) {
+
+	if (var_lb[first_faces[0]] == var_lb[first_faces[1]]) {
+
+	  //both faces have the same region => edge vars must be 0
+
+	  var_ub[y] = 0.0;
+	  var_ub[y+1] = 0.0;
+	}
+	else {
+	  //TODO : fix one to 0 (which one?). 
+	  //can't fix the other to anything, even if the situation there is the same 
+	  //  (there could be multiple such constellations at a crossing point)
+	}
+      }
+      else if (fixed1) {
+	//TODO : fix one to 0 (which one?)
+      }
+      else if (fixed2) {
+	//TODO : fix one to 0 (which one?)
+      }
+    }
+
+    int match2 = mesh.match(second_faces[0],second);
+
+    //edge = second;
+    if (second_faces.size() == 1) {
+
+      //int match = mesh.match(second_faces[0],edge);
+
+      //uint y = edge_pair_var_offs+2*j;
+
+      if (edge_pairs[j].common_point_idx_ == mesh.edge(second).from_idx_)
+        match2 *= -1;
+
+      if (match2 == -1)
+        var_ub[y] = 0.0;
+      else if (match2 == 1)
+        var_ub[y+1] = 0.0;
+    }
+    else {
+
+      bool fixed1 = (var_lb[second_faces[0]] == var_ub[second_faces[0]]);
+      bool fixed2 = (var_lb[second_faces[1]] == var_ub[second_faces[1]]);
+
+      
+      if (fixed1 && fixed2) {
+
+	if (var_lb[second_faces[0]] == var_lb[second_faces[1]]) {
+
+	  //both faces have the same region => edge vars must be 0
+
+	  var_ub[y] = 0.0;
+	  var_ub[y+1] = 0.0;
+	}
+	else {
+	  //TODO : fix one to 0 (which one?)
+	}
+      }
+      else if (fixed1) {
+	//TODO : fix one to 0 (which one?)
+      }
+      else if (fixed2) {
+	//TODO : fix one to 0 (which one?)
+      }
+
+    }
+  }
+  Petter::statusOK();
+
+  rhs_lower.resize(nConstraints,0.0);
+  rhs_upper.resize(nConstraints,0.0);
 
   uint nEntries = uint( 2*mesh.nEdges() + 6*edge_pairs.size() );  
   if (enforce_consistent_boundaries) {
@@ -3108,9 +3182,9 @@ double lp_segment_curvreg_message_passing(const Math2D::Matrix<float>& data_term
     bin_cost[1] = cost;
     
     if (var_ub[i] == 0.0)
-      bin_cost[1] = 10000;//1e30;
+      bin_cost[1] += 1e30;
     else if (var_lb[i] == 1.0)
-      bin_cost[0] = 10000;//1e30;
+      bin_cost[0] += 1e30;
   
     if (bp_fac == 1) 
       facMPBP.add_var(bin_cost);

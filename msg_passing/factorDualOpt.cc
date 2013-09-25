@@ -3820,6 +3820,13 @@ uint FactorDualOpt::add_cardinality_factor(const Math1D::Vector<uint>& var, cons
 uint FactorDualOpt::add_binary_ilp_factor(const Math1D::Vector<uint>& var, const Storage1D<bool>& positive,
                                           int rhs_lower, int rhs_upper) {
 
+
+  if (rhs_lower > rhs_upper) {
+    INTERNAL_ERROR << " INFEASIBLE CONSTRAINT" << std::endl;
+    exit(1);
+  }
+
+
   uint nUseful = 0;
 
   int nPos = 0;
@@ -3861,44 +3868,83 @@ uint FactorDualOpt::add_binary_ilp_factor(const Math1D::Vector<uint>& var, const
     }
   }
 
+
   if (nUseful != 0 && rhs_lower <= -nNeg && rhs_upper >= nPos)
     nUseful = 0; //constraint is always true
 
-  if (nUseful != 0) {
 
-    assert(nUseful >= 2);
+  if (nUseful == 0) {
+
+    std::cerr << "WARNING: removed superfluous constraint factor" << std::endl;
     
-    Storage1D<DualVariableNode*> vars(nUseful);
-    Storage1D<bool> reduced_positive(nUseful);
+    return MAX_UINT;
+  }
   
-    uint next = 0;
+
+  if (rhs_upper < -nNeg || rhs_lower > nPos) {
+
+    INTERNAL_ERROR << " INFEASIBLE CONSTRAINT" << std::endl;
+    exit(1);
+  }
+  
+  Storage1D<DualVariableNode*> vars(nUseful);
+  Storage1D<bool> reduced_positive(nUseful);
+  
+  uint next = 0;
+  
+  for (uint k=0; k < var.size(); k++) {
     
-    for (uint k=0; k < var.size(); k++) {
-    
-      if (fabs(var_[var[k]]->cost()[0] - var_[var[k]]->cost()[1]) < 1e10) {
-        vars[next] = var_[var[k]];
-        reduced_positive[next] = positive[k];
-        next++;
-      }
+    if (fabs(var_[var[k]]->cost()[0] - var_[var[k]]->cost()[1]) < 1e10) {
+      vars[next] = var_[var[k]];
+      reduced_positive[next] = positive[k];
+      next++;
     }
+  }
+  
+  assert(next == nUseful);
+  assert(nUsedFactors_ < factor_.size());
+  
 
-    assert(next == nUseful);
-    assert(nUsedFactors_ < factor_.size());
-
+  if (nUseful == 1) {
     
-    DualFactorNode* ptr;
+    std::cerr << "happens" << std::endl;
+    
+    if (nPos == 0) {
+      
+      //invert the constraint
+      
+      double temp_lower = rhs_lower;
+      rhs_lower = -rhs_upper;
+      rhs_upper = -temp_lower;
+    }
+    
+    Math1D::Vector<float> add_cost(2,0.0);
+    
+    if (rhs_lower == 1) {
+      add_cost[0] = 1e30;
+    }
+    else if (rhs_upper == 0) {
+      add_cost[1] = 1e30;
+    }
+    else {
+      INTERNAL_ERROR << "STRANGE CONSTRAINT. exiting" << std::endl;
+      exit(1);
+    }
+    
+    vars[0]->add_cost(add_cost);
+    return MAX_UINT;
+  }
+  else {
 
+  
+    DualFactorNode* ptr;
+    
     if (nNeg == 0) 
       ptr = new AllPosBILPConstraintDualFactorNode(vars, rhs_lower, rhs_upper);
     else
       ptr = new BILPConstraintDualFactorNode(vars, reduced_positive, rhs_lower, rhs_upper);
-
+    
     return add_factor(ptr);    
-  }
-  else {
-
-    std::cerr << "WARNING: removed superfluous constraint factor" << std::endl;
-    return MAX_UINT;
   }
 }
 

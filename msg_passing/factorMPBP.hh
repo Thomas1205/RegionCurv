@@ -19,6 +19,8 @@ public:
   VariableNode(const Math1D::Vector<float>& cost);
   
   void add_factor(FactorNode* node);
+
+  void add_cost(const Math1D::Vector<float>& cost);
   
   double* get_message(FactorNode* node);
   
@@ -40,7 +42,7 @@ protected:
   
   Math2D::Matrix<double> message_matrix_;
 
-  const Math1D::Vector<float> cost_;
+  Math1D::Vector<float> cost_;
 };
 
 
@@ -154,7 +156,6 @@ public:
 protected:
   float lambda_;
 };
-
 
 /*abstract*/ class TernaryFactorNodeBase : public FactorNode {
 public: 

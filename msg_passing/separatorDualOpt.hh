@@ -25,6 +25,8 @@ class sepDualOptVar {
 public:
   sepDualOptVar(const Math1D::Vector<float>& cost);
 
+  void add_cost(const Math1D::Vector<float>& cost);
+
   void add_factor(sepDualOptFactor* adjacent_fac);
   
   void add_pair_separator(sepDualOptPairSeparator* adjacent_sep);
@@ -41,7 +43,7 @@ public:
 
 protected:
   
-  const Math1D::Vector<float> cost_;
+  Math1D::Vector<float> cost_;
 
   Storage1D<sepDualOptFactor*> adjacent_factor_; //contains only those factors that do not subsume any separator with this var.
   Storage1D<std::pair<sepDualOptVar*,sepDualOptPairSeparator*> > adjacent_separator_;
@@ -199,7 +201,8 @@ public:
                                const Storage1D<uint>& separators,
                                const Storage1D<Math3D::Tensor<float> >& cost);
 
-  //NOTE: mode is so far ignored
+  sepDualOptVar* get_variable(uint v);
+
   double optimize(uint nIter, DualBCAMode mode = DUAL_BCA_MODE_MSD, bool quiet = true);
 
   const Math1D::Vector<uint>& labeling();

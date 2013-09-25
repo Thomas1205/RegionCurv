@@ -54,7 +54,6 @@ void CumTRWSVar::set_up_chains() {
     nChains_ = nChainlessChains;
   }
 
-
   //initialize cost
   for (uint l=0; l < cost_.size(); l++)
     cum_cost_[l] = cost_[l] / nChains_;
@@ -70,15 +69,15 @@ void CumTRWSVar::add_factor(CumTRWSFactor* factor) {
 
 double CumTRWSVar::average(uint& arg_min) {
 
-
   const uint nLabels = cost_.size();
   const uint nFactors = adjacent_factor_.size();
 
   for (uint l=0; l < nLabels; l++)
     cum_cost_[l] = cost_[l]; //convert float -> double
 
-  for (uint k=0; k < nFactors; k++)
+  for (uint k=0; k < nFactors; k++) {
     cum_cost_ += adjacent_factor_[k]->reparameterization(this);
+  }
 
   double offs = 1e300;
 
@@ -116,6 +115,10 @@ const Storage1D<CumTRWSFactor*>& CumTRWSVar::adjacent_factor() const {
 
 const Math1D::Vector<double>& CumTRWSVar::cost() const {
   return cum_cost_;
+}
+
+const Math1D::Vector<float>& CumTRWSVar::input_cost() const {
+  return cost_;
 }
 
 /**************************/
@@ -240,7 +243,7 @@ double GenericCumTRWSFactor::compute_reparameterization(const CumTRWSVar* var) {
   }
 
   Math1D::Vector<double>& cur_repar = reparameterization_[idx];
-  cur_repar.set_constant(1e300);
+  cur_repar.set_constant(1e100);
 
   Math1D::Vector<size_t> labeling(nVars,0);
 
@@ -270,7 +273,7 @@ double GenericCumTRWSFactor::compute_reparameterization(const CumTRWSVar* var) {
   }
 
 
-  double msg_offs = cur_repar.min();
+  const double msg_offs = cur_repar.min();
 
   for (uint l=0; l < cur_repar.size(); l++)
     cur_repar[l] -= msg_offs;
@@ -293,7 +296,7 @@ BinaryCumTRWSFactorBase::BinaryCumTRWSFactorBase(const Storage1D<CumTRWSVar*>& i
 
 double BinaryCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar* var, const Math2D::Matrix<float>& cost) {
 
-  double offs = 0.0;
+  //double offs = 0.0;
 
   const uint nLabels1 = involved_var_[0]->nLabels();
   const uint nLabels2 = involved_var_[1]->nLabels();
@@ -312,7 +315,7 @@ double BinaryCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar* var
 
     for (uint l1 = 0; l1 < nLabels1; l1++) {
 
-      double best = 1e300;
+      double best = 1e100;
 
       for (uint l2 = 0; l2 < nLabels2; l2++) {
 
@@ -332,7 +335,7 @@ double BinaryCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar* var
 
     for (uint l2 = 0; l2 < nLabels2; l2++) {
 
-      double best = 1e300;
+      double best = 1e100;
 
       for (uint l1 = 0; l1 < nLabels1; l1++) {
 
@@ -347,12 +350,11 @@ double BinaryCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar* var
   }
 
   double msg_offs = reparameterization_[idx].min();
-  offs += msg_offs;
 
   for (uint l=0; l < reparameterization_[idx].size(); l++)
     reparameterization_[idx][l] -= msg_offs;
-  
-  return offs;
+
+  return msg_offs;
 }
 
 /********************/
@@ -403,7 +405,7 @@ TernaryCumTRWSFactorBase::TernaryCumTRWSFactorBase(const Storage1D<CumTRWSVar*>&
   
 double TernaryCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar* var, const Math3D::Tensor<float>& cost) {
 
-  double offs = 0.0;
+  //double offs = 0.0;
 
   const uint nLabels1 = involved_var_[0]->nLabels();
   const uint nLabels2 = involved_var_[1]->nLabels();
@@ -434,7 +436,7 @@ double TernaryCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar* va
 
     for (uint l1 = 0; l1 < nLabels1; l1++) {
       
-      double best = 1e300;
+      double best = 1e100;
 
       for (uint l2 = 0; l2 < nLabels2; l2++) {
 
@@ -460,7 +462,7 @@ double TernaryCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar* va
 
     for (uint l2 = 0; l2 < nLabels2; l2++) {
       
-      double best = 1e300;
+      double best = 1e100;
       
       for (uint l1 = 0; l1 < nLabels1; l1++) {
 
@@ -487,7 +489,7 @@ double TernaryCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar* va
 
     for (uint l3 = 0; l3 < nLabels3; l3++) {
       
-      double best = 1e300;
+      double best = 1e100;
       
       for (uint l2 = 0; l2 < nLabels2; l2++) {
 
@@ -506,13 +508,12 @@ double TernaryCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar* va
     }
   }
 
-  double msg_offs = reparameterization_[idx].min();
-  offs += msg_offs;
+  const double msg_offs = reparameterization_[idx].min();
 
   for (uint l=0; l < reparameterization_[idx].size(); l++)
     reparameterization_[idx][l] -= msg_offs;
 
-  return offs;  
+  return msg_offs;
 }
 
 /********************/
@@ -564,7 +565,6 @@ SecondDiffCumTRWSFactor::SecondDiffCumTRWSFactor(const Storage1D<CumTRWSVar*>& i
 
 /*virtual*/ double SecondDiffCumTRWSFactor::compute_reparameterization(const CumTRWSVar* var) {
 
-  double offs = 0.0;
 
   const uint nLabels1 = involved_var_[0]->nLabels();
   const uint nLabels2 = involved_var_[1]->nLabels();
@@ -602,7 +602,7 @@ SecondDiffCumTRWSFactor::SecondDiffCumTRWSFactor(const Storage1D<CumTRWSVar*>& i
 
           const int so_diff = l3 + part; 
 	  
-          double hyp = 1e300;
+          double hyp = 1e100;
 
           if (so_diff == 0) {
             hyp = -w2 - param[2][l3];
@@ -644,7 +644,7 @@ SecondDiffCumTRWSFactor::SecondDiffCumTRWSFactor(const Storage1D<CumTRWSVar*>& i
 
           const int so_diff = l3 + part; 
 	  
-          double hyp = 1e300;
+          double hyp = 1e100;
 
           if (so_diff == 0) {
             hyp = -w1 - param[2][l3];
@@ -688,7 +688,7 @@ SecondDiffCumTRWSFactor::SecondDiffCumTRWSFactor(const Storage1D<CumTRWSVar*>& i
 
           const int so_diff = part + l1; 
 	  
-          double hyp = 1e300;
+          double hyp = 1e100;
 
           if (so_diff == 0) {
             hyp = -param[0][l1] - w2;
@@ -707,12 +707,11 @@ SecondDiffCumTRWSFactor::SecondDiffCumTRWSFactor(const Storage1D<CumTRWSVar*>& i
   }
 
   double msg_offs = reparameterization_[idx].min();
-  offs += msg_offs;
 
   for (uint l=0; l < reparameterization_[idx].size(); l++)
     reparameterization_[idx][l] -= msg_offs;
 
-  return offs;  
+  return msg_offs;
 }
 
 
@@ -729,8 +728,6 @@ FourthOrderCumTRWSFactorBase::FourthOrderCumTRWSFactorBase(const Storage1D<CumTR
 
 double FourthOrderCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar* var, const Storage1D<Math3D::Tensor<float> >& cost) {
 
-  double offs = 0.0;
-  
   const uint nLabels1 = involved_var_[0]->nLabels();
   const uint nLabels2 = involved_var_[1]->nLabels();
   const uint nLabels3 = involved_var_[2]->nLabels();
@@ -765,10 +762,10 @@ double FourthOrderCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar
 
     for (uint l1 = 0; l1 < nLabels1; l1++) {
       
-      double best = 1e300;
+      double best = 1e100;
 
       const Math3D::Tensor<float>& cur_cost = cost[l1];
-
+      
       for (uint l3 = 0; l3 < nLabels3; l3++) {
 
         const double w3 = param2[l3];
@@ -800,7 +797,7 @@ double FourthOrderCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar
     
     for (uint l2 = 0; l2 < nLabels2; l2++) {
       
-      double best = 1e300;
+      double best = 1e100;
       
       for (uint l1 = 0; l1 < nLabels1; l1++) {
 
@@ -834,7 +831,7 @@ double FourthOrderCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar
 
     for (uint l3 = 0; l3 < nLabels3; l3++) {
       
-      double best = 1e300;
+      double best = 1e100;
       
       for (uint l1 = 0; l1 < nLabels1; l1++) {
 
@@ -870,14 +867,14 @@ double FourthOrderCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar
 
     for (uint l4 = 0; l4 < nLabels4; l4++) {
       
-      double best = 1e300;
+      double best = 1e100;
       
       for (uint l1 = 0; l1 < nLabels1; l1++) {
 
         const Math3D::Tensor<float>& cur_cost = cost[l1];
 
         const double w1 = param0[l1];
-
+	        
         for (uint l3 = 0; l3 < nLabels3; l3++) {
 
           const double sum3 = w1 + param2[l3];
@@ -899,12 +896,11 @@ double FourthOrderCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar
   }
 
   double msg_offs = reparameterization_[idx].min();
-  offs += msg_offs;
 
   for (uint l=0; l < reparameterization_[idx].size(); l++)
     reparameterization_[idx][l] -= msg_offs;
   
-  return offs;
+  return msg_offs;
 }
 
 /********************/
@@ -965,7 +961,7 @@ OneOfNCumTRWSFactor::OneOfNCumTRWSFactor(const Storage1D<CumTRWSVar*>& involved_
 
   const uint nVars = involved_var_.size();
 
-  double best = 1e300;
+  double best = 1e100;
   uint arg_best = MAX_UINT;
 
   for (uint k=0; k < nVars; k++) {
@@ -1001,7 +997,7 @@ OneOfNCumTRWSFactor::OneOfNCumTRWSFactor(const Storage1D<CumTRWSVar*>& involved_
 
   assert(idx < nVars);
 
-  double best_gain = 1e300;
+  double best_gain = 1e100;
 
   double sum = 0.0;
 
@@ -1053,7 +1049,7 @@ void OneOfNCumTRWSFactorWithReuse::init() {
 
   const uint nVars = involved_var_.size();
 
-  double best = 1e300;
+  double best = 1e100;
   uint arg_best = MAX_UINT;
 
   for (uint k=0; k < nVars; k++) {
@@ -1108,6 +1104,43 @@ double OneOfNCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar
 
           best_ = hyp;
           status = DidUpdate;
+
+          //DEBUG
+          // Storage1D<Math1D::Vector<double> > param = reparameterization_;
+          // for (uint k=0; k < nVars; k++) {
+          //   if (k != idx)
+          //     param[k] -= involved_var_[k]->cost();
+          // }
+          
+          // double check_best = 1e100;
+          // double check_second_best = 1e100;
+          // uint check_arg_best = MAX_UINT;
+          // uint check_arg_second_best = MAX_UINT;
+          
+          // for (uint i=0; i < nVars; i++) {
+            
+          //   if (i != idx) {
+          //     const double hyp = -param[i][1] + param[i][0];
+              
+          //     if (hyp < check_best) {
+          //       check_second_best = check_best;
+          //       check_arg_second_best = check_arg_best;
+                
+          //       check_best = hyp;
+          //       check_arg_best = i;
+          //     }
+          //     else if (hyp < check_second_best) {
+          //       check_second_best = hyp;
+          //       check_arg_second_best = i;
+          //     }
+          //   }
+          // }
+
+          // assert(idx == arg_best_ || check_best == best_);
+
+          // //std::cerr << "check_second_best: " << check_second_best << ", second_best_: " << second_best_ << std::endl;
+          // assert(idx == arg_second_best_ || idx == arg_best_ || check_second_best == second_best_);
+          //END_DEBUG
         }
         else
           status = Recompute;
@@ -1142,8 +1175,8 @@ double OneOfNCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar
             param[k] -= involved_var_[k]->cost();
         }
 
-        best_ = 1e300;
-        second_best_ = 1e300;
+        best_ = 1e100;
+        second_best_ = 1e100;
         arg_best_ = MAX_UINT;
         arg_second_best_ = MAX_UINT;
         
@@ -1185,6 +1218,45 @@ double OneOfNCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar
           second_best_ = hyp;
           arg_second_best_ = to_update_;
         }
+
+
+        //DEBUG
+        // Storage1D<Math1D::Vector<double> > param = reparameterization_;
+        // for (uint k=0; k < nVars; k++) {
+        //   if (k != idx)
+        //     param[k] -= involved_var_[k]->cost();
+        // }
+          
+        // double check_best = 1e100;
+        // double check_second_best = 1e100;
+        // uint check_arg_best = MAX_UINT;
+        // uint check_arg_second_best = MAX_UINT;
+        
+        // for (uint i=0; i < nVars; i++) {
+          
+        //   if (i != idx) {
+        //     const double hyp = -param[i][1] + param[i][0];
+            
+        //     if (hyp < check_best) {
+        //       check_second_best = check_best;
+        //       check_arg_second_best = check_arg_best;
+              
+        //       check_best = hyp;
+        //       check_arg_best = i;
+        //     }
+        //     else if (hyp < check_second_best) {
+        //       check_second_best = hyp;
+        //       check_arg_second_best = i;
+        //     }
+        //   }
+        // }
+
+        // assert(idx == arg_best_ || check_best == best_);
+
+        // //std::cerr << "check_second_best: " << check_second_best << ", second_best_: " << second_best_ << std::endl;
+        // assert(idx == arg_second_best_ || idx == arg_best_ || check_second_best == second_best_);
+        //END_DEBUG
+
       }
     }
   }
@@ -1200,8 +1272,8 @@ double OneOfNCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar
     }
 
     sum_ = 0.0;
-    best_ = 1e300;
-    second_best_ = 1e300;
+    best_ = 1e100;
+    second_best_ = 1e100;
     arg_best_ = MAX_UINT;
     arg_second_best_ = MAX_UINT;
 
@@ -1279,7 +1351,7 @@ double CardinalityCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar
   assert(idx < nVars);
 
   Math1D::Vector<double>& message = reparameterization_[idx];
-  message.set_constant(1e300);
+  message.set_constant(1e100);
 
   Math1D::NamedVector<double> rel_param(nVars-1,MAKENAME(rel_param));
 
@@ -1316,6 +1388,24 @@ double CardinalityCumTRWSFactorBase::compute_reparameterization(const CumTRWSVar
 
   for (uint l=0; l < 2; l++)
     message[l] += offs;
+
+  //DEBUG
+  // if (involved_var_.size() == 2 && involved_var_[0]->rank() == 48905 && involved_var_[1]->rank() == 48906) {
+
+  //   std::cerr << "CARD, idx: " << idx << std::endl;
+  //   std::cerr << "cost: " << cost << std::endl;
+
+  //   for (uint i=0; i < 2; i++) {
+  //     std::cerr << "reparameterization [" << i << "]: " << reparameterization_[i] << std::endl;
+  //   }
+
+  //   for (uint i=0; i < 2; i++) {
+  //     std::cerr << "params[" << i << "]: " << param[i] << std::endl;
+  //   }
+    
+  //   std::cerr << "computed message: " << message << std::endl;
+  // }
+  //END_DEBUG
 
   const double total_offs = message.min();
 
@@ -1395,6 +1485,7 @@ double CardinalityCumTRWSFactorBaseWithReuse::compute_reparameterization(const C
   uint idx = MAX_UINT;
 
   if (to_update_ != MAX_UINT) {
+    //if (false) {
 
     if (var == involved_var_[to_update_]) {
       idx = to_update_;
@@ -1431,6 +1522,18 @@ double CardinalityCumTRWSFactorBaseWithReuse::compute_reparameterization(const C
         order_[var]--;
         order_[to_update_]++;
       }
+
+
+      //DEBUG
+      // Math1D::Vector<uint> save_order = order_;
+      // Storage1D<std::pair<double,uint> > save_value = value_;
+
+      // std::sort(value_.direct_access(),value_.direct_access()+nVars);
+      // for (uint k=0; k < nVars; k++) {
+      //   order_[value_[k].second] = k;
+      // }
+      //END_DEBUG
+
     }
   }
   else {
@@ -1496,6 +1599,22 @@ double CardinalityCumTRWSFactorBaseWithReuse::compute_reparameterization(const C
   for (uint k=0; k < 2; k++)
     message[k] -= total_offs;
 
+  //DEBUG
+  // CardinalityCumTRWSFactor check_obj(involved_var_,cost);
+  // check_obj.reparameterization_ = reparameterization_;
+  // check_obj.compute_reparameterization(var); 
+  // const Math1D::Vector<double>& check_message = check_obj.reparameterization_[idx];
+  
+  // Math1D::Vector<double> diff = check_message - message;
+  // if (diff.sqr_norm() >= 1e-5) {
+  //   std::cerr << "value_ : " << value_ << std::endl;
+  //   std::cerr << "idx: " << idx << ", offs: " << offs_ << ", order: " << order_[idx] << std::endl;
+    
+  //   std::cerr << "message: " << message << ", should be: " << check_message << std::endl;
+  //   assert(false);
+  // }
+  //END_DEBUG
+
   return total_offs;
 }
 
@@ -1518,6 +1637,8 @@ double CardinalityCumTRWSFactorWithReuse::compute_reparameterization(const CumTR
 AllPosBILPCumTRWSFactor::AllPosBILPCumTRWSFactor(const Storage1D<CumTRWSVar*>& involved_vars, 
                                                  int rhs_lower, int rhs_upper)
   : CumTRWSFactor(involved_vars), rhs_lower_(std::max(0,rhs_lower)), rhs_upper_(std::min<int>(involved_vars.size(),rhs_upper)) {
+
+  assert(involved_vars.size() >= 2);
 
   if (rhs_lower_ > rhs_upper_ || rhs_upper_ < 0) {
     INTERNAL_ERROR << "constraint is unsatisfiable, so inference is pointless. Exiting." << std::endl;
@@ -1556,7 +1677,7 @@ double AllPosBILPCumTRWSFactor::compute_reparameterization(const CumTRWSVar* var
   assert(idx < nVars);
 
   Math1D::Vector<double>& message = reparameterization_[idx];
-  message.set_constant(1e300);
+  message.set_constant(1e100);
 
   Math1D::NamedVector<double> rel_param(nVars-1,MAKENAME(rel_param));
 
@@ -1611,6 +1732,7 @@ BILPCumTRWSFactor::BILPCumTRWSFactor(const Storage1D<CumTRWSVar*>& involved_vars
                                      int rhs_lower, int rhs_upper) :
   CumTRWSFactor(involved_vars), rhs_lower_(rhs_lower), rhs_upper_(rhs_upper) {
 
+  assert(involved_vars.size() >= 2);
 
   for (uint v=0; v < involved_vars.size(); v++) {
     if (involved_vars[v]->nLabels() != 2) {
@@ -1698,8 +1820,15 @@ BILPCumTRWSFactor::BILPCumTRWSFactor(const Storage1D<CumTRWSVar*>& involved_vars
 
   Storage1D<Math1D::Vector<double> > param = reparameterization_;
   for (uint k=0; k < nVars; k++) {
-    if (involved_var_[k] != var)
-      param[k] -= involved_var_[k]->cost();
+    if (involved_var_[k] != var) {
+      for (uint l=0; l < 2; l++) {
+	const double cost = involved_var_[k]->cost()[l];
+	if (cost < 1e75)
+	  param[k][l] -= cost;
+	else
+	  param[k][l] = -1e100;  //don't apply calculus to infinity (could give negative cost)
+      }
+    }
     else {
       idx = k;
       param[k].set_constant(0.0);
@@ -1710,8 +1839,6 @@ BILPCumTRWSFactor::BILPCumTRWSFactor(const Storage1D<CumTRWSVar*>& involved_vars
 
   assert(idx < nVars);
 
-  /*** solution based on forward ****/
-
 
   /**** forward ****/
   assert(nVars >= 2);
@@ -1719,7 +1846,7 @@ BILPCumTRWSFactor::BILPCumTRWSFactor(const Storage1D<CumTRWSVar*>& involved_vars
   Math1D::Vector<double> forward_vec[2];
   forward_vec[0].resize(range_,1e100);
   forward_vec[1].resize(range_,1e100);
-  
+    
   Math1D::Vector<double>& start_forward_vec = forward_vec[0];
   
   const uint start_idx = (idx != 0) ? 0 : 1;
@@ -1731,63 +1858,64 @@ BILPCumTRWSFactor::BILPCumTRWSFactor(const Storage1D<CumTRWSVar*>& involved_vars
   if (init_val >= 0 && init_val < range_) {
     start_forward_vec[init_val] = -start_param[1];
   }
-  
+
   uint cur_idx = 0;
-
+  
   for (uint v = start_idx+1; v < nPos_; v++) {
-
+    
     if (v != idx) {
       
       const Math1D::Vector<double>& cur_param = param[v];
       
       const Math1D::Vector<double>& prev_forward_vec = forward_vec[cur_idx];
-      
+
       cur_idx = 1 - cur_idx;
       
       Math1D::Vector<double>& cur_forward_vec = forward_vec[cur_idx];
       
       for (int sum=zero_offset_; sum < std::min<int>(range_,zero_offset_+v+2); sum++) {
         
-	double best = 1e300;
-
+	double best = 1e100;
+	
 	for (int l=0; l < 2; l++) {
 	  
-	  double best_prev = 1e75;
+	  double best_prev = 1e100;
           
-            const int dest = sum - l;
-            if (dest >= 0) {
-	      
-              best_prev = prev_forward_vec[dest]; 
-            }
-            
-            const double hyp = best_prev - cur_param[l];
-            if (hyp < best)
-              best = hyp;
+	  const int dest = sum - l;
+	  if (dest >= 0) {
+	    
+	    best_prev = prev_forward_vec[dest]; 
+	  }
+          
+	  const double hyp = best_prev - cur_param[l];
+	  if (hyp < best)
+	    best = hyp;
 	}
 	cur_forward_vec[sum] = best;
       }
     }
   }
   
+
   for (uint v = std::max(start_idx+1,nPos_); v < nVars; v++) {
 
     if (v != idx) {
       
       const Math1D::Vector<double>& cur_param = param[v];
-	
+      
       const Math1D::Vector<double>& prev_forward_vec = forward_vec[cur_idx];
       
       cur_idx = 1 - cur_idx;
-      
+	
       Math1D::Vector<double>& cur_forward_vec = forward_vec[cur_idx];
       
       for (int sum=0; sum < range_; sum++) {
 	
-	double best = 1e300;
-
+	double best = 1e100;
+	
 	for (int l=0; l < 2; l++) {
 	  
-	  double best_prev = 1e75;
+	  double best_prev = 1e100;
           
 	  const int dest = sum + l;
 	  if (dest < range_) {
@@ -1808,12 +1936,14 @@ BILPCumTRWSFactor::BILPCumTRWSFactor(const Storage1D<CumTRWSVar*>& involved_vars
 
   //now derive the message
   for (uint l=0; l < 2; l++) {
+    
+    //std::cerr << "l: " << l << std::endl;
       
-    double min_msg = 1e300;
-
+    double min_msg = 1e100;
+    
     for (int s = rhs_lower_ + zero_offset_; s <= rhs_upper_ + zero_offset_; s++) { 
       
-      double best_prev = 1e75;
+      double best_prev = 1e100;
       
       int move = l;
       if (idx < nPos_) 
@@ -1833,6 +1963,8 @@ BILPCumTRWSFactor::BILPCumTRWSFactor(const Storage1D<CumTRWSVar*>& involved_vars
     message[l] = min_msg;
   }
 
+  //std::cerr << "comp offs." << std::endl;
+
   const double offs = message.min();
 
   if (fabs(offs) > 1e10) {
@@ -1848,9 +1980,9 @@ BILPCumTRWSFactor::BILPCumTRWSFactor(const Storage1D<CumTRWSVar*>& involved_vars
     for (uint v=0; v < involved_var_.size(); v++)
       std::cerr << involved_var_[v]->rank() << " ";
     std::cerr << std::endl;
-    std::cerr << "var params:" << std::endl;
+    std::cerr << "var params and input cost: " << std::endl;
     for (uint v=0; v < involved_var_.size(); v++)
-      std::cerr << involved_var_[v]->cost() << std::endl;
+      std::cerr << involved_var_[v]->cost() << " " << involved_var_[v]->input_cost() << std::endl;
 
     //DEBUG
     exit(1);
@@ -1864,6 +1996,7 @@ BILPCumTRWSFactor::BILPCumTRWSFactor(const Storage1D<CumTRWSVar*>& involved_vars
 }
 
 /********************/
+
 
 BILPCumTRWSFactorWithReuse::BILPCumTRWSFactorWithReuse(const Storage1D<CumTRWSVar*>& involved_vars, const Storage1D<bool>& positive,
                                                        int rhs_lower, int rhs_upper) :
@@ -1910,6 +2043,8 @@ BILPCumTRWSFactorWithReuse::BILPCumTRWSFactorWithReuse(const Storage1D<CumTRWSVa
 
   zero_offset_ = zero_offset;
 
+  //fwdbwd_light_.resize(range,nVars);
+
   //just one matrix for forward and backward, as we only need to entries up to the current var.
   // since the current var does not itself require storage we can save one column
   fwdbwd_light_.resize(range,nVars-1); 
@@ -1936,9 +2071,15 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
   const int range = fwdbwd_light_.xDim();
 
   if (to_update_ != MAX_UINT) {
-    Math1D::Vector<double> prev_param = reparameterization_[to_update_];
-    prev_param -= involved_var_[to_update_]->cost();
 
+    Math1D::Vector<double> prev_param = reparameterization_[to_update_];
+    for (uint l=0; l < 2; l++) {
+      const double cost = involved_var_[to_update_]->cost()[l];
+      if (cost < 1e75)
+	prev_param[l] -= cost;
+      else
+	prev_param[l] = -1e100; //don't apply calculus to infinity (could give negative cost)
+    }
 
     if (to_update_+1 < nVars && involved_var_[to_update_+1] == var) {
       idx = to_update_+1;
@@ -1963,11 +2104,11 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
                 
         for (int sum=0; sum < range; sum++) {
 
-          double best = 1e300;
+          double best = 1e100;
         
           for (int l=0; l < 2; l++) {
             
-            double best_prev = 1e75;
+            double best_prev = 1e100;
             
             int move = l;
             if (positive_[to_update_]) //since we are tracing backward here
@@ -2000,6 +2141,7 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
 
         fwdbwd_light_(zero_offset_,to_update_-1) = -prev_param[0];
 
+
         const int end_mul = (positive_[to_update_]) ? 1 : -1;
         if (int(zero_offset_) + end_mul >= 0
             && int(zero_offset_) + end_mul < range) {
@@ -2010,7 +2152,7 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
 
         for (int sum=0; sum < range; sum++) {
           
-          double best_prev = 1e75;
+          double best_prev = 1e100;
           
           for (int l=0; l < 2; l++) {
             
@@ -2019,7 +2161,7 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
               move *= -1;
             
             const int dest = sum + move;
-            double hyp = 1e75;
+            double hyp = 1e100;
             if (dest >= 0 && dest < range) {
 	      hyp = fwdbwd_light_(dest,to_update_) - prev_param[l];
             }
@@ -2040,8 +2182,17 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
 
     Storage1D<Math1D::Vector<double> > param = reparameterization_;
     for (uint k=0; k < nVars; k++) {
-      if (involved_var_[k] != var)
-        param[k] -= involved_var_[k]->cost();
+
+      if (involved_var_[k] != var) {
+
+	for (uint l=0; l < 2; l++) {
+	  const double cost = involved_var_[k]->cost()[l];
+	  if (cost < 1e75)
+	    param[k][l] -= cost;
+	  else
+	    param[k][l] = -1e100; //don't apply calculus to infinity (could give negative cost)
+	}
+      }
       else {
         idx = k;
         param[k].set_constant(0.0);
@@ -2068,11 +2219,11 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
       
       for (int sum=0; sum < range; sum++) {
         
-        double best = 1e300;
+        double best = 1e100;
         
         for (int l=0; l < 2; l++) {
           
-          double best_prev = 1e75;
+          double best_prev = 1e100;
           
           int move = l;
           if (positive_[v]) //since we are tracing backward here
@@ -2112,7 +2263,7 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
       
       for (int sum=0; sum < range; sum++) {
       
-        double best_prev = 1e75;
+        double best_prev = 1e100;
         
         for (int l=0; l < 2; l++) {
           
@@ -2121,7 +2272,7 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
             move *= -1;
 
           const int dest = sum + move;
-          double hyp = 1e75;
+          double hyp = 1e100;
           if (dest >= 0 && dest < range) {
 	    hyp = fwdbwd_light_(dest,v) - param[v][l];
           }
@@ -2137,13 +2288,107 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
 
   Math1D::Vector<double>& message = reparameterization_[idx];
 
+  //DEBUG
+  // Storage1D<Math1D::Vector<double> > param = reparameterization_;
+  // for (uint k=0; k < nVars; k++) {
+  //   if (involved_var_[k] != var)
+  //     param[k] -= involved_var_[k]->cost();
+  //   else {
+  //     param[k].set_constant(0.0);
+  //   }
+  // }
+
+  // Math2D::Matrix<double> check_fwd(range,nVars,1e100);
+  
+  // check_fwd(zero_offset_,0) = -param[0][0];
+  // const int init_mul = (positive_[0]) ? 1 : -1;
+  // if (int(zero_offset_)+init_mul >= 0
+  //     && int(zero_offset_)+init_mul < range) {
+  //   check_fwd(zero_offset_+init_mul,0) = -param[0][1];
+  // }
+
+  // for (uint v=1; v <= idx; v++) {
+    
+  //   //std::cerr << "v: " << v << std::endl;
+    
+  //   for (int sum=0; sum < range; sum++) {
+      
+  //     double best = 1e100;
+      
+  //     for (int l=0; l < 2; l++) {
+	
+  // 	double best_prev = 1e100;
+        
+  // 	int move = l;
+  // 	if (positive_[v]) //since we are tracing backward here
+  // 	  move *= -1;
+	
+  // 	const int dest = sum + move;
+  // 	if (dest >= 0 && dest < range) {
+	  
+  // 	  best_prev = check_fwd(dest,v-1);
+  // 	}
+          
+  // 	double forward = best_prev - param[v][l];
+
+  // 	if (forward < best)
+  // 	  best = forward;
+  //     }
+  //     check_fwd(sum,v) = best;
+  //   }
+  // }
+
+
+  // Math2D::Matrix<double> check_bwd(range,nVars,1e100);
+
+  // const uint last_var = nVars-1;
+
+  // check_bwd(zero_offset_,last_var) = -param[last_var][0];
+  // const int end_mul = (positive_[last_var]) ? 1 : -1;
+  // if (int(zero_offset_) + end_mul >= 0
+  //     && int(zero_offset_) + end_mul < range) {
+  //   check_bwd(zero_offset_ + end_mul,last_var) = -param[last_var][1];
+  // }
+
+
+  // //proceed
+  // for (int v=last_var-1; v > int(idx); v--) {
+    
+  //   //std::cerr << "v: " << v << std::endl;
+    
+  //   for (int sum=0; sum < range; sum++) {
+      
+  //     double best_prev = 1e100;
+      
+  //     for (int l=0; l < 2; l++) {
+	
+  // 	int move = l;
+  // 	if (positive_[v]) //since we are tracing backward here
+  // 	  move *= -1;
+	
+  // 	const int dest = sum + move;
+  // 	double hyp = 1e100;
+  // 	if (dest >= 0 && dest < range) {
+  // 	  hyp = check_bwd(dest,v+1) - param[v][l];
+  // 	}
+        
+  // 	if (hyp < best_prev)
+  // 	  best_prev = hyp;
+  //     }
+      
+  //     check_bwd(sum,v) = best_prev;
+  //   }
+  // }
+  //END_DEBUG
+
+
   for (uint l=0; l < 2; l++) {
     
-    double min_msg = 1e300;
+    double min_msg = 1e100;
     
     for (int s=0; s < (int) range; s++) {
       
-      double forward = 1e300;
+      double forward = 1e100;
       if (idx == 0) {
 
         if (l == 0 && s == zero_offset_)
@@ -2163,6 +2408,19 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
         const int dest = s + move;
         if (dest >= 0 && dest < range) {
           forward = fwdbwd_light_(dest,idx-1);
+
+	  //DEBUG
+	  // if (fabs(fwdbwd_light_(dest,idx-1) - check_fwd(dest,idx-1)) > 1e-5) {
+	    
+	  //   std::cerr << "forward mismatch: should be " << check_fwd(dest,idx-1) << ", is " << fwdbwd_light_(dest,idx-1) << std::endl;
+	    
+	  //   std::cerr << "dest= " << dest << ", idx = " << idx << std::endl;
+	    
+	  //   std::cerr << "exiting" << std::endl;
+	  //   exit(1);
+	  // }
+	  //END_DEBUG
+
         }
       }
 
@@ -2171,7 +2429,7 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
       
       if (idx+1 < nVars) {
         
-        double best_bwd = 1e300;
+        double best_bwd = 1e100;
         
         const int diff = (s - zero_offset_);
         
@@ -2180,6 +2438,19 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
           
           if (other >= 0 && other < (int) range) {
             
+
+	    //DEBUG
+	    // if (fabs(fwdbwd_light_(other,idx) - check_bwd(other,idx+1)) > 1e-5) {
+	    
+	    //   std::cerr << "backward mismatch: should be " << check_bwd(other,idx+1) << ", is: " << fwdbwd_light_(other,idx) << std::endl;
+
+	    //   std::cerr << "idx: " << idx << ", to_update: " << to_update_  << ", nVars: " << nVars << std::endl;
+
+	    //   std::cerr << "exiting" << std::endl;
+	    //   exit(1);
+	    // }
+	    //END_DEBUG
+
 	    best_bwd = std::min(best_bwd,fwdbwd_light_(other,idx));
           }
         }
@@ -2188,7 +2459,7 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
       }
       else {
         if (s < int(rhs_lower_ + zero_offset_) || s > int(rhs_upper_ + zero_offset_)) 
-          hyp = 1e300;
+          hyp = 1e100;
       }
       
       if (hyp < min_msg)
@@ -2207,6 +2478,7 @@ double BILPCumTRWSFactorWithReuse::compute_reparameterization(const CumTRWSVar* 
 
   return offs;
 }
+
 
 /********************/
 
@@ -2252,6 +2524,8 @@ uint CumFactorTRWS::add_var(const Math1D::Vector<float>& cost) {
   assert(!optimize_called_);
 
   if (nUsedVars_ == var_.size()) {
+    std::cerr << "WARNING: resize" << std::endl;
+
     var_.resize(uint(nUsedVars_*1.2)+4);
     rank2var_.resize(uint(nUsedVars_*1.2)+4);
   }
@@ -2495,6 +2769,7 @@ uint CumFactorTRWS::add_cardinality_factor(const Math1D::Vector<uint>& var, cons
   }
 }
 
+
 uint CumFactorTRWS::add_binary_ilp_factor(const Math1D::Vector<uint>& var, const Storage1D<bool>& positive,
                                           int rhs_lower, int rhs_upper, bool reuse) {
 
@@ -2561,6 +2836,18 @@ uint CumFactorTRWS::add_binary_ilp_factor(const Math1D::Vector<uint>& var, const
     exit(1);
   }
 
+  //if (nUseful != var.size())
+  //  std::cerr << "removed " << (var.size() - nUseful) << " / " << var.size() << " vars for BILP node" << std::endl;
+
+  // if (nUseful < 2) {
+  //   std::cerr << "only " << nUseful << " out of " << var.size() << " variables are actually not fixed" << std::endl;
+  
+  //   for (uint k=0; k < var.size(); k++)
+  //     std::cerr << "cost: " << var_[var[k]]->cost() << std::endl;
+  
+  //   std::cerr << "var: " << var << std::endl;
+  // }
+  
   Storage1D<CumTRWSVar*> vars(nUseful);
   Storage1D<bool> reduced_positive(nUseful);
     
@@ -2580,7 +2867,7 @@ uint CumFactorTRWS::add_binary_ilp_factor(const Math1D::Vector<uint>& var, const
   
   if (nUseful == 1) {
     
-    std::cerr << "only one remaining var" << std::endl;
+    std::cerr << "happens" << std::endl;
     
     if (nPos == 0) {
       
@@ -2658,9 +2945,7 @@ double CumFactorTRWS::optimize(uint nIter, bool quiet) {
 
   uint arg_min;
 
-  double bound = 1e300;
-
-  std::cerr.precision(8);
+  double bound = 1e100;
 
   if (!quiet) {
     size_t message_effort = 0;
@@ -2673,6 +2958,8 @@ double CumFactorTRWS::optimize(uint nIter, bool quiet) {
 
   for (uint f=0; f < nUsedFactors_; f++)
     factor_[f]->init();
+
+  std::cerr.precision(8);
 
   for (uint iter=1; iter <= nIter; iter++) {
 
@@ -2689,22 +2976,27 @@ double CumFactorTRWS::optimize(uint nIter, bool quiet) {
       
       CumTRWSVar* cur_var = var_[rank2var_[i]];
       
-      Storage1D<CumTRWSFactor*> adj_factors = cur_var->adjacent_factor();
+      const Storage1D<CumTRWSFactor*>& adj_factors = cur_var->adjacent_factor();
       
       for (uint k=0; k < adj_factors.size(); k++) {
 	
-        if (i != adj_factors[k]->min_rank()) {
+	CumTRWSFactor* cur_fac = adj_factors[k];
 
-          double cur_offs = adj_factors[k]->compute_reparameterization(cur_var);
+        if (i != cur_fac->min_rank()) {
+
+          double cur_offs = cur_fac->compute_reparameterization(cur_var);
 	
-	  if (i == adj_factors[k]->max_rank())
+	  if (i == cur_fac->max_rank()) {
 	    forward_lower += cur_offs;
+	  }
         }
       }
 
       forward_lower += cur_var->average(arg_min);
       labeling_[i] = arg_min;
     }
+
+    //std::cerr << "fwd bound: " << forward_lower << std::endl;
 
     //backward
     double backward_lower = 0.0;
@@ -2715,14 +3007,16 @@ double CumFactorTRWS::optimize(uint nIter, bool quiet) {
       
       CumTRWSVar* cur_var = var_[rank2var_[i]];
 
-      Storage1D<CumTRWSFactor*> adj_factors = cur_var->adjacent_factor();
+      const Storage1D<CumTRWSFactor*>& adj_factors = cur_var->adjacent_factor();
       
       for (uint k=0; k < adj_factors.size(); k++) {
 
-        if (i != int(adj_factors[k]->max_rank())) {	
-          double cur_offs = adj_factors[k]->compute_reparameterization(cur_var);
+	CumTRWSFactor* cur_fac = adj_factors[k];
+
+        if (i != int(cur_fac->max_rank())) {	
+          double cur_offs = cur_fac->compute_reparameterization(cur_var);
 	
-          if (i == int(adj_factors[k]->min_rank()))
+          if (i == int(cur_fac->min_rank()))
             backward_lower += cur_offs;
         }
       }
@@ -2753,3 +3047,8 @@ double CumFactorTRWS::optimize(uint nIter, bool quiet) {
 const Math1D::Vector<uint>& CumFactorTRWS::labeling() {
   return labeling_;
 }
+
+
+
+
+

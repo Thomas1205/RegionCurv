@@ -38,6 +38,8 @@ public:
 
   const Math1D::Vector<double>& cost() const;
 
+  const Math1D::Vector<float>& input_cost() const;
+  
 protected:
 
   Math1D::Vector<float> cost_;

@@ -15,6 +15,11 @@ void sepDualOptVar::add_factor(sepDualOptFactor* adjacent_fac) {
   adjacent_factor_[size] = adjacent_fac;
 }
 
+void sepDualOptVar::add_cost(const Math1D::Vector<float>& cost) {
+
+  cost_ += cost;
+}
+
 void sepDualOptVar::add_pair_separator(sepDualOptPairSeparator* adjacent_sep) {
 
   std::set<sepDualOptVar*> vars = adjacent_sep->involved_vars();
@@ -335,6 +340,7 @@ BinarySepDualOptFactor::BinarySepDualOptFactor(const Storage1D<sepDualOptVar*>& 
   const uint nLabels1 = cost_.xDim();
   const uint nLabels2 = cost_.yDim();
 
+
   // handle var1
   var_[0]->compute_message(this,msg);
 
@@ -352,7 +358,7 @@ BinarySepDualOptFactor::BinarySepDualOptFactor(const Storage1D<sepDualOptVar*>& 
 
     dual_var_[0][x] = 0.5 * (best - msg[x]);
   }
-
+  
   // handle var2
   var_[1]->compute_message(this,msg);
 
@@ -370,6 +376,7 @@ BinarySepDualOptFactor::BinarySepDualOptFactor(const Storage1D<sepDualOptVar*>& 
 
     dual_var_[1][y] = 0.5 * (best - msg[y]);
   }
+
 }
 
 /*virtual*/ void BinarySepDualOptFactor::write_cost(std::ostream& out, double factor) {
@@ -1412,6 +1419,8 @@ double FourthOrderSepDualOptFactor::eval_pair(uint pair_num,
   //now add pairwise separators
   for (uint s=0; s < separator_.size(); s++) {
 
+    //std::cerr << "s: " << s << std::endl;
+
     sepDualOptVar* v1 = separator_[s]->var1();
     sepDualOptVar* v2 = separator_[s]->var2();
 
@@ -1723,6 +1732,12 @@ void SeparatorDualOptimization::add_fourth_order_factor(uint v1, uint v2, uint v
   add_factor(new FourthOrderSepDualOptFactor(var,sep,cost_copy,minimal_links_));
 }
 
+sepDualOptVar* SeparatorDualOptimization::get_variable(uint v) {
+
+  if (v < nUsedVars_)
+    return var_[v];
+  return 0;
+}
 
 const Math1D::Vector<uint>& SeparatorDualOptimization::labeling() {
   return labeling_;
@@ -1759,6 +1774,10 @@ void SeparatorDualOptimization::save_problem() {
   for (uint v=0; v < nUsedVars_; v++) {
     of << (v+1) << std::endl;
   }
+  // for (uint s=0; s < nUsedSeparators_; s++) {
+  //   of << (var_idx[separator_[s]->var1()] + 1) << " "
+  //      << (var_idx[separator_[s]->var2()] + 1) << std::endl;
+  // }
   of.close();
   
   of.open("region_intersects.txt");
@@ -1766,7 +1785,10 @@ void SeparatorDualOptimization::save_problem() {
     
     for (uint v=0; v < factor_[f]->vars().size(); v++)
       of << (var_idx[factor_[f]->vars()[v]] + 1) << " ";
-
+    
+    // for (uint s=0; s < factor_[f]->separators().size(); s++) {
+    //   of << (sep_idx[factor_[f]->separators()[s]] + nUsedVars_ + 1) << " "; 
+    // }
     of << std::endl;
   }
   for (uint v=0; v < nUsedVars_; v++) 
@@ -1848,7 +1870,7 @@ double SeparatorDualOptimization::optimize(uint nIter, DualBCAMode mode, bool qu
     /*** compute bound ***/
     if (!quiet) {
       bound = 0.0;
-
+      
       for (uint v=0; v < nUsedVars_; v++) {
 	bound += var_[v]->dual_value(label);
 	labeling_[v] = label;
@@ -1873,7 +1895,7 @@ double SeparatorDualOptimization::optimize(uint nIter, DualBCAMode mode, bool qu
 
   for (uint s=0; s < nUsedSeparators_; s++)
     bound += separator_[s]->dual_value();
-  
+      
   for (uint f=0; f < nUsedFactors_; f++)
     bound += factor_[f]->dual_value();
 
