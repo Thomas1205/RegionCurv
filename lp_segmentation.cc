@@ -618,7 +618,7 @@ double curv_icm(uint* solution, const double* region_cost, const Mesh2D& mesh,
       
       for (uint k=0; k < point_indices.size(); k++) {
         hyp_point_cost[k] = point_energy(point_indices[k], solution, mesh, edge_pairs, point_pair, point_edge, 
-                                         lambda, gamma, bruckstein, crossings_allowed);
+                                         lambda, gamma, curv_power, bruckstein, crossings_allowed);
         hyp_energy += hyp_point_cost[k];
       }
       
