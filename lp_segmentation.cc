@@ -396,7 +396,7 @@ double point_energy(uint point, const uint* solution, const Mesh2D& mesh,
         conflicts.clear();
 	
       uint nConstraints = 2*point_edge[point].size() + conflicts.size();
-      uint nMatrixEntries = 4*point_pair.size() + 4*conflicts.size();
+      uint nMatrixEntries = 8*point_pair.size() + 4*conflicts.size();
 
       SparseMatrixDescription<double> lp_descr(nMatrixEntries, nConstraints, nVars);
 
