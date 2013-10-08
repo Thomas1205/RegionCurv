@@ -2301,19 +2301,19 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   
   double integral_energy = curv_energy(labeling.direct_access(), cost.direct_access(), mesh,
-                                       lambda, gamma, curv_power, bruckstein, !prevent_crossings)
-    + energy_offset;
+                                       lambda, gamma, curv_power, bruckstein, !prevent_crossings);
 
-  std::cerr << "integral energy according to independent routine: " << integral_energy << std::endl;
+  std::cerr << "integral energy according to independent routine: " << integral_energy 
+	    << "(" << (integral_energy + energy_offset) << ")" << std::endl;
 
 
-  if (!options.convex_prior_ && !constrain_number_of_objects) {
-    double icm_energy = curv_icm(labeling.direct_access(), cost.direct_access(), mesh,
-				 lambda, gamma, curv_power, bruckstein, energy_offset, !prevent_crossings) 
-      + energy_offset;
+  // if (!options.convex_prior_ && !constrain_number_of_objects) {
+  //   double icm_energy = curv_icm(labeling.direct_access(), cost.direct_access(), mesh,
+  // 				 lambda, gamma, curv_power, bruckstein, energy_offset, !prevent_crossings) 
+  //     + energy_offset;
     
-    std::cerr << "energy after ICM: " << icm_energy << std::endl;
-  }
+  //   std::cerr << "energy after ICM: " << icm_energy << std::endl;
+  // }
 
   uint nOpposingLinePairs = 0;
 
@@ -2737,6 +2737,18 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     std::cerr << "energy of thresholded solution: " << thresh_energy 
               << "  (" << nNonIntThresh << " non-integral variables)" << std::endl;
   }
+
+  for (uint i=0;i<mesh.nFaces();++i) {
+    if (lp_solution[i] > 0.99) {
+      labeling[i] = 1;
+    }
+    else if (lp_solution[i] < 0.01) {
+      labeling[i] = 0;
+    }
+    else {
+      labeling[i] = -1;
+    }
+  }
 #endif
 
   uint nOpposingLinePairs_after = 0;
@@ -2759,9 +2771,15 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
     Petter::statusOK();
   }
 
+  if (!options.convex_prior_ && !constrain_number_of_objects) {
+    double icm_energy = curv_icm(labeling.direct_access(), cost.direct_access(), mesh,
+				 lambda, gamma, curv_power, bruckstein, energy_offset, !prevent_crossings); 
+    
+    std::cerr << "energy after ICM: " << icm_energy << "(" << (icm_energy+energy_offset) << ")" << std::endl;
+  }
+
   Petter::statusTry("Building output...");
 
-  Math1D::Vector<int> labels(mesh.nFaces());
 
   uint out_factor = options.output_factor_;
 
@@ -2776,18 +2794,6 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
 
   //re-compute pixel shares for the now larger mesh
   compute_pixel_shares(large_mesh, out_factor*xDim, out_factor*yDim, shares, share_start);
-
-  for (uint i=0;i<mesh.nFaces();++i) {
-    if (lp_solution[i] > 0.99) {
-      labels[i] = 1;
-    }
-    else if (lp_solution[i] < 0.01) {
-      labels[i] = 0;
-    }
-    else {
-      labels[i] = -1;
-    }
-  }
 
   for (uint y=0; y < yDim*out_factor; y++) {
     for (uint x=0; x < xDim*out_factor; x++) {
