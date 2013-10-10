@@ -2802,7 +2802,7 @@ double lp_segment_curvreg(const Math2D::Matrix<float>& data_term, const LPSegOpt
       double frac_sum = 0.0;
       for (uint k= share_start[y*(xDim*out_factor)+x]; k < share_start[y*(xDim*out_factor)+x+1]; k++) {
         uint face = shares[k].face_idx_;
-        sum += large_mesh.convex_area(face) * shares[k].share_ * lp_solution[face];
+        sum += large_mesh.convex_area(face) * shares[k].share_ * labeling[face];
         frac_sum += large_mesh.convex_area(face) * shares[k].share_ * frac_solution[face];
       }
       double seg = int(sum*255.0 + 0.5);

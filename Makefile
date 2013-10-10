@@ -4,7 +4,7 @@ include common/Makefile.common
 # Change these to point to your Coin Cbc installation
 COININCLUDEDIR = ~/work/software/linprog/thirdparty/devel/coin-Cbc/include/
 COINLIBDIR = ~/work/software/linprog/thirdparty/devel/coin-Cbc/lib64/
-COINLINK = -L $(COINLIBDIR) -lClp -lCoinUtils -lOsiClp -lOsi -lCbc -lCgl -lz -lbz2 -llapack -lblas
+COINLINK = -L $(COINLIBDIR) -lClp -lCoinUtils -lOsiClp -lOsi -lCbc -lCgl -lz -lbz2 
 
 ##############################################################
 
