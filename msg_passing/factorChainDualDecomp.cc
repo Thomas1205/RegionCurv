@@ -1530,8 +1530,8 @@ double AllPosBILPChainDDFactor::compute_forward(const ChainDDVar* in_var, const 
 
   forward.set_constant(1e300);
   
-  int best_c0 = 100000;
-  int best_c1 = 100000;
+  int best_c0 = 0;
+  int best_c1 = 0;
 
   double cum_sum = 0.0;
 
@@ -1853,6 +1853,9 @@ double BILPChainDDFactor::compute_forward(const ChainDDVar* in_var, const ChainD
     forward_msg[l] = min_msg;
     trace(idx,l) = l;
 
+    if (min_msg >= 1e50) //the variable cannot have this label, traceback might violate some bounds
+      continue;
+
     if (idx < nPos_)
       best_s -= l;
     else
@@ -2147,8 +2150,6 @@ uint FactorChainDualDecomposition::add_binary_ilp_factor(const Math1D::Vector<ui
           rhs_upper++;
         }
       }
-      assert(var_[var[k]]->cost()[0] < var_[var[k]]->cost()[1]); 
-      //otherwise need to adjust rhs_lower and upper (currently not implemented)
     }
   }
 
