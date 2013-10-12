@@ -3447,7 +3447,7 @@ BILPConstraintDualFactorNode::BILPConstraintDualFactorNode(const Storage1D<DualV
   forward_light[0][zero_offset] = - dual_ptr[0][0];
   int init_mul = ((nPos_ > 0) ? 1 : -1) + zero_offset;
   if (init_mul >= 0 && init_mul < range)
-    forward_light[0][zero_offset+init_mul] = - dual_ptr[0][1];
+    forward_light[0][init_mul] = - dual_ptr[0][1];
 
   uint cur_idx = 0;
 
