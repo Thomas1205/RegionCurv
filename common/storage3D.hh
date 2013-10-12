@@ -4,6 +4,10 @@
  *** and the University of Düsseldorf, Germany 2010 - 2012 **/
 /*** if you desire the checked version, make sure your compiler defines the option SAFE_MODE on the command line ***/
 
+#ifndef STORAGE_3D_HH
+#define STORAGE_3D_HH
+
+
 #include "makros.hh"
 
 template<typename T, typename ST=size_t>
@@ -447,3 +451,5 @@ template<typename T, typename ST>
 bool operator!=(const Storage3D<T,ST>& v1, const Storage3D<T,ST>& v2) {
   return !operator==(v1,v2);
 }
+
+#endif

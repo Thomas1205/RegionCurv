@@ -415,9 +415,6 @@ protected:
 
 /**************************/
 
-/**************************/
-
-
 //special case of a cardinality potential where cost are 0-infty
 class AllPosBILPConstraintDualFactorNode: public DualFactorNode {
 public:
