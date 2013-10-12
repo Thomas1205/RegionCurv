@@ -3172,12 +3172,16 @@ BILPConstraintDualFactorNode::BILPConstraintDualFactorNode(const Storage1D<DualV
 	temp_forward(0,zero_offset) = cur_msg[0];
 	
 	if (nPos_ > 0) {
-	  forward_light[0][zero_offset+1] = cur_msg[1];
-	  temp_forward(1,zero_offset+1) = cur_msg[1];
+	  if (zero_offset+1 < range) {
+	    forward_light[0][zero_offset+1] = cur_msg[1];
+	    temp_forward(1,zero_offset+1) = cur_msg[1];
+	  }
 	}
 	else {
-	  forward_light[0][zero_offset-1] = cur_msg[1];
-	  temp_forward(1,zero_offset-1) = cur_msg[1];
+	  if (zero_offset > 0) {
+	    forward_light[0][zero_offset-1] = cur_msg[1];
+	    temp_forward(1,zero_offset-1) = cur_msg[1];
+	  }
 	}
       }
       else {
