@@ -6,7 +6,7 @@
 
 int main(int argc, char** argv) {
 
-  if (argc == 2 && strings_equal(argv[1],"-h")) {
+  if (argc == 1 || strings_equal(argv[1],"-h")) {
 
     std::cerr << "USAGE: " << argv[0] << std::endl
 	      << "  -i <pgm or ppm> : filename of input image (to be denoised)" << std::endl
@@ -23,11 +23,11 @@ int main(int argc, char** argv) {
     exit(0);
   }
 
-  const int nParams = 13;
+  const int nParams = 14;
   ParamDescr  params[nParams] = {{"-i",mandInFilename,0,""},{"-o",mandOutFilename,0,""},{"-n",optWithValue,1,"8"},
 				 {"-gamma",mandWithValue,0,""}, {"-enforce-boundary-consistency",flag,0,""},
 				 {"-enforce-region-edge-con",flag,0,""},{"-b",optWithValue,1,"1"},{"-bruckstein",flag,0,""},
-				 {"-light-constraints",flag,0,""},{"-solver",optWithValue,1,"clp"},
+				 {"-light-constraints",flag,0,""},{"-solver",optWithValue,1,"clp"},{"-lambda",optWithValue,1,"0.0"},
 				 {"-hex-mesh",flag,0,""},{"-reduce-pairs",flag,0,""},{"-adaptive",optWithValue,0,""}};
 
   Application app(argc,argv,params,nParams);

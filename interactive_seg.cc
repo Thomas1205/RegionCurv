@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
               << "  -o <filename> : name of the output segmentation" << std::endl
               << "  -fg-mask <filename> : file containing foreground seeds" << std::endl
               << "  -bg-mask <filename> : file containing background seeds" << std::endl
-              << "  -boundary-constraints (tight | simple | extra | off) : constraints to ensure consistency of regions and boundaries." 
+              << "  -boundary-constraints (tight | simple | extra | off) : constraints to ensure consistency of regions and boundaries." << std::endl
               << "     default is tight (= Strandmark&Kahl 11), extra unites simple and tight " << std::endl 
               << " [-n (4|8|16)]: size of neighborhood, default 8" << std::endl
               << " [-bruckstein]: curvature discretization according to Bruckstein et al." << std::endl
