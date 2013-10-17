@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
 	      << " [-n (4|8|16)]: size of neighborhood, default 8" << std::endl
 	      << " [-b <uint>]: number of bins for the levels" << std::endl
 	      << " [-enforce-levelcon]: enforce the level constraint" << std::endl
-	      << " [-reduce-pairs] : same some memory and run-time by not considering pairs with very high curvature" << std::endl
+	      << " [-reduce-pairs] : save some memory and run-time by not considering pairs with very high curvature" << std::endl
 	      << "  -boundary-constraints (tight | simple | extra | off) : constraints to ensure consistency of regions and boundaries." 
 	      << "     default is simple, extra unites simple and tight " << std::endl;
     exit(0);

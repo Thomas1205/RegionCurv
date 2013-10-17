@@ -1,7 +1,7 @@
 CHANGE history for RegionCurv
 
 
-**** changes for the upcoming version (1.1?) ****
+**** version 1.1 ****
 
 - included the message passing methods MPLP, Dual Decomposition and TRWS
   (in close collaboration with Vladimir Kolmogorov)
